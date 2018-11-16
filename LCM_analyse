@@ -62,6 +62,7 @@ for (p in seq_along(myparameterslist)) { # seq_along is just another way of writ
                         by = list(year = substr(mydata$VisitDate[mydata$Test==myparameter], 1, 4)),
                         FUN = mean)
     mydata$year <- as.numeric(mydata$year)
+    if(myparameter=="Net phytoplankton, total biovolume") mydata$x <- mydata$x/1000000
     plot(mydata, type='l', ylab=myparameter,col=adjustcolor("black", alpha.f = .7),lwd=2)
     points(mydata,col=adjustcolor("black", alpha.f = 1), pch=20)
     abline(lm(x ~ year, data = mydata), col=adjustcolor("black", alpha.f = .3))
