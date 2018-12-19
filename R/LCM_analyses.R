@@ -16,11 +16,11 @@ for (i in 1:length(ldf))
 
 # Clean data - the date-time format varies
 for (i in 1:length(ldf)) {
- temporary <- ldf[[i]] 
- temporary$VisitDate <- parse_date_time(x = temporary$VisitDate, orders = c("m/d/y", "m/d/Y"))
- assign(paste("LCM",substr(filenames, 51, 52), sep="")[i], temporary)
- ldf[[i]] <- temporary
- rm(temporary)
+  temporary <- ldf[[i]] 
+  temporary$VisitDate <- parse_date_time(x = temporary$VisitDate, orders = c("m/d/y", "m/d/Y"))
+  assign(paste("LCM",substr(filenames, 51, 52), sep="")[i], temporary)
+  ldf[[i]] <- temporary
+  rm(temporary)
 }
 names(ldf)
 # Plot, e.g., phosphorus
