@@ -1,8 +1,6 @@
 # Load packages
 # Give the path of a specific script I want to load
-source(paste(getwd(),"/Scripts/packages.R", sep=""))
-
-# alex-modifications
+source(paste(getwd(),"/R/packages.R", sep=""))
 
 # Load data
 # There should be 15 monitoring points on the lake
@@ -10,19 +8,20 @@ source(paste(getwd(),"/Scripts/packages.R", sep=""))
 filenames <- list.files(paste(getwd(),"/Data/LakeMonitoringPoints", sep=""), pattern="*.txt", full.names=TRUE)
 ldf <- lapply(filenames, read.csv, header=T, sep="\t")
 res <- lapply(ldf, summary)
-names(res) <- paste("LCM",substr(filenames, 51, 52), sep="")
+names(res) <- paste("LCM",substr(filenames, 58, 59), sep="")
 for (i in 1:length(ldf))
-  assign(paste("LCM",substr(filenames, 51, 52), sep="")[i], ldf[[i]]) # Create individual dataframes
+  assign(paste("LCM",substr(filenames, 58, 59), sep="")[i], ldf[[i]]) # Create individual dataframes
 
 # Clean data - the date-time format varies
 for (i in 1:length(ldf)) {
   temporary <- ldf[[i]] 
   temporary$VisitDate <- parse_date_time(x = temporary$VisitDate, orders = c("m/d/y", "m/d/Y"))
-  assign(paste("LCM",substr(filenames, 51, 52), sep="")[i], temporary)
+  assign(paste("LCM",substr(filenames, 58, 59), sep="")[i], temporary)
   ldf[[i]] <- temporary
   rm(temporary)
 }
-names(ldf)
+names(ldf) <- names(res)
+
 # Plot, e.g., phosphorus
 mydata <- LCM50
 plot(mydata$VisitDate[mydata$Test=="Total Phosphorus"], mydata$Result[mydata$Test=="Total Phosphorus"], type="l", ylim=c(0,200))
