@@ -2,7 +2,7 @@
 # Give the path of a specific script I want to load
 source(paste(getwd(),"/R/packages.R", sep=""))
 
-# Load data
+# Load data ####
 # There should be 15 monitoring points on the lake
 (Sys.glob(paste(getwd(),"/Data/LakeMonitoringPoints/","*.txt", sep="")))
 filenames <- list.files(paste(getwd(),"/Data/LakeMonitoringPoints", sep=""), pattern="*.txt", full.names=TRUE)
@@ -12,7 +12,7 @@ names(res) <- paste("LCM",substr(filenames, 58, 59), sep="")
 for (i in 1:length(ldf))
   assign(paste("LCM",substr(filenames, 58, 59), sep="")[i], ldf[[i]]) # Create individual dataframes
 
-# Clean data - the date-time format varies
+# Clean data - the date-time format varies ####
 for (i in 1:length(ldf)) {
   temporary <- ldf[[i]] 
   temporary$VisitDate <- parse_date_time(x = temporary$VisitDate, orders = c("m/d/y", "m/d/Y"))
@@ -22,7 +22,7 @@ for (i in 1:length(ldf)) {
 }
 names(ldf) <- names(res)
 
-# Plot, e.g., phosphorus
+# Plot, e.g., phosphorus ####
 mydata <- LCM50
 plot(mydata$VisitDate[mydata$Test=="Total Phosphorus"], mydata$Result[mydata$Test=="Total Phosphorus"], type="l", ylim=c(0,200))
 
@@ -87,15 +87,41 @@ for (p in seq_along(myparameterslist)) { # seq_along is just another way of writ
 }
 View(output_trends)
 
-# PCA
+# Create one global data set ####
 total <- NULL
 for (i in 1:length(ldf)) {
   total <- rbind(total,ldf[[i]])
 }
 summary(total)
 
+# Look at some parameters correlation ####
+# Might be a better way to do that but right now I can't wrap my head around it
+head(total)
+msubset <- total[,c("VisitDate", "Test", "Result")]
+unique(msubset$Test)
+head(msubset)
+msubset <- msubset[(msubset$Test=="Chlorophyll-a"|msubset$Test=="Total Phosphorus"|msubset$Test=="Temperature"),]
+#msubset <- msubset[(msubset$Test=="Net phytoplankton, total biovolume"|msubset$Test=="Total Phosphorus"),]
+head(msubset);tail(msubset)
+
+msubset <-  dcast(data = msubset,formula = VisitDate~Test,fun.aggregate = sum,value.var = "Result")
+head(msubset);tail(msubset)
+
+cor(msubset$`Total Phosphorus`,msubset$`Chlorophyll-a`)
+cor(msubset$Temperature,msubset$`Chlorophyll-a`)
+#cor(msubset$`Total Phosphorus`,msubset$`Net phytoplankton, total biovolume`)
+mcor <- ggplot(msubset, aes(x=`Total Phosphorus`, y=`Chlorophyll-a`)) +
+  geom_point() +
+  theme_bw(base_size=14)
+mcor + stat_smooth()
+
+summary(lm(msubset$`Chlorophyll-a`~msubset$`Total Phosphorus`+msubset$Temperature))
+summary(lm(msubset$`Chlorophyll-a`~msubset$`Total Phosphorus`))
+
+# PCA
 total <- dcast(data = total,formula = StationID~Test,fun.aggregate = sum,value.var = "Result")
 head(total)
+
 
 acpR<-dudi.pca(total[,-1])
 5
