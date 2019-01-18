@@ -13,3 +13,5 @@ pkgTest("lubridate") # Handle different date time format
 pkgTest("vegan");pkgTest("ade4") # PCA
 
 pkgTest("reshape2") # To 'unmelt' data
+
+pkgTest("ggplot2")
