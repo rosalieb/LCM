@@ -94,36 +94,18 @@ for (i in 1:length(ldf)) {
 }
 summary(total)
 
-# Look at some parameters correlation ####
-# Might be a better way to do that but right now I can't wrap my head around it
-head(total)
-msubset <- total[,c("VisitDate", "Test", "Result")]
-unique(msubset$Test)
-head(msubset)
-msubset <- msubset[(msubset$Test=="Chlorophyll-a"|msubset$Test=="Total Phosphorus"|msubset$Test=="Temperature"),]
-#msubset <- msubset[(msubset$Test=="Net phytoplankton, total biovolume"|msubset$Test=="Total Phosphorus"),]
-head(msubset);tail(msubset)
-
-msubset <-  dcast(data = msubset,formula = VisitDate~Test,fun.aggregate = sum,value.var = "Result")
-head(msubset);tail(msubset)
-
-cor(msubset$`Total Phosphorus`,msubset$`Chlorophyll-a`)
-cor(msubset$Temperature,msubset$`Chlorophyll-a`)
-#cor(msubset$`Total Phosphorus`,msubset$`Net phytoplankton, total biovolume`)
-mcor <- ggplot(msubset, aes(x=`Total Phosphorus`, y=`Chlorophyll-a`)) +
-  geom_point() +
-  theme_bw(base_size=14)
-mcor + stat_smooth()
-
-summary(lm(msubset$`Chlorophyll-a`~msubset$`Total Phosphorus`+msubset$Temperature))
-summary(lm(msubset$`Chlorophyll-a`~msubset$`Total Phosphorus`))
-
-# PCA
-total <- dcast(data = total,formula = StationID~Test,fun.aggregate = sum,value.var = "Result")
+# transform the dataset
+total <- dcast(data = total,formula = VisitDate + StationID~Test,value.var = "Result",fun.aggregate = mean, na.rm = TRUE)
+dim(total)
 head(total)
 
+cor(total$`Total Phosphorus`,total$`Chlorophyll-a`, use = 'complete.obs')
+cor(total$`Total Phosphorus`,total$`Dissolved Oxygen`, use = 'complete.obs')
+cor(total$`Chlorophyll-a`,total$`Dissolved Oxygen`, use = 'complete.obs')
 
-acpR<-dudi.pca(total[,-1])
+ggplot(data = total, aes(x=`Total Phosphorus`,y=`Chlorophyll-a`)) + geom_point() + stat_smooth(method=lm)
+
+acpR<-dudi.pca(total[,-c(1,2)])
 5
 summary(acpR)
 s.corcircle(acpR$co, clab=0.8)
