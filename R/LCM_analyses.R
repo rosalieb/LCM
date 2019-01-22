@@ -113,8 +113,16 @@ cor(total$`Total Phosphorus`,total$`Dissolved Oxygen`, use = 'complete.obs')
 cor(total$`Chlorophyll-a`,total$`Dissolved Oxygen`, use = 'complete.obs')
 
 ggplot(data = total, aes(x=`Total Phosphorus`,y=`Chlorophyll-a`)) + geom_point() + stat_smooth(method=lm)
+plot(total$`Total Phosphorus`, total$`Chlorophyll-a`, pch=20)
 
-acpR<-dudi.pca(total[,-c(1,2)])
+# NAs cannot be handled by the PCA. 
+# I'm replacing the NAs by the column average, so they won't get any weight in the analysis
+total_PCA <- total
+for (i in 3:ncol(total_PCA)) {
+  total_PCA[is.na(total_PCA[,i]),i] <- mean(total_PCA[,i], na.rm=T)
+}
+
+acpR<-dudi.pca(total_PCA[,-c(1,2)])
 5
 summary(acpR)
 s.corcircle(acpR$co, clab=0.8)
