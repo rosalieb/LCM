@@ -8,15 +8,24 @@ source(paste(getwd(),"/R/packages.R", sep=""))
 filenames <- list.files(paste(getwd(),"/Data/LakeMonitoringPoints", sep=""), pattern="*.txt", full.names=TRUE)
 ldf <- lapply(filenames, read.csv, header=T, sep="\t")
 res <- lapply(ldf, summary)
-names(res) <- paste("LCM",substr(filenames, 58, 59), sep="")
+# The function below substr() will allow us to extract the number of the lake
+#    monitoring site in order to rename our new dataframes
+# The way data are formated in the folder, the site code is the two first characters
+#    of the file name
+# Because path changes for different users, we'll access it by getting the length
+#    of the path, and then adding 2 (to get pass the change in folder to the first
+#    character)
+location_name <- nchar(paste(getwd(),"/Data/LakeMonitoringPoints", sep=""))+2
+
+names(res) <- paste("LCM",substr(filenames, location_name, location_name+1), sep="")
 for (i in 1:length(ldf))
-  assign(paste("LCM",substr(filenames, 58, 59), sep="")[i], ldf[[i]]) # Create individual dataframes
+  assign(paste("LCM",substr(filenames, location_name, location_name+1), sep="")[i], ldf[[i]]) # Create individual dataframes
 
 # Clean data - the date-time format varies ####
 for (i in 1:length(ldf)) {
   temporary <- ldf[[i]] 
   temporary$VisitDate <- parse_date_time(x = temporary$VisitDate, orders = c("m/d/y", "m/d/Y"))
-  assign(paste("LCM",substr(filenames, 58, 59), sep="")[i], temporary)
+  assign(paste("LCM",substr(filenames, location_name, location_name+1), sep="")[i], temporary)
   ldf[[i]] <- temporary
   rm(temporary)
 }
