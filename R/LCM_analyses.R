@@ -103,10 +103,17 @@ for (i in 1:length(ldf)) {
 }
 summary(total)
 
-# transform the dataset
+# transform the data to average per year
+total_year <- total
+total_year$VisitDate <- year(total_year$VisitDate )
+
+# transform the datasets
 total <- dcast(data = total,formula = VisitDate + StationID~Test,value.var = "Result",fun.aggregate = mean, na.rm = TRUE)
+total_year <- dcast(data = total_year,formula = VisitDate + StationID~Test,value.var = "Result",fun.aggregate = mean, na.rm = TRUE)
 dim(total)
 head(total)
+dim(total_year)
+head(total_year)
 
 # Want to create a column with the day number in the year
 # e.g. January 1st is day 1
@@ -124,9 +131,10 @@ cor(total$`Chlorophyll-a`,total$`Dissolved Oxygen`, use = 'complete.obs')
 ggplot(data = total, aes(x=`Total Phosphorus`,y=`Chlorophyll-a`)) + geom_point() + stat_smooth(method=lm)
 plot(total$`Total Phosphorus`, total$`Chlorophyll-a`, pch=20)
 
+# PCA ####
 # NAs cannot be handled by the PCA. 
 # I'm replacing the NAs by the column average, so they won't get any weight in the analysis
-total_PCA <- total
+total_PCA <- total_year
 for (i in 3:ncol(total_PCA)) {
   total_PCA[is.na(total_PCA[,i]),i] <- mean(total_PCA[,i], na.rm=T)
 }
@@ -135,7 +143,7 @@ acpR<-dudi.pca(total_PCA[,-c(1,2)])
 5
 summary(acpR)
 s.corcircle(acpR$co, clab=0.8)
-s.label(acpR$l1, clabel=0.6, label = paste("LCM",substr(filenames, 51, 52), sep=""))
+s.label(acpR$l1, clabel=0.6, label = paste(total_year$VisitDate,total_year$StationID))
 s.arrow(acpR$co, add.p=TRUE)
 
 
@@ -182,59 +190,62 @@ plot(mdata$VisitDate, as.numeric(mdata$Result), type="l")
 str(mdata$Depth[mdata$VisitDate==samplingdate[i]])
 tail(mdata[mdata$Test=="Temperature",],10)
 
-# MFA
+# MFA ####
 #### Create the data frame for MFA ####
-# GroupLakesF <- NULL
-# for (i in 1:length(GroupLakesnames)) {
-#   if (i==1) {
-#     GroupLakesF <- as.data.frame(get(GroupLakesnames[i]))
-#     rownames(GroupLakesF) <- GroupLakesF[,1]
-#     #LakeTemporary <-  get(lakes[i])[,which(as.vector(sapply(get(lakes[i]), function(x) sum(x != 0)))>nbsp)]
-#     colnames(GroupLakesF) <- paste(lakes[i],colnames(GroupLakesF), sep="_")
-#     GroupLakesF <- GroupLakesF[,-c(which(colnames(GroupLakesF)==paste(lakes[i],"Year", sep="_")))]
-#   } else {
-#     GroupLakesF_2 <- as.data.frame(get(GroupLakesnames[i]))
-#     rownames(GroupLakesF_2) <- GroupLakesF_2[,1]
-#     #LakeTemporary <-  get(lakes[i])[,which(as.vector(sapply(get(lakes[i]), function(x) sum(x != 0)))>nbsp)]
-#     colnames(GroupLakesF_2) <- paste(lakes[i],colnames(GroupLakesF_2), sep="_")
-#     GroupLakesF_2 <- GroupLakesF_2[,-c(which(colnames(GroupLakesF_2)==paste(lakes[i],"Year", sep="_")))]
-#     GroupLakesF <- merge(GroupLakesF, GroupLakesF_2, by="row.names", all=TRUE)
-#     rownames(GroupLakesF) <- GroupLakesF[,which(colnames(GroupLakesF)=="Row.names")]
-#     GroupLakesF <- GroupLakesF[,-c(which(colnames(GroupLakesF)=="Row.names"))]
-#   }
+total_MFA <- total_year[order(total_year$VisitDate, total_year$StationID),]
+head(total_MFA)
+
+GroupLakesF <- NULL
+for (i in 1:length(GroupLakesnames)) {
+  if (i==1) {
+    GroupLakesF <- as.data.frame(get(GroupLakesnames[i]))
+    rownames(GroupLakesF) <- GroupLakesF[,1]
+    #LakeTemporary <-  get(lakes[i])[,which(as.vector(sapply(get(lakes[i]), function(x) sum(x != 0)))>nbsp)]
+    colnames(GroupLakesF) <- paste(lakes[i],colnames(GroupLakesF), sep="_")
+    GroupLakesF <- GroupLakesF[,-c(which(colnames(GroupLakesF)==paste(lakes[i],"Year", sep="_")))]
+  } else {
+    GroupLakesF_2 <- as.data.frame(get(GroupLakesnames[i]))
+    rownames(GroupLakesF_2) <- GroupLakesF_2[,1]
+    #LakeTemporary <-  get(lakes[i])[,which(as.vector(sapply(get(lakes[i]), function(x) sum(x != 0)))>nbsp)]
+    colnames(GroupLakesF_2) <- paste(lakes[i],colnames(GroupLakesF_2), sep="_")
+    GroupLakesF_2 <- GroupLakesF_2[,-c(which(colnames(GroupLakesF_2)==paste(lakes[i],"Year", sep="_")))]
+    GroupLakesF <- merge(GroupLakesF, GroupLakesF_2, by="row.names", all=TRUE)
+    rownames(GroupLakesF) <- GroupLakesF[,which(colnames(GroupLakesF)=="Row.names")]
+    GroupLakesF <- GroupLakesF[,-c(which(colnames(GroupLakesF)=="Row.names"))]
+  }
+}
+
+# GroupLakesF <- t(GroupLakesF)
+# for(c in 1:ncol(GroupLakesF)){
+#   GroupLakesF[is.na(GroupLakesF[,c]), c] <- mean(GroupLakesF[,c], na.rm = TRUE)
 # }
-# 
-# # GroupLakesF <- t(GroupLakesF)
-# # for(c in 1:ncol(GroupLakesF)){
-# #   GroupLakesF[is.na(GroupLakesF[,c]), c] <- mean(GroupLakesF[,c], na.rm = TRUE)
-# # }
-# # GroupLakesF <- t(GroupLakesF)
-# d <- as.data.frame(GroupLakesF)  
-# 
-# if (grouping == "Y") {
-#   GroupLakesF <- GroupLakesF[,which(colMeans(GroupLakesF,na.rm = F)>0)]
-# }
-# #### MFA all lakes ####
-# colnames(GroupLakesF)
-# rownames(GroupLakesF)
-# 
-# dim(GroupLakesF)
-# GroupLakesF <- GroupLakesF[,which(colMeans(GroupLakesF,na.rm = F)>0)]
-# dim(GroupLakesF)
-# 
-# groups_MFA <- NULL
-# for (i in 1:length(lakes)) {
-#   groups_MFA <- c(groups_MFA,length(c(grep(lakes[i], colnames(GroupLakesF), value=TRUE))))
-# }
-# groups_MFA2 <- groups_MFA[which(groups_MFA>0)]
-# 
-# if (grouping == "Y") { #if by group
-#   resR <- MFA(GroupLakesF, group=groups_MFA2, name.group = lakes[which(groups_MFA>0)], graph = TRUE)
-#   resR_out[[r]] <- resR
-# }
-# 
-# MFAout_axis2[r,(lakes %in% names(resR$group$contrib[,2]))] <- resR$group$contrib[,2]
-# MFAout_axis1[r,(lakes %in% names(resR$group$contrib[,1]))] <- resR$group$contrib[,1]
-# MFAout_devepl_axis1 <- c(MFAout_devepl_axis1, resR$eig[1,2])
-# MFAout_devepl_axis2 <- c(MFAout_devepl_axis2,resR$eig[2,2])
-# 
+# GroupLakesF <- t(GroupLakesF)
+d <- as.data.frame(GroupLakesF)
+
+if (grouping == "Y") {
+  GroupLakesF <- GroupLakesF[,which(colMeans(GroupLakesF,na.rm = F)>0)]
+}
+#### MFA all lakes ####
+colnames(GroupLakesF)
+rownames(GroupLakesF)
+
+dim(GroupLakesF)
+GroupLakesF <- GroupLakesF[,which(colMeans(GroupLakesF,na.rm = F)>0)]
+dim(GroupLakesF)
+
+groups_MFA <- NULL
+for (i in 1:length(lakes)) {
+  groups_MFA <- c(groups_MFA,length(c(grep(lakes[i], colnames(GroupLakesF), value=TRUE))))
+}
+groups_MFA2 <- groups_MFA[which(groups_MFA>0)]
+
+if (grouping == "Y") { #if by group
+  resR <- MFA(GroupLakesF, group=groups_MFA2, name.group = lakes[which(groups_MFA>0)], graph = TRUE)
+  resR_out[[r]] <- resR
+}
+
+MFAout_axis2[r,(lakes %in% names(resR$group$contrib[,2]))] <- resR$group$contrib[,2]
+MFAout_axis1[r,(lakes %in% names(resR$group$contrib[,1]))] <- resR$group$contrib[,1]
+MFAout_devepl_axis1 <- c(MFAout_devepl_axis1, resR$eig[1,2])
+MFAout_devepl_axis2 <- c(MFAout_devepl_axis2,resR$eig[2,2])
+
