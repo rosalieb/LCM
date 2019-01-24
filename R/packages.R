@@ -8,6 +8,7 @@ pkgTest <- function(x)
 }
 
 pkgTest("lubridate") # Handle different date time format
+# also used to get the day number in a year, e.g. January 1st is day 1
 # https://stackoverflow.com/questions/25463523/convert-variable-with-mixed-date-formats-to-one-format
 
 pkgTest("vegan");pkgTest("ade4") # PCA

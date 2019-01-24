@@ -108,6 +108,15 @@ total <- dcast(data = total,formula = VisitDate + StationID~Test,value.var = "Re
 dim(total)
 head(total)
 
+# Want to create a column with the day number in the year
+# e.g. January 1st is day 1
+DOY <- yday(total$VisitDate) - 1
+YEAR <- year(total$VisitDate)
+plot(DOY[total$StationID==2],YEAR[total$StationID==2],
+     pch=20, xlab="DOY", ylab="Year")
+points(DOY[total$StationID==34],YEAR[total$StationID==34],pch=20,col="red")
+
+# Some correlations
 cor(total$`Total Phosphorus`,total$`Chlorophyll-a`, use = 'complete.obs')
 cor(total$`Total Phosphorus`,total$`Dissolved Oxygen`, use = 'complete.obs')
 cor(total$`Chlorophyll-a`,total$`Dissolved Oxygen`, use = 'complete.obs')
