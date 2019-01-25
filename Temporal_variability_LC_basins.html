@@ -125,7 +125,7 @@ $(document).ready(function () {
 
 <div id="introduction" class="section level1">
 <h1>1. Introduction</h1>
-<p>A significant advantage to using Lake Champlain to compare food web models is that the lake is divided (by causeways) into four trophically different basins. The Main Lake is deep (122 m) and meso-oligotrophic, Malletts Bay is moderately deep (50 m) and oligotrophic, and the Inland Sea is moderately deep (35 m) and meso-eutrophic, whereas Missisquoi Bay is shallow (7 m) and highly eutrophic. Therefore, comparisons can be made among models and among different trophic systems within the same lake. For example, coldwater fish species avoid Missisquoi Bay, and stocked lake trout avoid the Inland Sea in summer, resulting in lower pressures on the forage base and different upper food webs compared to the Main Lake. Forage fish monitoring has been conducted in all of the basins except Missisquoi Bay; long-term ecological monitoring stations are present in all basins.</p>
+<p>A significant advantage to using Lake Champlain to compare food web models is that the lake is divided (by causeways) into four trophically different basins. The <strong>Main Lake</strong> is deep (122 m) and meso-oligotrophic, <strong>Malletts Bay</strong> is moderately deep (50 m) and oligotrophic, and the <strong>Inland Sea</strong> is moderately deep (35 m) and meso-eutrophic, whereas <strong>Missisquoi Bay</strong> is shallow (7 m) and highly eutrophic. Therefore, comparisons can be made among models and among different trophic systems within the same lake. For example, coldwater fish species avoid Missisquoi Bay, and stocked lake trout avoid the Inland Sea in summer, resulting in lower pressures on the forage base and different upper food webs compared to the Main Lake. Forage fish monitoring has been conducted in all of the basins except Missisquoi Bay; long-term ecological monitoring stations are present in all basins.</p>
 </div>
 <div id="materials-and-methods" class="section level1">
 <h1>2. Materials and methods</h1>
@@ -159,9 +159,123 @@ $(document).ready(function () {
 ## 4     114.5000
 ## 5     118.0000</code></pre>
 </div>
-<div id="write-a-code-to-do-pcas" class="section level2">
-<h2>2.2. Write a code to do PCAs</h2>
+<div id="check-outliers" class="section level2">
+<h2>2.2. Check outliers</h2>
+<p>Running the code below takes a lot of time, so summary of outliers given below. Uncomment the ‘dotchart()’ to see individual plots.</p>
+<p>It seems that there might be an outlier for the Net Phytoplankton, Chlorophyta biovolume + density (one value is 4 times hogher than the previous max). The outlier is for station 4 (South Lake) on 2006-09-27 - not a site I’m using so not too bad.</p>
+<p>Outlier too for Chrysophyta biovolume, station 50 (Missisquoi Bay) on 2014-09-19.</p>
+<p>Max value (but doesn’t behave as an outlier) for Cyanobacteria on 2013-07-30, at station 51 (Missiquoi Bay).</p>
+<p>No outlier for Pyrrophyta biovolume either, max value on 2008-06-27, station 25 (Malletts Bay). Max values for Pyrrophyta density on 2007-07-16 for stations 34 and 40 (Northeast Arm, Inland Sea).</p>
+<p>For Net phytoplankton, total biovolume, max value on 2014-09-19 for station 50 (Missisquoi Bay). For Net phytoplankton, total density, max value on 2013-07-30 for station 51 (Missisquoi Bay).</p>
+<p>For Ortho-Phosphorus, max value for station 2 on 1994-07-27 (most likely an outlier).</p>
+<p>Total Phosphorus, max value for station 2 on 2004-08-17 (235 µg/L).</p>
+<p>Max Total Suspended solids for station 2 (South Lake, southern most station) on 2004-08-17.</p>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Chlorophyta biovolume`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 2811 2006-09-27         4
+## 2971 2007-07-30        34
+## 3076 2007-10-18         4
+## 3537 2009-09-02         4
+## 2949 2007-07-16        40</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Chlorophyta density`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 2811 2006-09-27         4
+## 3076 2007-10-18         4
+## 4503 2013-07-25         7
+## 4769 2014-08-19        40
+## 3984 2011-08-11         4</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Chrysophyta biovolume`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 4813 2014-09-19        50
+## 4500 2013-07-24         4
+## 3984 2011-08-11         4
+## 3736 2010-07-29        50
+## 4316 2012-09-14        50</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Cyanobacteria biovolume`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 4510 2013-07-30        51
+## 4281 2012-08-21        51
+## 2803 2006-09-22        51
+## 3253 2008-08-20        50
+## 3228 2008-08-06        51</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Cyanobacteria density`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 4510 2013-07-30        51
+## 4281 2012-08-21        51
+## 3253 2008-08-20        50
+## 4509 2013-07-30        50
+## 2803 2006-09-22        51</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Pyrrophyta biovolume`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 3161 2008-06-27        25
+## 2948 2007-07-16        34
+## 2949 2007-07-16        40
+## 3460 2009-07-20        34
+## 4002 2011-08-22         4</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, Pyrrophyta density`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 2948 2007-07-16        34
+## 2949 2007-07-16        40
+## 3161 2008-06-27        25
+## 4002 2011-08-22         4
+## 3460 2009-07-20        34</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, total biovolume`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 4813 2014-09-19        50
+## 4281 2012-08-21        51
+## 4500 2013-07-24         4
+## 3984 2011-08-11         4
+## 4316 2012-09-14        50</code></pre>
+<pre class="r"><code>total[order(total$`Net phytoplankton, total density`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 4510 2013-07-30        51
+## 4281 2012-08-21        51
+## 3253 2008-08-20        50
+## 4509 2013-07-30        50
+## 4975 2015-07-20        51</code></pre>
+<pre class="r"><code>total[order(total$`Ortho-Phosphorus`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##      VisitDate StationID
+## 384 1994-07-27         2
+## 38  1992-06-22        50
+## 261 1993-09-03        50
+## 97  1992-09-01        34
+## 274 1993-09-20        50</code></pre>
+<pre class="r"><code>total[order(total$`Total Phosphorus`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 2286 2004-08-17         2
+## 3837 2010-10-04        51
+## 5123 2015-10-27        25
+## 384  1994-07-27         2
+## 4801 2014-09-12        51</code></pre>
+<pre class="r"><code>total[order(total$`Total Suspended Solids`, decreasing = T),][1:5,1:2]</code></pre>
+<pre><code>##       VisitDate StationID
+## 2286 2004-08-17         2
+## 2165 2003-10-31         2
+## 1672 2001-06-13         2
+## 1539 2000-08-02         2
+## 384  1994-07-27         2</code></pre>
+</div>
+<div id="write-a-function-to-do-pcas" class="section level2">
+<h2>2.3. Write a function to do PCAs</h2>
 <p>Creating a function to repeat the PCA more easily accross station.</p>
+<pre class="r"><code># Parameters of the function should be:
+#  mstationID= the number of the monitoring site, e.g., 2= South Lake B
+#  ndim= number of dimension for PCA, default is 5
+mpca_data &lt;- function(mstationID, ndim=5)
+{
+  mdata &lt;- total_year[total_year$StationID==mstationID,]
+
+  # First, deleting the columns that have only NAs (could happen when some parameters where never measured at the specific station)
+  mdata &lt;- mdata[colSums(!is.na(mdata)) &gt; 0]
+  
+  # NAs cannot be handled by the PCA. 
+  # I'm replacing the NAs by the column average, so they won't get any weight in the analysis
+  #for (i in 3:ncol(mdata)) {
+  #  mdata[is.na(mdata[,i]),i] &lt;- mean(mdata[,i], na.rm=T)
+  #}
+  
+  return(mdata)
+}</code></pre>
 </div>
 </div>
 <div id="results" class="section level1">
@@ -169,12 +283,49 @@ $(document).ready(function () {
 <div id="main-lake" class="section level2">
 <h2>3.1. Main Lake</h2>
 <p>The Main Lake is deep (122 m) and meso-oligotrophic. The monitoring point 19 is in the middle of the main lake.</p>
-<pre class="r"><code>mdata &lt;- total_year[total_year$StationID==19,]
+<pre class="r"><code>mydata &lt;- mpca_data(mstationID = 19)
 
-# First, deleting the columns that have only NAs (could happen when some parameters where never measured at the specific station)
 
-# NAs cannot be handled by the PCA. 
-# I'm replacing the NAs by the column average, so they won't get any weight in the analysis</code></pre>
+  
+  #acpR&lt;-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
+  #summary(acpR)
+  #s.corcircle(acpR$co, clab=0.8)
+  #s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
+  #mtext(&quot;test&quot;, side = 1)
+  #s.arrow(acpR$co, add.p=TRUE)
+  
+  #result &lt;- prcomp(mydata[,-c(1,2)], center = TRUE, scale = TRUE, na.action = na.omit)
+
+  d       &lt;- data.frame(V1 = sample(1:100, 10), V2 = sample(1:100, 10), 
+                      V3 = sample(1:100, 10))
+result  &lt;- prcomp(d, center = TRUE, scale = TRUE, na.action = na.omit)</code></pre>
+<pre><code>## Warning: In prcomp.default(d, center = TRUE, scale = TRUE, na.action = na.omit) :
+##  extra argument 'na.action' will be disregarded</code></pre>
+<pre class="r"><code>result$x                                # $</code></pre>
+<pre><code>##               PC1         PC2          PC3
+##  [1,] -1.21289817 -0.85966600 -0.859242990
+##  [2,] -1.15936081  1.05279760  0.121211609
+##  [3,] -0.24811276  1.40671760 -0.703021539
+##  [4,]  1.82541801 -0.57525180 -0.258121794
+##  [5,]  1.63991460 -1.06106722  0.368268425
+##  [6,] -1.82860303 -1.36512678  0.002726442
+##  [7,]  0.02416984  0.70001461  0.523988944
+##  [8,] -1.01132700  0.06813903  0.990444147
+##  [9,]  1.75183603  0.47887866 -0.113549606
+## [10,]  0.21896327  0.15456430 -0.072703640</code></pre>
+<pre class="r"><code>d$V1[5] &lt;- NA                           # $
+result  &lt;- prcomp(~V1+V2, data=d, center = TRUE, scale = TRUE, na.action = na.omit)
+result$x</code></pre>
+<pre><code>##            PC1         PC2
+## 1  -1.67929609  0.06077075
+## 2  -0.27736182 -0.97850640
+## 3   0.09977096 -1.47652489
+## 4   1.14586570  1.04350883
+## 6  -1.86790917  0.79336953
+## 7   0.72859333 -0.11073303
+## 8  -0.06736211  0.38300813
+## 9   1.60938544  0.21733196
+## 10  0.30831376  0.06777511</code></pre>
 </div>
 <div id="including-plots" class="section level2">
 <h2>Including Plots</h2>
