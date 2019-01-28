@@ -6,6 +6,11 @@
 #
 #    http://shiny.rstudio.com/
 #
+# Some notes for Alex:
+# Rules for using the server function to assemble inputs into outputs...
+# 1. Save the output that you build to output$ -> output$hist for example
+# 2. Build the output with a render*() function -> example is already in the code
+# 3. Access input calues with input$ -> input$num for example
 
 library(shiny)
 #examplefile
