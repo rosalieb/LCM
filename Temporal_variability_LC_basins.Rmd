@@ -153,36 +153,40 @@ The Main Lake is deep (122 m) and meso-oligotrophic. The monitoring point 19 is 
 
 ```{r PCA for Main Lake}
 mydata <- mpca_data(mstationID = 19, replaceNAs = TRUE)
-
-
-  
+ 
   acpR<-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
   summary(acpR)
   s.corcircle(acpR$co, clab=0.8)
   s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
-  legend("topleft", legend = )
+#  legend("topleft", legend = c(paste("PC1:",round(acpR$eig[1]/sum(acpR$eig)*100,2),"%",sep=""), paste("PC2:",round(acpR$eig[2]/sum(acpR$eig)*100,2),"%"),sep=""), cex=.4)
   #s.arrow(acpR$co, add.p=TRUE)
   
-  #result <- prcomp(mydata[,-c(1,2)], center = TRUE, scale = TRUE, na.action = na.omit)
+```
 
-  d       <- data.frame(V1 = sample(1:100, 10), V2 = sample(1:100, 10), 
-                      V3 = sample(1:100, 10))
-result  <- prcomp(d, center = TRUE, scale = TRUE, na.action = na.omit)
-result$x                                # $
-d$V1[5] <- NA                           # $
-result  <- prcomp(~V1+V2, data=d, center = TRUE, scale = TRUE, na.action = na.omit)
-result$x
+## 3.2. Mallets Bay
+Malletts Bay is moderately deep (50 m) and oligotrophic
+
+```{r PCA for Mallets Bay}
+mydata <- mpca_data(mstationID = 25, replaceNAs = TRUE)
+ 
+acpR<-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
+summary(acpR)
+s.corcircle(acpR$co, clab=0.8)
+s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
+
   
 ```
 
+## 3.3. Inland Sea
+The Inland Sea is moderately deep (35 m) and meso-eutrophice. 
 
+```{r PCA for Inland Sea}
+mydata <- mpca_data(mstationID = 34, replaceNAs = TRUE)
+ 
+acpR<-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
+summary(acpR)
+s.corcircle(acpR$co, clab=0.8)
+s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+  
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
