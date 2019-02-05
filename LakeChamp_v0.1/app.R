@@ -28,7 +28,7 @@
 #
 # Reactive functions:
 # 1. Use a code chunk to build (and rebuild) an object...What code will the function use?
-# 2. The object will respind to changes in a set of reactive values...Which reactive values
+# 2. The object will respond to changes in a set of reactive values...Which reactive values
 #    will the object respond to?
 # You can build many commands into the braces in the render function.
 library(shiny)
