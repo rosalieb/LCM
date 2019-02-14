@@ -13,7 +13,10 @@ ui <- fluidPage(
       conditionalPanel(
         'input.dataset === "total_app"',
         checkboxGroupInput("toshow", "Columns in LCM to show:",
-                           names(total_app), selected = names(total_app))
+        choiceNames =
+          list(toshow(names(total_app))),
+        choiceValues =
+          list(names(total_app))
       ),
       conditionalPanel(
         'input.dataset === "mtcars"',
