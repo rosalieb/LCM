@@ -52,7 +52,9 @@ server <- function(input, output) {
       gl <- lapply(input$toshow, 
                    function(b) ggplot(out, aes(x=out[,1],y=out[, b])) +
                      geom_point() +
-                     xlab("Year") + ylab(b))
+                     xlab("Year") + ylab(b) +
+                     xlim(c(input$range[1],input$range[2]))
+                   )
       grid.arrange(grobs = gl, nrow = 1)
     }
     
