@@ -32,7 +32,16 @@
 #    will the object respond to?
 # You can build many commands into the braces in the render function.
 library(shiny)
+library(DT) #opening this package to include datatables
 #examplefile
+
+total_app <- total_year[,1:5]
+names(total_app) <- paste("Var",1:5, sep="")
+names(total_app)
+ncol(total_year)
+head(diamonds)
+str(names(diamonds))
+str(names(total_app))
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -47,12 +56,21 @@ ui <- fluidPage(
                      "Number of bins:",
                      min = 1,
                      max = 50,
-                     value = 30)
+                     value = c(20,30)),
+         conditionalPanel(
+           'input.dataset === "total_app"',
+           checkboxGroupInput("toshow", "Columns to show:",
+                              names(total_app), selected = names(total_app))
+         )
       ),
       
       # Show a plot of the generated distribution
       mainPanel(
-         plotOutput("distPlot")
+         tabsetPanel(
+           id = 'dataset',
+           tabPanel("geysers",plotOutput("distPlot")),
+           tabPanel("LCM", DT::dataTableOutput("mytable1"))
+         )
       )
    )
 )
@@ -75,6 +93,12 @@ server <- function(input, output) {
       
       
       
+   })
+   
+   
+   #Add datatable for LCM
+   output$mytable1 <- DT::renderDataTable({
+     DT::datatable(total_app[, input$toshow, drop = FALSE],options = list(orderClasses = TRUE))
    })
 
    
