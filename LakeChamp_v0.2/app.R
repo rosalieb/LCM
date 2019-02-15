@@ -1,38 +1,54 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
 library(shiny)
 library(ggplot2)
 library(gridExtra)
 library(shiny)
 library(DT)
 library(yaml)
+library(shinydashboard)
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
 
+
 # Define UI for slider demo app ----
-ui <- fluidPage(
-  
+ui <- dashboardPage(
+  #define color
+  skin = "green",
   # App title ----
-  titlePanel("Selection"),
-  
+  #embedment of logo is not working:
+  dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
+                                 tags$img(src=paste(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png",sep=""))),
+                  titleWidth = 450
+  ),
   # Sidebar layout with input and output definitions ----
-  sidebarLayout(
-    
+  dashboardSidebar(
+    #you can edit the width of the sidebar here
+    width = 200,
     # Sidebar to demonstrate various slider options ----
-    sidebarPanel(
+    
       # Input: Specification of range within an interval ----
       sliderInput("range", "Years selected",
                   min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
                   value = c(2000,2012),sep = ""),
       conditionalPanel(
-                 'input$id == "graph"',
-                 checkboxGroupInput("toshow", "Columns to show:",
-                 colnames(out)))#, selected = colnames(out)))
-
+        'input$id == "graph"',
+        checkboxGroupInput("toshow", "Columns to show:",
+                           colnames(out)))#, selected = colnames(out)))
+      
     ),
+  dashboardBody(
     mainPanel(
-      img(src='logo_rubenstein_lab.png', align = "right"),
       tabsetPanel(
         id = 'what do you want to see?',
         tabPanel("graph", plotOutput("myplot1")),
@@ -55,7 +71,7 @@ server <- function(input, output) {
                      geom_point() +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
-                   )
+      )
       grid.arrange(grobs = gl, nrow = 1)
     }
     
