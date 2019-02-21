@@ -10,7 +10,7 @@ ncol(total_year)
 ui <- fluidPage(
   
   # App title ----
-  titlePanel("LCM"),
+  titlePanel("LCM Data"),
   
   # Sidebar layout with input and output definitions ----
   sidebarLayout(
@@ -21,7 +21,7 @@ ui <- fluidPage(
       # Input: Specification of range within an interval ----
       sliderInput("range", "Range:",
                   min = 1992, max = 2017,
-                  value = c(1992,2017))
+                  value = c(1992,2017), sep = "")
       
     ),
     
