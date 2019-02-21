@@ -2,10 +2,13 @@
 # Give the path of a specific script I want to load
 source(paste(getwd(),"/R/packages.R", sep=""))
 
+# Attempt to read data from online databases ####
+# Is there a way in R to download data from online databases? Any blogpost, stackoverflow discussion I missed? #rstats
+
 # Load data ####
 # There should be 15 monitoring points on the lake
-(Sys.glob(paste(getwd(),"/Data/LakeMonitoringPoints/","*.txt", sep="")))
-filenames <- list.files(paste(getwd(),"/Data/LakeMonitoringPoints", sep=""), pattern="*.txt", full.names=TRUE)
+(Sys.glob(paste0(getpath4data(),"LakeMonitoringPoints/","*.txt")))
+filenames <- list.files(paste0(getpath4data(),"LakeMonitoringPoints"), pattern="*.txt", full.names=TRUE)
 ldf <- lapply(filenames, read.csv, header=T, sep="\t")
 res <- lapply(ldf, summary)
 # The function below substr() will allow us to extract the number of the lake
@@ -15,7 +18,7 @@ res <- lapply(ldf, summary)
 # Because path changes for different users, we'll access it by getting the length
 #    of the path, and then adding 2 (to get pass the change in folder to the first
 #    character)
-location_name <- nchar(paste(getwd(),"/Data/LakeMonitoringPoints", sep=""))+2
+location_name <- nchar(paste0(getpath4data(),"LakeMonitoringPoints"))+2
 
 names(res) <- paste("LCM",substr(filenames, location_name, location_name+1), sep="")
 for (i in 1:length(ldf))

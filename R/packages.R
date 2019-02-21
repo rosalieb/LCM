@@ -16,3 +16,5 @@ pkgTest("vegan");pkgTest("ade4") # PCA
 pkgTest("reshape2") # To 'unmelt' data
 
 pkgTest("ggplot2")
+
+source("R/getpath4data.R")

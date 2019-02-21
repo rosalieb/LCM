@@ -28,7 +28,7 @@ ui <- dashboardPage(
   # App title ----
   #embedment of logo is not working:
   dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
-                                 tags$img(src=paste(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png",sep=""))),
+                                 tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
                   titleWidth = 450
   ),
   # Sidebar layout with input and output definitions ----
