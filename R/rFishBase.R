@@ -4,11 +4,29 @@
 library(rfishbase)
 library(dplyr)
 
+#load Lake Champlain species, as in Marsden and Langdon 2012
+fishlc <- read.delim(paste0(getpath4data(),"fish_in_LC.txt"))
+
 dim(fishbase)
+
+head(fishbase)
+
+diet(species_list = c("Oreochromis niloticus"))
+diet(species_list = c("Oncorhynchus mykiss"))
+diet(species_list = c("Acipenser fulvescens"))
+
+predators(species_list = c("Oncorhynchus mykiss"))
+ecosystem(species_list = c("Oncorhynchus mykiss"))
+length_length(species_list = c("Oreochromis niloticus"))
+grep("Mali",  brains()[,"Locality"], ignore.case = T)
+View(brains())
+brains()[brains()[,"Locality"]=="Mali",]
+brains()[brains()[,"Locality"]==NA,]
+d4 <- as.data.frame(brains()[brains()[,"Locality"]=="France",])
 
 groupers <- fishbase %>% filter(Family == "Salmonidae") %>%
   mutate(gensp = paste(Genus, Species))
-nrow(groupers)
+dim(groupers)
 head(groupers)
 
 grptroph <- ecology(groupers$gensp, fields = c("DietTroph"))
@@ -28,3 +46,6 @@ d3 %>% select(Genus, Species, DietTroph, trophall) %>%
   data.frame() %>% head(20)
 
 d3 %>% filter(gensp == "Epinephelus malabaricus") %>% select(trophall)
+
+
+# From paper Boettiger

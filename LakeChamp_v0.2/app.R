@@ -14,6 +14,7 @@ library(shiny)
 library(DT)
 library(yaml)
 library(shinydashboard)
+library(leaflet)
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
@@ -24,44 +25,98 @@ out <- out[order(out$year,decreasing = F),]
 # Define UI for slider demo app ----
 ui <- dashboardPage(
   #define color
-  skin = "green",
+  skin = "black",
   # App title ----
   #embedment of logo is not working:
   dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                  tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
-                  titleWidth = 450
+                  titleWidth = 350
   ),
+
   # Sidebar layout with input and output definitions ----
   dashboardSidebar(
     #you can edit the width of the sidebar here
-    width = 200,
-    # Sidebar to demonstrate various slider options ----
-    
-      # Input: Specification of range within an interval ----
-      sliderInput("range", "Years selected",
-                  min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
-                  value = c(2000,2012),sep = ""),
-      conditionalPanel(
-        'input$id == "graph"',
-        checkboxGroupInput("toshow", "Columns to show:",
-                           colnames(out)))#, selected = colnames(out)))
-      
+    #width = 200,
+    sidebarMenu(
+      menuItem(
+        "About this project", 
+        tabName = "about", 
+        icon = icon("question")
+      ),
+      menuItem(
+        "Map", 
+        tabName = "m_lake", 
+        icon = icon("map") #icon("globe"),
+      ),
+      menuItem(
+        "Data", 
+        tabName = "data", 
+        icon = icon("bar-chart"),
+        menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
+        menuSubItem("Table", tabName = "d_table", icon = icon("table")),
+        sliderInput("range", "Years selected",
+                    min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
+                    value = c(2000,2012),sep = ""),
+        conditionalPanel(
+          'input$id == "graph"',
+          checkboxGroupInput("toshow", "Columns to show:",
+                             colnames(out)))#, selected = colnames(out)))
+      )
+    )
     ),
   dashboardBody(
-    mainPanel(
-      tabsetPanel(
-        id = 'what do you want to see?',
-        tabPanel("graph", plotOutput("myplot1")),
-        tabPanel("table", DT::dataTableOutput("mytable1"))
+    tabItems(
+      tabItem(
+        tabName = "about",
+        #Render an output text
+        textOutput("mytext1")
+      ),
+      tabItem(
+        tabName = "m_lake",
+        box(
+          title = "Lake Champlain monitoring sites",
+          collapsible = TRUE,
+          tags$style(type = "text/css", "#map {height: calc(100vh - 80px) !important;}"),
+          leafletOutput("mymap1")
+        )
+      ),
+      tabItem(
+        tabName = "d_chart",
+        title = "Instruction: Select data to plot",
+        box(
+          title = "dot charts",
+          collapsible = TRUE,
+          width = "100%",
+          height = "70%",
+          plotOutput("myplot1")
+        ),
+        box(
+          title = "line charts",
+          collapsible = TRUE,
+          width = "100%",
+          height = "70%",
+          plotOutput("myplot2")
+        )
+      ),
+      tabItem(
+        tabName = "d_table",
+        DT::dataTableOutput("mytable1")
       )
     )
   )
-  
 )
 
 server <- function(input, output) {
   
   # plot
+  output$mytext1 <- renderText({ 
+    "Here we can write a description about Lake Champlain. We can do that later using section from your report."
+  })
+  
+  output$mymap1 <- renderLeaflet({
+    leaflet() %>% addTiles()
+  })
+    
   output$myplot1 <- renderPlot({
     if (length(input$toshow) == 0) {
       ggplot(data.frame())
@@ -77,9 +132,25 @@ server <- function(input, output) {
     
   })
   
+  output$myplot2 <- renderPlot({
+    if (length(input$toshow) == 0) {
+      ggplot(data.frame())
+    } else {
+      gl <- lapply(input$toshow, 
+                   function(b) ggplot(out, aes(x=out[,1],y=out[, b])) +
+                     geom_point() + 
+                     stat_smooth(method=loess, formula=y~x) +
+                     xlab("Year") + ylab(b) +
+                     xlim(c(input$range[1],input$range[2]))
+      )
+      grid.arrange(grobs = gl, nrow = 1)
+    }
+    
+  })
+  
   # table
   output$mytable1 <- DT::renderDataTable({
-    DT::datatable(out[out$year >= as.numeric(input$range[1]) & out$year <= as.numeric(input$range[2]), ], filter = 'top', options = list(orderClasses = TRUE))
+    DT::datatable(out[out$year >= as.numeric(input$range[1]) & out$year <= as.numeric(input$range[2]), ], filter = 'top', options = list(orderClasses = TRUE, scrollX = TRUE))
   })
   
 }
