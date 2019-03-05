@@ -21,6 +21,9 @@ out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
 
+boatIcon <- makeIcon(
+  iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
+  iconWidth = 20, iconHeight = 20)
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -32,7 +35,7 @@ ui <- dashboardPage(
                                  tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
                   titleWidth = 350
   ),
-
+  
   # Sidebar layout with input and output definitions ----
   dashboardSidebar(
     #you can edit the width of the sidebar here
@@ -63,7 +66,7 @@ ui <- dashboardPage(
                              colnames(out)))#, selected = colnames(out)))
       )
     )
-    ),
+  ),
   dashboardBody(
     tabItems(
       tabItem(
@@ -114,9 +117,12 @@ server <- function(input, output) {
   })
   
   output$mymap1 <- renderLeaflet({
-    leaflet() %>% addTiles()
+    leaflet(LCMcoord) %>% 
+      addTiles() %>%  # Add default OpenStreetMap map tiles
+      addMarkers(icon = boatIcon, lat = as.numeric(LCMcoord$Latitude), lng = as.numeric(LCMcoord$Longitude), 
+                 popup = LCMcoord$Station)
   })
-    
+  
   output$myplot1 <- renderPlot({
     if (length(input$toshow) == 0) {
       ggplot(data.frame())
@@ -156,4 +162,3 @@ server <- function(input, output) {
 }
 
 shinyApp(ui, server)
-
