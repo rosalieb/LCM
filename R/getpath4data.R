@@ -5,4 +5,9 @@ getpath4data <- function() {
   if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to download the data from the VTDEC website and place them in a folder we can reach")
 }
 
+myconstant <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return(2)
+  if(Sys.getenv("USER")=="alexnaccarato") return(21)
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to download the data from the VTDEC website and place them in a folder we can reach")
+}
 

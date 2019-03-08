@@ -18,9 +18,9 @@ res <- lapply(ldf, summary)
 # Because path changes for different users, we'll access it by getting the length
 #    of the path, and then adding 2 (to get pass the change in folder to the first
 #    character)
-location_name <- nchar(paste0(getpath4data(),"LakeMonitoringPoints"))+2
+location_name <- nchar(paste0(getpath4data(),"LakeMonitoringPoints"))+myconstant()
 
-names(res) <- paste("LCM",substr(filenames, location_name, location_name+1), sep="")
+names(res) <- paste0("LCM",substr(filenames, location_name, location_name+1))
 for (i in 1:length(ldf))
   assign(paste("LCM",substr(filenames, location_name, location_name+1), sep="")[i], ldf[[i]]) # Create individual dataframes
 
