@@ -25,6 +25,10 @@ boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
   iconWidth = 20, iconHeight = 20)
 
+xIcon <- makeIcon(
+  iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
+  iconWidth = 20, iconHeight = 20)
+
 # Define UI for slider demo app ----
 ui <- dashboardPage(
   #define color
@@ -119,8 +123,12 @@ server <- function(input, output) {
   output$mymap1 <- renderLeaflet({
     leaflet(LCMcoord) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
-      addMarkers(icon = boatIcon, lat = as.numeric(LCMcoord$Latitude), lng = as.numeric(LCMcoord$Longitude), 
-                 popup = LCMcoord$Station)
+      addMarkers(data = LCMcoord, icon = boatIcon, lat = as.numeric(LCMcoord$LLatitude), 
+                 lng = as.numeric(LCMcoord$LLongitude), 
+                 popup = LCMcoord$LStation) %>%
+      addMarkers(data = LCMcoord, icon = xIcon, lat = as.numeric(LCMcoord$TLatitude), 
+                 lng = as.numeric(LCMcoord$TLongitude),
+                 popup = LCMcoord$TStation)
   })
   
   output$myplot1 <- renderPlot({
@@ -162,3 +170,4 @@ server <- function(input, output) {
 }
 
 shinyApp(ui, server)
+
