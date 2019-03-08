@@ -1,8 +1,9 @@
 lcm <- read.delim(paste0(getpath4data(),"Lake_Champlain_long-term_monitoring.txt"), header=T,sep=",")
 lcm2018 <- read.delim(paste0(getpath4data(),"Lake_Champlain_long-term_monitoring_2018.txt"), header=T, sep="\t")
+lcm2018 <- read.delim(paste0(getpath4data(),"LakeMonitoringPoints2018/Lake_Champlain_long-term_monitoring_2018.txt"), header=T, sep="\t")
 
-View(data.frame(test=unique(lcm$Test)))
-View(unique(data.frame(test=lcm2018$Test)))
+nrow(data.frame(test=unique(lcm$Test)))
+nrow(unique(data.frame(test=lcm2018$Test)))
 
 sum(colSums(!is.na(total[,-c(1,2)])))
 ncol(total)

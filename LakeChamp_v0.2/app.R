@@ -83,6 +83,10 @@ ui <- dashboardPage(
       tabItem(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
+        # conditionalPanel(
+        #   'input$id == "graph"',
+        #   checkboxGroupInput("sitestoshow", "Sites to show:",
+        #                      unique(out$StationID))),
         box(
           title = "dot charts",
           collapsible = TRUE,
