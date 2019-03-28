@@ -52,7 +52,8 @@ ui <- dashboardPagePlus(
       menuItem(
         "About this project", 
         tabName = "about", 
-        icon = icon("question")
+        icon = icon("question"),
+        selected = T
       ),
       menuItem(
         "Map", 
@@ -63,7 +64,7 @@ ui <- dashboardPagePlus(
         "Data", 
         tabName = "data", 
         icon = icon("bar-chart"),
-        menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart"), selected = TRUE),
+        menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         sliderInput("range", "Years selected",
                     min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
@@ -71,7 +72,7 @@ ui <- dashboardPagePlus(
         conditionalPanel(
           'input$id == "graph"',
           checkboxGroupInput("toshow", "Columns to show:",
-                             colnames(out)))#, selected = colnames(out)))
+                             colnames(out), selected = c("Temperature")))
       )
     )
   ),
@@ -113,6 +114,7 @@ ui <- dashboardPagePlus(
         tabName = "d_table",
         DT::dataTableOutput("mytable1")
       )
+      
     )
   ),
   rightsidebar = rightSidebar(
@@ -135,6 +137,7 @@ server <- function(input, output) {
   output$mytext1 <- renderText({ 
     "Here we can write a description about Lake Champlain. We can do that later using section from your report."
   })
+  
   
   output$mymap1 <- renderLeaflet({
     leaflet(LCMcoord) %>% 
