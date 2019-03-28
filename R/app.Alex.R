@@ -112,20 +112,20 @@ ui <- dashboardPagePlus(
         DT::dataTableOutput("mytable1")
       )
     )
-  ),
-  rightsidebar = rightSidebar(
-    background = "dark", width = 80,
-    rightSidebarTabContent(
-      id = 1,
-      icon = "desktop",
-      title = "Tab 1",
-      active = TRUE,
-      conditionalPanel(
-        'input$id2 == "sites"',
-        checkboxGroupInput("toshow2", "Sites to show:",
-                           unique(out$StationID), selected = unique(out$StationID)))
-    )
-  )
+  )#,
+  # rightsidebar = rightSidebar(
+  #   background = "dark", width = 80,
+  #   rightSidebarTabContent(
+  #     id = 1,
+  #     icon = "desktop",
+  #     title = "Tab 1",
+  #     active = TRUE,
+  #     conditionalPanel(
+  #       'input$id2 == "sites"',
+  #       checkboxGroupInput("toshow2", "Sites to show:",
+  #                          unique(out$StationID), selected = unique(out$StationID)))
+  #   )
+  # )
 )
 server <- function(input, output) {
   
