@@ -36,7 +36,7 @@ ui <- dashboardPagePlus(
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  header = dashboardHeaderPlus(enable_rightsidebar = TRUE,
+  header = dashboardHeader(enable_rightsidebar = TRUE,
                                title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                               tags$img(src='logo_rubenstein_lab.png')),
                                titleWidth = 350

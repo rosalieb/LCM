@@ -33,13 +33,12 @@ xIcon <- makeIcon(
   iconWidth = 20, iconHeight = 20)
 
 # Define UI for slider demo app ----
-ui <- dashboardPagePlus(
+ui <- dashboardPage(
   #define color
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  header = dashboardHeaderPlus(enable_rightsidebar = TRUE,
-                               title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
+  header = dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                tags$img(src='logo_rubenstein_lab.png')),
                                titleWidth = 350
   ),
@@ -96,6 +95,16 @@ ui <- dashboardPagePlus(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
         box(
+          title = "select sites",
+          collapsible = TRUE,
+          width = "100%",
+          height = "70%",
+          conditionalPanel(
+            'input$id2 == "sites"',
+            checkboxGroupInput("toshow2", "Sites to show:",
+                               unique(out$StationID), selected = unique(out$StationID)))
+        ),
+        box(
           title = "dot charts",
           collapsible = TRUE,
           width = "100%",
@@ -115,19 +124,6 @@ ui <- dashboardPagePlus(
         DT::dataTableOutput("mytable1")
       )
       
-    )
-  ),
-  rightsidebar = rightSidebar(
-    background = "dark", width = 80,
-    rightSidebarTabContent(
-      id = 1,
-      icon = "desktop",
-      title = "Tab 1",
-      active = TRUE,
-      conditionalPanel(
-        'input$id2 == "sites"',
-        checkboxGroupInput("toshow2", "Sites to show:",
-                           unique(out$StationID), selected = unique(out$StationID)))
     )
   )
 )

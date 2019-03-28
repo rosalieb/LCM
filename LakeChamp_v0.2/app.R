@@ -14,6 +14,7 @@ library(shiny)
 library(DT)
 library(yaml)
 library(shinydashboard)
+library(shinydashboardPlus)
 library(leaflet)
 
 out <- total_year
@@ -30,12 +31,12 @@ xIcon <- makeIcon(
   iconWidth = 20, iconHeight = 20)
 
 # Define UI for slider demo app ----
-ui <- dashboardPage(
+ui <- dashboardPagePlus(
   #define color
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
+  dashboardHeaderPlus(,title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                  tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
                   titleWidth = 350
   ),
