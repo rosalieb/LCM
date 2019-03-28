@@ -38,8 +38,7 @@ ui <- dashboardPagePlus(
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  header = dashboardHeaderPlus(enable_rightsidebar = TRUE, rightSidebarIcon = "gears",
-                               collapse_sidebar = TRUE,
+  header = dashboardHeaderPlus(enable_rightsidebar = TRUE,
                                title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                tags$img(src='logo_rubenstein_lab.png')),
                                titleWidth = 350
@@ -121,16 +120,10 @@ ui <- dashboardPagePlus(
     )
   ),
   rightsidebar = rightSidebar(
-    rightSidebarTabContent(
-      id = 1,
-      icon = "desktop",
-      title = "Stations",
-      conditionalPanel(
-          checkboxGroupInput("stationstoshow", "Stations to show:",
-                            colnames(mydatalist)))
+    background = "dark", width = 80
     )
   )
-)
+
 server <- function(input, output) {
   
   # plot
