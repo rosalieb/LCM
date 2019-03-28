@@ -38,8 +38,7 @@ ui <- dashboardPagePlus(
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  header = dashboardHeaderPlus(enable_rightsidebar = TRUE, rightSidebarIcon = "gears",
-                               collapse_sidebar = TRUE,
+  header = dashboardHeaderPlus(enable_rightsidebar = TRUE,
                                title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                tags$img(src='logo_rubenstein_lab.png')),
                                titleWidth = 350
@@ -64,7 +63,7 @@ ui <- dashboardPagePlus(
         "Data", 
         tabName = "data", 
         icon = icon("bar-chart"),
-        menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
+        menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart"), selected = TRUE),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         sliderInput("range", "Years selected",
                     min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
@@ -95,10 +94,6 @@ ui <- dashboardPagePlus(
       tabItem(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
-        # conditionalPanel(
-        #   'input$id == "graph"',
-        #   checkboxGroupInput("sitestoshow", "Sites to show:",
-        #                      unique(out$StationID))),
         box(
           title = "dot charts",
           collapsible = TRUE,
@@ -121,13 +116,16 @@ ui <- dashboardPagePlus(
     )
   ),
   rightsidebar = rightSidebar(
+    background = "dark", width = 80,
     rightSidebarTabContent(
       id = 1,
       icon = "desktop",
-      title = "Stations",
+      title = "Tab 1",
+      active = TRUE,
       conditionalPanel(
-          checkboxGroupInput("stationstoshow", "Stations to show:",
-                            colnames(mydatalist)))
+        'input$id2 == "sites"',
+        checkboxGroupInput("toshow2", "Sites to show:",
+                           unique(out$StationID), selected = unique(out$StationID)))
     )
   )
 )
@@ -169,13 +167,13 @@ server <- function(input, output) {
       ggplot(data.frame())
     } else {
       gl <- lapply(input$toshow, 
-                   function(b) ggplot(out, aes(x=out[,1],y=out[, b])) +
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$toshow2),], aes(x=out[out$StationID %in% as.numeric(input$toshow2),1],y=out[out$StationID %in% as.numeric(input$toshow2), b])) +
                      geom_point() + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
       )
-      grid.arrange(grobs = gl, nrow = round(length(gl)/2))
+      if (length(gl)==1) grid.arrange(grobs = gl, nrow = 1) else grid.arrange(grobs = gl, nrow = round(length(gl)/2))
     }
     
   })
