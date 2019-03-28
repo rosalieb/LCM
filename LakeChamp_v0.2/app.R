@@ -144,6 +144,7 @@ server <- function(input, output) {
                      geom_point() +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
+                     #ggcolors(~input$mysites)
       )
       grid.arrange(grobs = gl, nrow = 1)
     }

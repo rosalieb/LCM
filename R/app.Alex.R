@@ -33,7 +33,7 @@ xIcon <- makeIcon(
   iconWidth = 20, iconHeight = 20)
 
 # Define UI for slider demo app ----
-ui <- dashboardPage(
+ui <- dashboardPagePlus(
   #define color
   skin = "black",
   # App title ----
@@ -175,7 +175,7 @@ server <- function(input, output) {
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
       )
-      grid.arrange(grobs = gl, nrow = 1)
+      grid.arrange(grobs = gl, nrow = round(length(gl)/2))
     }
     
   })
