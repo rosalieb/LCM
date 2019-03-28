@@ -14,24 +14,22 @@ library(shiny)
 library(DT)
 library(yaml)
 library(shinydashboard)
-library(leaflet)
 library(shinydashboardPlus)
+library(leaflet)
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
 
-rubensteinIcon <- makeIcon(
-  iconUrl = "logo_rubenstein_lab.png",
-  iconWidth = 50, iconHeight = 15
-)
-
-title <- tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
-                tags$img(src = rubensteinIcon))
+mydatalist
 
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
+  iconWidth = 20, iconHeight = 20)
+
+xIcon <- makeIcon(
+  iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
 
 # Define UI for slider demo app ----
@@ -40,11 +38,15 @@ ui <- dashboardPage(
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  dashboardHeaderPlus(title = title, titleWidth = 200
+  header = dashboardHeaderPlus(enable_rightsidebar = TRUE, rightSidebarIcon = "gears",
+                               collapse_sidebar = TRUE,
+                               title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
+                               tags$img(src='logo_rubenstein_lab.png')),
+                               titleWidth = 350
   ),
   
   # Sidebar layout with input and output definitions ----
-  dashboardSidebar(
+  sidebar = dashboardSidebar(
     #you can edit the width of the sidebar here
     #width = 200,
     sidebarMenu(
@@ -74,7 +76,7 @@ ui <- dashboardPage(
       )
     )
   ),
-  dashboardBody(
+  body = dashboardBody(
     tabItems(
       tabItem(
         tabName = "about",
@@ -93,6 +95,10 @@ ui <- dashboardPage(
       tabItem(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
+        # conditionalPanel(
+        #   'input$id == "graph"',
+        #   checkboxGroupInput("sitestoshow", "Sites to show:",
+        #                      unique(out$StationID))),
         box(
           title = "dot charts",
           collapsible = TRUE,
@@ -113,10 +119,18 @@ ui <- dashboardPage(
         DT::dataTableOutput("mytable1")
       )
     )
+  ),
+  rightsidebar = rightSidebar(
+    rightSidebarTabContent(
+      id = 1,
+      icon = "desktop",
+      title = "Stations",
+      conditionalPanel(
+          checkboxGroupInput("stationstoshow", "Stations to show:",
+                            colnames(mydatalist)))
+    )
   )
 )
-
-
 server <- function(input, output) {
   
   # plot
@@ -127,9 +141,12 @@ server <- function(input, output) {
   output$mymap1 <- renderLeaflet({
     leaflet(LCMcoord) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
-      addMarkers(icon = boatIcon, lat = as.numeric(LCMcoord$Latitude), lng = as.numeric(LCMcoord$Longitude), 
-                 popup = LCMcoord$Station)
-    
+      addMarkers(data = LCMcoord, icon = boatIcon, lat = as.numeric(LCMcoord$LLatitude), 
+                 lng = as.numeric(LCMcoord$LLongitude), 
+                 popup = LCMcoord$LStation) %>%
+      addMarkers(data = LCMcoord, icon = xIcon, lat = as.numeric(LCMcoord$TLatitude), 
+                 lng = as.numeric(LCMcoord$TLongitude),
+                 popup = LCMcoord$TStation)
   })
   
   output$myplot1 <- renderPlot({
@@ -171,4 +188,5 @@ server <- function(input, output) {
 }
 
 shinyApp(ui, server)
+
 
