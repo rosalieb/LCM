@@ -22,8 +22,6 @@ out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
 
-mydatalist
-
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
   iconWidth = 20, iconHeight = 20)
@@ -40,7 +38,7 @@ ui <- dashboardPagePlus(
   #embedment of logo is not working:
   header = dashboardHeaderPlus(enable_rightsidebar = TRUE,
                                title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
-                               tags$img(src='logo_rubenstein_lab.png')),
+                                              tags$img(src='logo_rubenstein_lab.png')),
                                titleWidth = 350
   ),
   
