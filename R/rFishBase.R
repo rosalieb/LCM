@@ -28,6 +28,8 @@ vioplot(dietlc$Troph)
 vioplot(predatorslc$PredatTroph)
 vioplot(predatorslc$PredatTroph)
 dietlc[dietlc$Species=="Salvelinus namaycush",]
+yperch <- dietlc[dietlc$Species=="Perca flavescens",]
+yperch <- dietlc[,complete.cases(dietlc)]
 
 vioplot(c_code()$LatDec)
 vioplot(c_code()$LongDec)
@@ -50,7 +52,7 @@ length_length(species_list = c("Oreochromis niloticus"))
 grep("Mali",  brains()[,"Locality"], ignore.case = T)
 View(brains())
 brains()[brains()[,"Locality"]=="Mali",]
-brains()[brains()[,"Locality"]==NA,]
+brains()[is.na(brains()[,"Locality"]),]
 d4 <- as.data.frame(brains()[brains()[,"Locality"]=="France",])
 
 groupers <- fishbase %>% filter(Family == "Salmonidae") %>%
@@ -61,7 +63,9 @@ head(groupers)
 grptroph <- ecology(groupers$gensp, fields = c("DietTroph"))
 nrow(grptroph)
 
-head(grptroph)
+head(grptroph[!is.na(grptroph),])
+summary(grptroph)
+summary(grptroph[!is.na(grptroph),])
 
 d2 <- left_join(groupers, grptroph)
 nrow(d2)
