@@ -14,13 +14,16 @@ library(shiny)
 library(DT)
 library(yaml)
 library(shinydashboard)
-library(shinydashboardPlus)
 library(leaflet)
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
+
+colors <- colors(distinct = TRUE)
+set.seed(1585) # to set random generator seed
+colors2 <- sample(colors, 15)
 
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
@@ -31,12 +34,12 @@ xIcon <- makeIcon(
   iconWidth = 20, iconHeight = 20)
 
 # Define UI for slider demo app ----
-ui <- dashboardPagePlus(
+ui <- dashboardPage(
   #define color
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  dashboardHeaderPlus(,title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
+  dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                  tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
                   titleWidth = 350
   ),
@@ -67,7 +70,7 @@ ui <- dashboardPagePlus(
                     value = c(2000,2012),sep = ""),
         conditionalPanel(
           'input$id == "graph"',
-          checkboxGroupInput("toshow", "Columns to show:",
+          checkboxGroupInput("sites_toshow", "Columns to show:",
                              colnames(out)))#, selected = colnames(out)))
       )
     )
@@ -91,19 +94,26 @@ ui <- dashboardPagePlus(
       tabItem(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
-        # conditionalPanel(
-        #   'input$id == "graph"',
-        #   checkboxGroupInput("sitestoshow", "Sites to show:",
-        #                      unique(out$StationID))),
         box(
-          title = "dot charts",
+          title = "Station Selection",
+          collapsible = TRUE,
+          width = "100%", 
+          height = "70%",
+          conditionalPanel(
+            'input$id2 == "sites"',
+            checkboxGroupInput("param_toshow", "Sites to show:",
+                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)))
+          )
+        ),
+        box(
+          title = "Dot Charts",
           collapsible = TRUE,
           width = "100%",
           height = "70%",
           plotOutput("myplot1")
         ),
         box(
-          title = "line charts",
+          title = "Line Charts",
           collapsible = TRUE,
           width = "100%",
           height = "70%",
@@ -137,12 +147,14 @@ server <- function(input, output) {
   })
   
   output$myplot1 <- renderPlot({
-    if (length(input$toshow) == 0) {
+    if (length(input$sites_toshow) == 0) {
       ggplot(data.frame())
     } else {
-      gl <- lapply(input$toshow, 
-                   function(b) ggplot(out, aes(x=out[,1],y=out[, b])) +
-                     geom_point() +
+      gl <- lapply(input$sites_toshow, 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
+                     aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
+                     as.numeric(input$param_toshow), b])) +
+                     geom_point(color = out$StationID) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
                      #ggcolors(~input$mysites)
@@ -153,12 +165,14 @@ server <- function(input, output) {
   })
   
   output$myplot2 <- renderPlot({
-    if (length(input$toshow) == 0) {
+    if (length(input$sites_toshow) == 0) {
       ggplot(data.frame())
     } else {
-      gl <- lapply(input$toshow, 
-                   function(b) ggplot(out, aes(x=out[,1],y=out[, b])) +
-                     geom_point() + 
+      gl <- lapply(input$sites_toshow, 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
+                     aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
+                     as.numeric(input$param_toshow), b])) +
+                     geom_point(color = out$StationID) + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
