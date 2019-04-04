@@ -21,9 +21,9 @@ out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
 
-colors <- colors(distinct = TRUE)
+colors1 <- colors(distinct = TRUE)
 set.seed(1585) # to set random generator seed
-colors2 <- sample(colors, 15)
+colors2 <- sample(colors1, 15)
 
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
@@ -154,7 +154,7 @@ server <- function(input, output) {
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
                      as.numeric(input$param_toshow), b])) +
-                     geom_point(color = out$StationID) +
+                     geom_point(colors2 = out$StationID) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
                      #ggcolors(~input$mysites)
@@ -172,7 +172,7 @@ server <- function(input, output) {
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
                      as.numeric(input$param_toshow), b])) +
-                     geom_point(color = out$StationID) + 
+                     geom_point(colors2 = out$StationID) + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
