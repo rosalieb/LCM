@@ -24,6 +24,7 @@ out <- out[order(out$year,decreasing = F),]
 colors1 <- colors(distinct = TRUE)
 set.seed(1585) # to set random generator seed
 colors2 <- sample(colors1, 15)
+colScale <- scale_color_manual(name = "grp", values = colors2)
 
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
@@ -41,7 +42,13 @@ ui <- dashboardPage(
   #embedment of logo is not working:
   dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
                                  tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
-                  titleWidth = 350
+                  titleWidth = 350,
+                  tags$li(class = "dropdown", tags$a(href="https://twitter.com/RosalieBruel", 
+                                                     icon("twitter"))),
+                  tags$li(class = "dropdown", tags$a(href="https://rosalieb.github.io/rosaliebruelweb/index.html",
+                                                     icon("user"))),
+                  tags$li(class = "dropdown", tags$a(href="https://www.instagram.com/rubensteinlaboratory/",
+                                                     icon("instagram")))
   ),
   
   # Sidebar layout with input and output definitions ----
@@ -132,7 +139,7 @@ server <- function(input, output) {
   
   # plot
   output$mytext1 <- renderText({ 
-    "Here we can write a description about Lake Champlain. We can do that later using section from your report."
+    "Spanning a length of 190 km from Whitehall, NY to its outlet at the Richelieu River in Québec, Canada, Lake Champlain covers 113,000 hectares and is estimated to hold roughly 25 trillion liters Average lake depth is 19.5 meters (64.5 feet), with the greatest lake depth of 122 meters (400 feet). A majority of the water that enters Lake Champlain runs through its basin, which covers over 21,000 square kilometers. Over half of the basin is in Vermont, about a third in New York, and less than a tenth in the Province of Québec. The water retention time varies by lake segment, ranging between two months in the South Lake to about 3 years in the Main Lake."
   })
   
   output$mymap1 <- renderLeaflet({
@@ -153,8 +160,8 @@ server <- function(input, output) {
       gl <- lapply(input$sites_toshow, 
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
-                     as.numeric(input$param_toshow), b])) +
-                     geom_point(colors2 = out$StationID) +
+                     as.numeric(input$param_toshow), b]), color = grp) +
+                     geom_point() +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
                      #ggcolors(~input$mysites)
@@ -171,8 +178,8 @@ server <- function(input, output) {
       gl <- lapply(input$sites_toshow, 
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
-                     as.numeric(input$param_toshow), b])) +
-                     geom_point(colors2 = out$StationID) + 
+                     as.numeric(input$param_toshow), b]), color = StationID) +
+                     geom_point(colScale = out$StationID) + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
