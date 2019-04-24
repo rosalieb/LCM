@@ -41,8 +41,8 @@ ui <- dashboardPage(
   # App title ----
   #embedment of logo is not working:
   dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
-                                 tags$img(src=paste0(getwd(),"/LakeChamp_v0.2/www/logo_rubenstein_lab.png"))),
-                  titleWidth = 350,
+                                 icon("home")),
+                  titleWidth = 200,
                   tags$li(class = "dropdown", tags$a(href="https://twitter.com/RosalieBruel", 
                                                      icon("twitter"))),
                   tags$li(class = "dropdown", tags$a(href="https://rosalieb.github.io/rosaliebruelweb/index.html",
@@ -87,7 +87,7 @@ ui <- dashboardPage(
       tabItem(
         tabName = "about",
         #Render an output text
-        textOutput("mytext1")
+        htmlOutput("mytext1")
       ),
       tabItem(
         tabName = "m_lake",
@@ -138,9 +138,12 @@ ui <- dashboardPage(
 server <- function(input, output) {
   
   # plot
-  output$mytext1 <- renderText({ 
-    myparagraph <- "<b> Spanning </b> a length of 190 km from Whitehall, NY <br> to its outlet at the Richelieu River in Québec, Canada, Lake Champlain covers 113,000 hectares and is estimated to hold roughly 25 trillion liters. Average lake depth is 19.5 meters (64.5 feet), with the greatest lake depth of 122 meters (400 feet). A majority of the water that enters Lake Champlain runs through its basin, which covers over 21,000 square kilometers. Over half of the basin is in Vermont, about a third in New York, and less than a tenth in the Province of Québec. The water retention time varies by lake segment, ranging between two months in the South Lake to about 3 years in the Main Lake."
-    HTML(paste(myparagraph))
+  output$mytext1 <- renderUI({ 
+    header <- "<h1>Lake Champlain</h1>"
+    myparagraph1 <- "<b> Spanning </b> a length of 190 km from Whitehall, NY <br/> to its outlet at the Richelieu River in Québec, Canada, Lake Champlain covers 113,000 hectares and is estimated to hold roughly 25 trillion liters. Average lake depth is 19.5 meters (64.5 feet), with the greatest lake depth of 122 meters (400 feet). A majority of the water that enters Lake Champlain runs through its basin, which covers over 21,000 square kilometers. Over half of the basin is in Vermont, about a third in New York, and less than a tenth in the Province of Québec. The water retention time varies by lake segment, ranging between two months in the South Lake to about 3 years in the Main Lake."
+    myparagraph2 <- "test"
+    linkToSite <- "Click <a href = 'http://www.lcbp.org/'>here</a> to visit the Lake Champlain Basin Program website."
+    HTML(paste(header, myparagraph1, myparagraph2, linkToSite, sep = '<br/>'))
   })
   
   output$mymap1 <- renderLeaflet({
