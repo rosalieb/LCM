@@ -39,6 +39,13 @@ library(gtable) # to get two plots aligned ggplot
 library(grid) # low-level grid functions are required
 library(scatterpie) # for pie chart on map
 library(lubridate) # to standardize date-time with different format
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
 ```
 
 
@@ -53,7 +60,7 @@ The VT Fish and Wildlife Department states that 'stocking fish helps to restore 
 Stocking data were obtained from the <a href= https://vtfishandwildlife.com/fishvt>VTFWD website</a> by clicking on the link 'Trout Stocking Report'.
 
 ```{r include=FALSE}
-stkvt <- read.delim('/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/VTFWD_Stocking_2009-2019.txt')
+stkvt <- read.delim(paste0(getpath4data(),'Stocking/VTFWD_Stocking_2009-2019.txt'))
 nrow(stkvt)
 length(stkvt$ACTUAL.NUMBER.STOCKED[!is.na(stkvt$ACTUAL.NUMBER.STOCKED)])
 names(stkvt)
@@ -126,9 +133,8 @@ ggplot(data=stkvt[grep("Champ",stkvt$WATER),], aes(x=SPECIES,y=ACTUAL.NUMBER.STO
 
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-bathy<-readOGR("/Users/Rosalie/Desktop/Travail/QGIS/LakeChamplainBathy/LakeChamplain_Shapefile/LakeChamplain.shp")
+bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
 lcgroupmap=c("lake",rep("island", 84562))
-
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
 class(bathy)
@@ -147,7 +153,7 @@ states <- us_states(resolution = "high")
 ```{r include=FALSE}
 # 1 - Load gps location for different cities
 # Then convert them to correct projection
-gps1 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/GPS_coordinates_stocking_locations_counties.txt")
+gps1 <- read.delim(paste0(getpath4data(),"Stocking/GPS_coordinates_stocking_locations_counties.txt"))
 gps1$County <- gsub("\xca","",gps1$County)
 gps1$State <- gsub("\xca","",gps1$State)
 gps1_df <- gps1
@@ -155,7 +161,7 @@ coordinates(gps1)<-~Longitude+Latitude
 proj4string(gps1)<-CRS("+proj=longlat +datum=WGS84")
 gps1 <- spTransform(gps1,crs(world))
 
-gps2 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/GPS_coordinates_stocking_locations_LC.txt")
+gps2 <- read.delim(paste0(getpath4data(),"Stocking/GPS_coordinates_stocking_locations_LC.txt"))
 gps2_df <- gps2
 gps2_df$Sites <- as.character(gps2_df$Sites)
 coordinates(gps2)<-~Longitude+Latitude
@@ -261,7 +267,7 @@ p
 Stocking data were obtained from the <a href= https://data.ny.gov/Recreation/Fish-Stocking-Lists-Actual-Beginning-2011/9hpx-asd8>NYDEC website</a>.
 
 ```{r include=FALSE}
-stkny <- read.delim('/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/NYDEC_Stocking_2011-2019.txt')
+stkny <- read.delim(paste0(getpath4data(),"Stocking/NYDEC_Stocking_2011-2019.txt"))
 nrow(stkny)
 names(stkny)
 
