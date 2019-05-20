@@ -17,4 +17,13 @@ pkgTest("reshape2") # To 'unmelt' data
 
 pkgTest("ggplot2")
 
+#pkgTest("xlsx")
+
+pkgTest("datapasta")
+
+pkgTest("dplyr")
+
+pkgTest("FSA")
+pkgTest("FSAdata")
+
 source("R/getpath4data.R")
