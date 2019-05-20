@@ -1,0 +1,634 @@
+---
+title: "Stocking data VTFWS and NYDEC"
+author: "Rosalie Bruel"
+date: "15/05/2019"
+output: 
+  html_document: 
+    df_print: paged
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+  df_print: paged
+fontsize: 11pt
+---
+
+_Last updte: `r Sys.Date()`_
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages, include=FALSE}
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(stringr)
+library("sf")
+library(rgdal) # to read bathymetry
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("ggspatial")
+#load spatial packages
+library(raster)
+library(rgeos)
+library(gtable) # to get two plots aligned ggplot
+library(grid) # low-level grid functions are required
+library(scatterpie) # for pie chart on map
+library(lubridate) # to standardize date-time with different format
+```
+
+
+The VT Fish and Wildlife Department states that 'stocking fish helps to restore populations of native fish, improve fisheries in Vermont, and provide better fishing opportunities'.
+
+# Accessing data for each agency {.tabset}
+
+## VTFWD
+
+### Read data and basic stats
+
+Stocking data were obtained from the <a href= https://vtfishandwildlife.com/fishvt>VTFWD website</a> by clicking on the link 'Trout Stocking Report'.
+
+```{r include=FALSE}
+stkvt <- read.delim('/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/VTFWD_Stocking_2009-2019.txt')
+nrow(stkvt)
+length(stkvt$ACTUAL.NUMBER.STOCKED[!is.na(stkvt$ACTUAL.NUMBER.STOCKED)])
+names(stkvt)
+
+stkvt$DATE.STOCKED <- parse_date_time(x = stkvt$DATE.STOCKED,orders = c("m/d/y", "m/d/Y"))
+```
+
+Over the `r min(stkvt$Year)`-`r max(stkvt$Year)` period, `r nrow(stkvt)` stocking events were scheduled, and `r length(stkvt$ACTUAL.NUMBER.STOCKED[!is.na(stkvt$ACTUAL.NUMBER.STOCKED)])` stocking events took place.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+summ_stkvt <- stkvt %>% group_by(as.factor(Year)) %>%
+  summarize(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            scheduled=length(ACTUAL.NUMBER.STOCKED),
+            went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
+            percent_done=went_through/scheduled)
+summ_stkvt <- as.data.frame(summ_stkvt)
+
+p1 <- ggplot(data=summ_stkvt, aes(x=summ_stkvt[,1],y=as.numeric(summ_stkvt[,2]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("mean # stocked") 
+
+p2 <- ggplot(data=summ_stkvt, aes(x=summ_stkvt[,1],y=as.numeric(summ_stkvt[,3]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("sum # stocked") 
+
+## convert plots to gtable objects
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g <- rbind(g1, g2, size="first") # stack the two plots
+g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
+# center the legend vertically
+g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
+grid.newpage()
+grid.draw(g)
+
+colnames(summ_stkvt) <- c("Year","Mean #fish stocked", "Total #fish stocked", "Schedule events", "Stocking that went through", "% stocking done")
+summ_stkvt
+
+```
+
+In 2019, there are still many stocking events that were not carried out. We're removing this year from the analysis.
+
+```{r remove 2019 from the dataframe}
+stkvt <- stkvt[stkvt$Year!=2019,]
+```
+
+### Species stocked
+
+What are the species stocked by VTFWD? We're only looking at the effective stocking now.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+sp_stkvt <- stkvt %>% group_by(as.factor(SPECIES)) %>%
+  summarize(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            scheduled=length(ACTUAL.NUMBER.STOCKED),
+            went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
+            percent_done=went_through/scheduled)
+
+ggplot(data=stkvt, aes(x=SPECIES,y=ACTUAL.NUMBER.STOCKED, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("All Vermont")
+
+ggplot(data=stkvt[grep("Champ",stkvt$WATER),], aes(x=SPECIES,y=ACTUAL.NUMBER.STOCKED, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("Lake Champlain waters")
+
+
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+bathy<-readOGR("/Users/Rosalie/Desktop/Travail/QGIS/LakeChamplainBathy/LakeChamplain_Shapefile/LakeChamplain.shp")
+lcgroupmap=c("lake",rep("island", 84562))
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+class(bathy)
+crs(bathy)
+crs(world)
+bathy <- spTransform(bathy,crs(world))
+crs(bathy)
+
+# get states too
+library(USAboundaries)
+library(USAboundariesData)
+states <- us_states(resolution = "high")
+
+```
+
+```{r include=FALSE}
+# 1 - Load gps location for different cities
+# Then convert them to correct projection
+gps1 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/GPS_coordinates_stocking_locations_counties.txt")
+gps1$County <- gsub("\xca","",gps1$County)
+gps1$State <- gsub("\xca","",gps1$State)
+gps1_df <- gps1
+coordinates(gps1)<-~Longitude+Latitude
+proj4string(gps1)<-CRS("+proj=longlat +datum=WGS84")
+gps1 <- spTransform(gps1,crs(world))
+
+gps2 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/GPS_coordinates_stocking_locations_LC.txt")
+gps2_df <- gps2
+gps2_df$Sites <- as.character(gps2_df$Sites)
+coordinates(gps2)<-~Longitude+Latitude
+proj4string(gps2)<-CRS("+proj=longlat +datum=WGS84")
+gps2 <- spTransform(gps2,crs(world))
+gps2_df$Longitude <- gps2$Longitude
+gps2_df$Latitude <- gps2$Latitude
+
+
+# 2 - Match gps to initial data
+stkvt$lon <- rep(NA, nrow(stkvt))
+stkvt$lat <- rep(NA, nrow(stkvt))
+for (i in 1:nrow(stkvt)) {
+  if(i==1) {n1=0;n2=0;n3=0;which_double <- NULL; number_not_matched=0;number_not_matched2=0;which_not_matched <- NULL}
+  if(stkvt$COUNTY[i] %in% gps1_df$County) {
+    if(length(gps1_df$Longitude[gps1_df$County==stkvt$COUNTY[i]])==1) {
+      stkvt$lon[i] <- gps1_df$Longitude[gps1_df$County==stkvt$COUNTY[i]]
+      stkvt$lat[i] <- gps1_df$Latitude[gps1_df$County==stkvt$COUNTY[i]]
+      n1 <- n1+1 # for info message
+    } else {
+      n2 <- n2+1 # for info message
+      which_not_matched <- c(which_not_matched, i)
+      if(!is.na(stkvt$ACTUAL.NUMBER.STOCKED[i])) number_not_matched <- number_not_matched + stkvt$ACTUAL.NUMBER.STOCKED[i]
+      if(length(grep(stkvt$WATER[i], which_double))==0) which_double <- paste(which_double,"       - ", stkvt$WATER[i], "\n")
+    }
+    
+  } else {
+      n3 <- n3+1 # for info message
+            if(!is.na(stkvt$ACTUAL.NUMBER.STOCKED[i])) number_not_matched2 <- number_not_matched2 + stkvt$ACTUAL.NUMBER.STOCKED[i]
+      }
+  # Info message
+  if(i==nrow(stkvt)) message(paste0(" ✓ Found GPS coordinates match for ", n1," of the stocking events","\n ✕ More than 1 match for ", n2, " of the stocking events.\n  It corresponds to ",number_not_matched," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),").\n   Sites are:\n",which_double," ✕ No GPS coordinates match were found for ", n3, " of the stocking events.\n  It corresponds to ",number_not_matched2," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),")." ))
+}
+
+# 3 - create a format that scatterpie will be able to handle
+# It will look like:
+#    ~Lon   ~Lat    ~species1   ~species2    ~species3
+#      xx     xx        xxx           xxx         xxx
+summ_stkvt_map <- stkvt
+summ_stkvt_map$flonlat <- as.factor(paste(summ_stkvt_map$lon, summ_stkvt_map$lat, sep="___"))
+summ_stkvt_map <- with(summ_stkvt_map, tapply(ACTUAL.NUMBER.STOCKED,list("Lon Lat"=flonlat, "Species"=SPECIES), sum, na.rm=T))
+summ_stkvt_map <- as.data.frame(summ_stkvt_map)
+summ_stkvt_map$total <- rowSums(summ_stkvt_map,na.rm=T)
+summ_stkvt_map$flonlat <- rownames(summ_stkvt_map)
+rownames(summ_stkvt_map) <- 1:nrow(summ_stkvt_map)
+summ_stkvt_map <- cbind(summ_stkvt_map[,1:(ncol(summ_stkvt_map)-1)],data.frame(do.call('rbind', strsplit(as.character(summ_stkvt_map$flonlat), '___', fixed=TRUE))))
+colnames(summ_stkvt_map) <- str_replace(colnames(summ_stkvt_map), "X1", "lon")
+colnames(summ_stkvt_map) <- str_replace(colnames(summ_stkvt_map), "X2", "lat")
+summ_stkvt_map$lon <- as.numeric(paste(summ_stkvt_map$lon))
+summ_stkvt_map$lat <- as.numeric(paste(summ_stkvt_map$lat))
+
+summ_stkvt_map <- summ_stkvt_map[!is.na(summ_stkvt_map$lon),]
+summ_stkvt_map[is.na(summ_stkvt_map)] <- 0
+```
+
+Here are the results from matching GPS coordinates to initial dataframe:
+
+```{r echo=FALSE}
+message(paste0(" ✓ Found GPS coordinates match for ", n1," of the stocking events","\n ✕ More than 1 match for ", n2, " of the stocking events.\n  It corresponds to ",number_not_matched," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),").\n   Sites are:\n",which_double," ✕ No GPS coordinates match were found for ", n3, " of the stocking events.\n  It corresponds to ",number_not_matched2," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),")." ))
+
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# library(scatterpie) for pie charts on map
+
+p <- ggplot() +  
+  geom_sf(data = world)  + 
+  geom_sf(data = states) +
+  coord_sf(xlim = c(-77, -70), ylim = c(40, 46))  +
+  theme_set(theme_bw()) +
+  xlab("Longitude") + ylab("Latitude")
+# p <- p +
+#   geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +  scale_fill_manual(values = c("lightgrey","darkgrey"))
+p <- p +
+    geom_scatterpie(data = summ_stkvt_map, 
+                    aes(x=lon, y=lat, r = sqrt(total+4000)/4000),
+                    cols = c("BKT", "BNT", "LAS", "LAT", "RBT", "STT", "WAE"),  alpha = 0.5) +
+    scale_fill_manual(
+        breaks = c("BKT", "BNT", "LAS", "LAT", "RBT", "STT", "WAE"),
+        labels = c("BKT", "BNT", "LAS", "LAT", "RBT", "STT", "WAE"),
+        values = c("BKT" = "orange",
+                   "BNT" = "red",
+                   "LAS" = "darkred",
+                   "LAT" = "yellow",
+                   "RBT" = "grey",
+                   "STT" = "black",
+                   "WAE" = "cyan")#,
+        # labels = c("Brook Trout", "Brown Trout", "Landlocked Atlantic Salmon", "Lake Trout", "Rainbow Trout", "Steelhead Trout")
+        )
+
+p
+
+```
+
+
+## NYDEC
+
+### Read data and basic stats
+
+Stocking data were obtained from the <a href= https://data.ny.gov/Recreation/Fish-Stocking-Lists-Actual-Beginning-2011/9hpx-asd8>NYDEC website</a>.
+
+```{r include=FALSE}
+stkny <- read.delim('/Volumes/-/Script R/LCM_GitHub_Data_LCM/Stocking/NYDEC_Stocking_2011-2019.txt')
+nrow(stkny)
+names(stkny)
+
+#QAQC some data
+stkny$Town[stkny$Town=="plattsburgh"] <- "Plattsburgh"
+
+```
+
+Over the `r min(stkny$Year)`-`r max(stkny$Year)` period, `r nrow(stkny)` stocking events took place.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+summ_stkny <- stkny %>% group_by(as.factor(Year)) %>%
+  summarize(mean=mean(Number, na.rm=T),
+            sum=sum(Number, na.rm=T),
+            went_through=length(Number))
+summ_stkny <- as.data.frame(summ_stkny)
+
+p1 <- ggplot(data=summ_stkny, aes(x=summ_stkny[,1],y=as.numeric(summ_stkny[,2]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("mean # stocked") 
+
+p2 <- ggplot(data=summ_stkny, aes(x=summ_stkny[,1],y=as.numeric(summ_stkny[,3]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("sum # stocked") 
+
+## convert plots to gtable objects
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g <- rbind(g1, g2, size="first") # stack the two plots
+g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
+# center the legend vertically
+g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
+grid.newpage()
+grid.draw(g)
+
+colnames(summ_stkny) <- c("Year","Mean #fish stocked", "Total #fish stocked", "Stocking events")
+summ_stkny
+
+```
+
+
+### Species stocked
+
+What are the species stocked by VTFWD? We're only looking at the effective stocking now.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+sp_stkny <- stkny %>% group_by(as.factor(Species)) %>%
+  summarize(mean=mean(Number, na.rm=T),
+            sum=sum(Number, na.rm=T),
+            went_through=length(Number))
+
+ggplot(data=stkny, aes(x=Species,y=Number, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("All NY")
+
+ggplot(data=stkny[grep("Champ",stkny$Waterbody),], aes(x=Species,y=Number, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("Lake Champlain waters")
+
+
+```
+
+
+# Focus on Lake Champlain
+
+## VT data
+
+Grand Isle gathers the most stocking events over the years, but it's in Colchester that most fish were stocked.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Vermont data
+stkvtlc <- stkvt[grep("Champ",stkvt$WATER),]
+#head(stkvtlc)
+
+stkvtsites <- stkvtlc %>% group_by(TOWN) %>%
+  summarize(meanFishStocked=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            sumFishStocked=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            sumFishStockedPerYear=sum(ACTUAL.NUMBER.STOCKED, na.rm=T)/10,
+            NumberStockingEvents=length(ACTUAL.NUMBER.STOCKED))
+
+stkvtsites[order(stkvtsites$sumFishStocked, decreasing = T),]
+
+#levels(stkvtlc$COUNTY)
+
+```
+
+## NY data:
+
+```{r echo=FALSE}
+# NY data
+stknylc <- stkny[grep("hampl",stkny$Waterbody),]
+
+stknylcsites <- stknylc %>% group_by(Town) %>%
+  summarize(meanFishStocked=mean(Number, na.rm=T),
+            sumFishStocked=sum(Number, na.rm=T),
+            sumFishStockedPerYear=sum(Number, na.rm=T)/7,
+            NumberStockingEvents=length(Number))
+
+stknylcsites[order(stknylcsites$sumFishStocked, decreasing = T),]
+
+```
+
+
+
+## Mapping
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summ_sp_yr_vt <- as.data.frame(with(stkvtlc, tapply(ACTUAL.NUMBER.STOCKED
+  ,list("species"=SPECIES,"Year#"=Year), sum, na.rm=T)))
+summ_sp_yr_vt <- as.data.frame(t(summ_sp_yr_vt[rowSums(summ_sp_yr_vt, na.rm=T)>0,]))
+summ_sp_yr_vt$Year <- rownames(summ_sp_yr_vt)
+summ_sp_yr_vt$State <- "VT"
+
+summ_sp_yr_ny <- as.data.frame(with(stknylc, tapply(Number
+  ,list("species"=Species,"Year#"=Year), sum, na.rm=T)))
+summ_sp_yr_ny <- as.data.frame(t(summ_sp_yr_ny[rowSums(summ_sp_yr_ny, na.rm=T)>0,]))
+
+colnames(summ_sp_yr_ny) <- str_replace(colnames(summ_sp_yr_ny), "Brown Trout", "BNT")
+colnames(summ_sp_yr_ny) <- str_replace(colnames(summ_sp_yr_ny), "Landlocked Salmon", "LAS")
+colnames(summ_sp_yr_ny) <- str_replace(colnames(summ_sp_yr_ny), "Lake Trout", "LAT")
+colnames(summ_sp_yr_ny) <- str_replace(colnames(summ_sp_yr_ny), "Round Whitefish", "RWI")
+
+summ_sp_yr_ny$Year <- rownames(summ_sp_yr_ny)
+summ_sp_yr_ny$State <- "NY"
+
+
+custom_rbind = function(x1,x2){
+  c1 = setdiff(colnames(x1),colnames(x2))
+  c2 = setdiff(colnames(x2),colnames(x1))
+  for(c in c2){##Adding missing columns from 2 in 1
+    x1[[c]]=NA
+  }
+  for(c in c1){##Similiarly ading missing from 1 in 2
+    x2[[c]]=NA
+  }
+  x2 = x2[colnames(x1)]
+  rbind(x1,x2)
+}
+
+summ_sp_yr <- Reduce(custom_rbind,list(summ_sp_yr_vt,summ_sp_yr_ny))  
+rownames(summ_sp_yr) <- paste(summ_sp_yr$Year, summ_sp_yr$State, sep="_")
+
+```
+
+The dataframe below gives the average lentgh of fish released this year. The average length of fish changed over the season, so I balanced the length by the proportion released on that month vs. fish from the same specie release over the year.
+
+```{r details on species stocked by NY, echo=FALSE, message=FALSE, warning=FALSE}
+stknylc$Size_pondere <- rep(NA, nrow(stknylc))
+for (i in 1:nrow(stknylc)) {
+  stknylc$Size_pondere[i] <- stknylc$Size_mm[i]*stknylc$Number[i]/sum(stknylc$Number[stknylc$Year==stknylc$Year[i] & stknylc$Species==stknylc$Species[i]])
+}
+
+summ_sp_yr_ny <- as.data.frame(with(stknylc, tapply(Size_pondere
+  ,list("species"=Species,"Year#"=Year), sum, na.rm=T)))
+summ_sp_yr_ny <- as.data.frame(t(summ_sp_yr_ny[rowSums(summ_sp_yr_ny, na.rm=T)>0,]))
+
+summ_sp_yr_ny
+
+```
+
+## Map 
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# 1 - gps data were loaded previously
+
+# 2a - Match gps to initial data for VT
+stkvtlc$TOWN[stkvtlc$TOWN=="panton"] = "Panton"
+stkvtlc$lon <- rep(NA, nrow(stkvtlc))
+stkvtlc$lat <- rep(NA, nrow(stkvtlc))
+for (i in 1:nrow(stkvtlc)) {
+  if(i==1) {n1=0;n2=0;n3=0;which_double <- NULL;which_abs <- NULL; number_not_matched=0;number_not_matched2=0;which_not_matched <- NULL}
+  if(stkvtlc$TOWN[i] %in% gps2_df$Sites) {
+    if(length(gps2_df$Longitude[gps2_df$Sites==stkvtlc$TOWN[i]])==1) {
+      stkvtlc$lon[i] <- gps2_df$Longitude[gps2_df$Sites==stkvtlc$TOWN[i]]
+      stkvtlc$lat[i] <- gps2_df$Latitude[gps2_df$Sites==stkvtlc$TOWN[i]]
+      n1 <- n1+1 # for info message
+    } else {
+      n2 <- n2+1 # for info message
+      which_not_matched <- c(which_not_matched, i)
+      if(!is.na(stkvtlc$ACTUAL.NUMBER.STOCKED[i])) number_not_matched <- number_not_matched + stkvtlc$ACTUAL.NUMBER.STOCKED[i]
+      if(length(grep(stkvtlc$WATER[i], which_double))==0) which_double <- paste(which_double,"       - ", stkvtlc$WATER[i], "\n")
+    }
+    
+  } else {
+      n3 <- n3+1 # for info message
+      if(!is.na(stkvt$ACTUAL.NUMBER.STOCKED[i])) number_not_matched2 <- number_not_matched2 + stkvt$ACTUAL.NUMBER.STOCKED[i]
+      if(length(grep(stkvtlc$WATER[i], which_double))==0) which_abs <- paste(which_abs,"       - ", stkvtlc$WATER[i], "\n")
+      }
+  # Info message
+  if(i==nrow(stkvtlc)) message(paste0(" ✓ Found GPS coordinates match for ", n1," of the stocking events","\n ✕ More than 1 match for ", n2, " of the stocking events.\n  It corresponds to ",number_not_matched," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),").\n   Sites are:\n",which_double," ✕ No GPS coordinates match were found for ", n3, " of the stocking events.\n  It corresponds to ",number_not_matched2," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),")..\n  Sites are:\n",which_abs ))
+}
+
+```
+
+Results GPS matching for VT:
+
+```{r echo=FALSE, warning=FALSE}
+message(paste0(" ✓ Found GPS coordinates match for ", n1," of the stocking events","\n ✕ More than 1 match for ", n2, " of the stocking events.\n  It corresponds to ",number_not_matched," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),").\n   Sites are:\n",which_double," ✕ No GPS coordinates match were found for ", n3, " of the stocking events.\n  It corresponds to ",number_not_matched2," fish (out of ",sum(stkvt$ACTUAL.NUMBER.STOCKED,na.rm=T),")..\n  Sites are:\n",which_abs ))
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+# 3 - create a format that scatterpie will be able to handle
+# It will look like:
+#    ~Lon   ~Lat    ~species1   ~species2    ~species3
+#      xx     xx        xxx           xxx         xxx
+summ_stkvtlc_map <- stkvtlc
+summ_stkvtlc_map$flonlat <- as.factor(paste(summ_stkvtlc_map$lon, summ_stkvtlc_map$lat, sep="___"))
+summ_stkvtlc_map <- with(summ_stkvtlc_map, tapply(ACTUAL.NUMBER.STOCKED,list("Lon Lat"=flonlat, "Species"=SPECIES), sum, na.rm=T))
+summ_stkvtlc_map <- as.data.frame(summ_stkvtlc_map)
+summ_stkvtlc_map$total <- rowSums(summ_stkvtlc_map,na.rm=T)
+summ_stkvtlc_map$flonlat <- rownames(summ_stkvtlc_map)
+rownames(summ_stkvtlc_map) <- 1:nrow(summ_stkvtlc_map)
+summ_stkvtlc_map <- cbind(summ_stkvtlc_map[,1:(ncol(summ_stkvtlc_map)-1)],data.frame(do.call('rbind', strsplit(as.character(summ_stkvtlc_map$flonlat), '___', fixed=TRUE))))
+colnames(summ_stkvtlc_map) <- str_replace(colnames(summ_stkvtlc_map), "X1", "lon")
+colnames(summ_stkvtlc_map) <- str_replace(colnames(summ_stkvtlc_map), "X2", "lat")
+summ_stkvtlc_map$lon <- as.numeric(paste(summ_stkvtlc_map$lon))
+summ_stkvtlc_map$lat <- as.numeric(paste(summ_stkvtlc_map$lat))
+
+summ_stkvtlc_map <- summ_stkvtlc_map[!is.na(summ_stkvtlc_map$lon),]
+summ_stkvtlc_map[is.na(summ_stkvtlc_map)] <- 0
+
+
+```
+
+
+```{r include=FALSE}
+
+# 2b - Match gps to initial data for NY
+stknylc$Town <- as.character(stknylc$Town)
+stknylc$Town[stknylc$Town=="Plattsburgh"] <- "Plattsburgh NY"
+stknylc$Town[stknylc$Town=="Port Kent"]   <- "Port Kent NY"
+stknylc$Town[stknylc$Town=="Moriah"]      <- "Moriah NY"
+stknylc$Town[stknylc$Town=="Chesterfield, Essex"]      <- "Chesterfield, Essex NY"
+stknylc$Town[stknylc$Town=="Essex"]      <- "Chesterfield, Essex NY"
+stknylc$lon <- rep(NA, nrow(stknylc))
+stknylc$lat <- rep(NA, nrow(stknylc))
+for (i in 1:nrow(stknylc)) {
+  if(i==1) {n1=0;n2=0;n3=0;which_double <- NULL;which_abs<-NULL; number_not_matched=0;number_not_matched2=0;which_not_matched <- NULL}
+  if(stknylc$Town[i] %in% gps2_df$Sites) {
+    if(length(gps2_df$Longitude[gps2_df$Sites==stknylc$Town[i]])==1) {
+      stknylc$lon[i] <- gps2_df$Longitude[gps2_df$Sites==stknylc$Town[i]]
+      stknylc$lat[i] <- gps2_df$Latitude[gps2_df$Sites==stknylc$Town[i]]
+      n1 <- n1+1 # for info message
+    } else {
+      n2 <- n2+1 # for info message
+      which_not_matched <- c(which_not_matched, i)
+      if(!is.na(stknylc$Number[i])) number_not_matched <- number_not_matched + stknylc$Number[i]
+      if(length(grep(stknylc$Town[i], which_double))==0) which_double <- paste(which_double,"       - ", stknylc$Town[i], "\n")
+    }
+    
+  } else {
+    n3 <- n3+1 # for info message
+    if(!is.na(stknylc$Number[i])) number_not_matched2 <- number_not_matched2 + stknylc$Number[i]
+    if(length(grep(stknylc$Town[i], which_abs))==0) which_abs <- paste(which_abs,"       - ", stknylc$Town[i], "\n")
+  }
+  # Info message
+  if(i==nrow(stknylc)) message(paste0(" ✓ Found GPS coordinates match for ", n1," of the stocking events","\n ✕ More than 1 match for ", n2, " of the stocking events.\n  It corresponds to ",number_not_matched," fish (out of ",sum(stknylc$Number,na.rm=T),").\n  Sites are:\n",which_double," ✕ No GPS coordinates match were found for ", n3, " of the stocking events.\n  It corresponds to ",number_not_matched2," fish (out of ",sum(stknylc$Number,na.rm=T),").\n  Sites are:\n",which_abs ))
+}
+
+```
+
+Results GPS matching for NY:
+
+```{r echo=FALSE}
+message(paste0(" ✓ Found GPS coordinates match for ", n1," of the stocking events","\n ✕ More than 1 match for ", n2, " of the stocking events.\n  It corresponds to ",number_not_matched," fish (out of ",sum(stknylc$Number,na.rm=T),").\n  Sites are:\n",which_double," ✕ No GPS coordinates match were found for ", n3, " of the stocking events.\n  It corresponds to ",number_not_matched2," fish (out of ",sum(stknylc$Number,na.rm=T),").\n  Sites are:\n",which_abs ))
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+# 3 - create a format that scatterpie will be able to handle
+# It will look like:
+#    ~Lon   ~Lat    ~species1   ~species2    ~species3
+#      xx     xx        xxx           xxx         xxx
+summ_stknylc_map <- stknylc
+summ_stknylc_map$flonlat <- as.factor(paste(summ_stknylc_map$lon, summ_stknylc_map$lat, sep="___"))
+summ_stknylc_map <- with(summ_stknylc_map, tapply(Number,list("Lon Lat"=flonlat, "Species"=Species), sum, na.rm=T))
+summ_stknylc_map <- as.data.frame(summ_stknylc_map)
+summ_stknylc_map$total <- rowSums(summ_stknylc_map,na.rm=T)
+summ_stknylc_map$flonlat <- rownames(summ_stknylc_map)
+rownames(summ_stknylc_map) <- 1:nrow(summ_stknylc_map)
+summ_stknylc_map <- cbind(summ_stknylc_map[,1:(ncol(summ_stknylc_map)-1)],data.frame(do.call('rbind', strsplit(as.character(summ_stknylc_map$flonlat), '___', fixed=TRUE))))
+colnames(summ_stknylc_map) <- str_replace(colnames(summ_stknylc_map), "X1", "lon")
+colnames(summ_stknylc_map) <- str_replace(colnames(summ_stknylc_map), "X2", "lat")
+summ_stknylc_map$lon <- as.numeric(paste(summ_stknylc_map$lon))
+summ_stknylc_map$lat <- as.numeric(paste(summ_stknylc_map$lat))
+# remove rows with no GPS coordinates 
+summ_stknylc_map <- summ_stknylc_map[!is.na(summ_stknylc_map$lat),]
+# remove species column with no count
+summ_stknylc_map[is.na(summ_stknylc_map)] <- 0
+
+summ_stknylc_map <-summ_stknylc_map[,abs(colSums(summ_stknylc_map))>0]
+
+colnames(summ_stknylc_map) <- str_replace(colnames(summ_stknylc_map), "Brown Trout", "BNT")
+colnames(summ_stknylc_map) <- str_replace(colnames(summ_stknylc_map), "Landlocked Salmon", "LAS")
+colnames(summ_stknylc_map) <- str_replace(colnames(summ_stknylc_map), "Lake Trout", "LAT")
+
+```
+
+
+```{r match ny and vt gps datasets, include=FALSE}
+# write function to add extra column when the name doesn't exist yet
+matchColName <- function(df_origin,df_toedit,replace=NA) {
+  for (i in 1:ncol(df_origin)) {
+    if (i==1) n1=0
+    if (!colnames(df_origin)[i] %in% colnames(df_toedit)) {
+      df_toedit$newcol <- rep(replace, nrow(df_toedit))
+      colnames(df_toedit) <- str_replace(colnames(df_toedit), "newcol", colnames(df_origin)[i])
+      n1=n1+1
+    }
+    if(i==ncol(df_origin)) message(paste0(n1," columns were added to the second data frame to match the first one columns."))
+  }
+  df_toedit <- return(df_toedit)
+}
+
+# apply function to 2 dataframes
+summ_stkvtlc_map <- matchColName(summ_stknylc_map,summ_stkvtlc_map, replace=0)
+summ_stknylc_map <- matchColName(summ_stkvtlc_map,summ_stknylc_map, replace=0)
+
+# rbind dataframes
+summ_stkvtlc_map$Agency <- "VT"
+summ_stknylc_map$Agency <- "NY"
+summ_stklc_map <- rbind(summ_stkvtlc_map,summ_stknylc_map[,colnames(summ_stkvtlc_map)])
+
+# when lon or lat are very close, make only one point
+summ_stklc_map <- summ_stklc_map[order(summ_stklc_map$lon),]
+newdf <- summ_stklc_map
+for (i in which(duplicated(summ_stklc_map$lon)&duplicated(summ_stklc_map$lat))) {
+  newdf[i,] <- c(colSums(summ_stklc_map[summ_stklc_map$lat==summ_stklc_map$lat[i],!colnames(summ_stklc_map) %in% c("lon","lat","Agency")]),summ_stklc_map[i,colnames(summ_stklc_map) %in% c("lon","lat","Agency")])
+  newdf$Agency[i] <- "NY/VT" 
+}
+summ_stklc_map <- newdf[-(which(duplicated(summ_stklc_map$lon))-1),]
+
+
+```
+
+Fish stocked on Lake Champlain watershed. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p <- ggplot() +  
+  #geom_sf(data = world) +
+  geom_sf(data = states) +
+  coord_sf(xlim = c(-74, -72.5), ylim = c(43.5, 45.5))  +
+  theme_set(theme_bw()) +
+  xlab("Longitude") + ylab("Latitude")
+
+p <- p + geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+  scale_fill_manual(values = c("lightgrey","darkgrey"))
+
+p  +
+  geom_scatterpie(data = summ_stklc_map, 
+                    aes(x=lon, y=lat, r = sqrt(total)/12000),
+                    cols = c("BKT", "BNT", "LAS", "LAT", "RBT", "STT", "WAE"),  alpha = 0.5) +
+    scale_fill_manual(
+        breaks = c("BKT", "BNT", "LAS", "LAT", "RBT", "STT", "WAE"),
+        labels = c("BKT", "BNT", "LAS", "LAT", "RBT", "STT", "WAE"),
+        values = c("BKT" = "orange",
+                   "BNT" = "red",
+                   "LAS" = "darkred",
+                   "LAT" = "yellow",
+                   "RBT" = "grey",
+                   "STT" = "black",
+                   "WAE" = "cyan")
+    )
+
+```
+
