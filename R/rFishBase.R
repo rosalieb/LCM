@@ -160,3 +160,37 @@ NLRBertalanffy<-nls(vonBertalanffy,data=list(Age=Age,Length=Length),start=list(L
 # ######Adding distribution of K from non linear regression
 # lines(xLoo,dnorm(xLoo,Loo_NL,sd_Loo_NL),lty=3) 
 # dev.off()
+
+
+# EcoBase ####
+#To get the list of available Ewe models
+
+library(RCurl)
+library(XML)
+library(plyr)
+
+
+
+#To obtain the list of available model
+h=basicTextGatherer()
+curlPerform(url = 'http://sirs.agrocampus-ouest.fr/EcoBase/php/webser/soap-client_3.php',writefunction=h$update)
+
+data<-xmlTreeParse(h$value(),useInternalNodes=TRUE)
+liste_mod<-ldply(xmlToList(data),data.frame)
+
+grep("Tampa Bay",liste_mod$model.model_name)
+grep("United States",liste_mod$model.country)
+
+#liste_mod contains a list and decription of available models in EcoBase  
+
+#To get the input values for model mymodel - 403 
+
+h=basicTextGatherer()
+mymodel<-403
+curlPerform(url = paste('http://sirs.agrocampus-ouest.fr/EcoBase/php/webser/soap-client.php?no_model=',mymodel,sep=''),writefunction=h$update,verbose=TRUE)
+
+
+data<-xmlTreeParse(h$value(),useInternalNodes=TRUE)
+
+input1<-xpathSApply(data,'//group',function(x) xmlToList(x))
+
