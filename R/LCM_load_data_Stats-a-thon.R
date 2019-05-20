@@ -158,7 +158,7 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step1.txt"))){
   message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
   answer <- readline()
   if(answer=="Y") write.table(unique_dat, file = paste0(getpath4data(),"LCM_unique_param_step1.txt"), col.names = T, row.names = F, sep="\t")
-}
+} else {write.table(unique_dat, file = paste0(getpath4data(),"LCM_unique_param_step1.txt"), col.names = T, row.names = F, sep="\t")}
 
 unique_dat$Result <- as.numeric(as.character(unique_dat$Result))
 
@@ -177,7 +177,7 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step2.txt"))){
   message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
   answer <- readline()
   if(answer=="Y") write.table(unique_dat_vertical, file = paste0(getpath4data(),"LCM_unique_param_step2.txt"), col.names = T, row.names = F, sep="\t")
-}
+} else {write.table(unique_dat_vertical, file = paste0(getpath4data(),"LCM_unique_param_step2.txt"), col.names = T, row.names = F, sep="\t")}
 
 # We have one issue left: when measurements have been taken in an interval or 2-4 days, we want to assume they are the same data.
 # Create an additional column with year+julian day.
@@ -197,10 +197,14 @@ unique_dat_vertical$StationID <- as.numeric(as.character(unique_dat_vertical$Sta
 mythreshold <- 4 #setting here my threshold. If two measurements have been carried out within 4 days e.g. Monday and Thursday, or Friday and Monday, they are considered as the same date.
 
 df <- unique_dat_vertical[order(unique_dat_vertical$StationID, decreasing = F),]
+myvec=NULL
+mysite=NULL
 for (i in unique(df$StationID)) {
   test4 <- df[df$StationID==i,]
   test4 <- test4[order(test4$Day, decreasing = F),] 
   dif <- abs(diff(test4$Day))
+  myvec <- c(myvec, dif)
+  mysite <- c(mysite, rep(i, length(myvec)))
   which_dif <- which(dif<=mythreshold)
   test5 <- test4[-c(which_dif,which_dif+1),]
   for (j in seq_along(which_dif)) {
@@ -215,7 +219,10 @@ for (i in unique(df$StationID)) {
   cat(paste0(nrow(test4)-nrow(test5)," days (out of ",nrow(test4), ") were merged for station ", i,", using ",mythreshold," days as a threshold for merging.\n"))
   if (i==unique(df$StationID)[1]) df_output <- test5 else df_output <- rbind(df_output, test5)
 }
-  
+myvec = myvec[myvec<50]  
+mysite=mysite[myvec<50]  
+abline(h=10)
+plot(order(myvec), pch=mysite[order(myvec)])
 nrow(df_output)
 summary(df_output)
 
@@ -224,9 +231,9 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step3.txt"))){
   message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
   answer <- readline()
   if(answer=="Y") write.table(df_output, file = paste0(getpath4data(),"LCM_unique_param_step3.txt"), col.names = T, row.names = F, sep="\t")
-}
+} else {write.table(df_output, file = paste0(getpath4data(),"LCM_unique_param_step3.txt"), col.names = T, row.names = F, sep="\t")}
 
-# Create a dataframe without all the unnecessary data ####
+# Create a dataframe without all biological data  ####
 df_lc <- df_output
 bloom_thresh <- 1*10^8 # Set here our threshold for bloom
 df_lc$Bloom <- ifelse(is.na(df_lc$`Net phytoplankton, Cyanobacteria biovolume`),
@@ -242,12 +249,41 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step4.txt"))){
   message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
   answer <- readline()
   if(answer=="Y") write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step4.txt"), col.names = T, row.names = F, sep="\t")
-}
+} else write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step4.txt"), col.names = T, row.names = F, sep="\t")
 
+
+# Assign the same value to E and H when no distinction is done ####
+df_lc2 <- df_lc
+head(df_lc2)
+grep("_E",x = names(df_lc2))
+gsub("_E","", names(df_lc2)[grep("_E",x = names(df_lc2))])
+for (i in 1:length(grep("_E",x = names(df_lc2)))) {
+  df_lc2[is.na(df_lc2[,grep("_E",x = names(df_lc2))[i]]), grep("_E",x = names(df_lc2))[i]] <- 
+    df_lc2[is.na(df_lc2[,grep("_E",x = names(df_lc2))[i]]), gsub("_E","", names(df_lc2)[grep("_E",x = names(df_lc2))[i]])]
+}
+for (i in 1:length(grep("_H",x = names(df_lc2)))) {
+  df_lc2[is.na(df_lc2[,grep("_H",x = names(df_lc2))[i]]), grep("_H",x = names(df_lc2))[i]] <- 
+    df_lc2[is.na(df_lc2[,grep("_H",x = names(df_lc2))[i]]), gsub("_H","", names(df_lc2)[grep("_H",x = names(df_lc2))[i]])]
+  # remove the column with integrated value
+  df_lc2 <- df_lc2[,-which(names(df_lc2)==gsub("_H","", names(df_lc2)[grep("_H",x = names(df_lc2))[i]]))]
+}
+dim(df_lc);dim(df_lc2)
 
 # Attemp model ####
+temporary <- gsub("_E|_H","",names(df_lc))
+for (i in 3:length(unique(temporary))) {
+  if(i==3) myvec = NULL
+  if(length(which(temporary %in% unique(temporary)[i]))>1) myvec <- c(myvec,which(rowSums(df_lc[, temporary==unique(temporary)[i]], na.rm = T)>0)) else 
+    myvec <- c(myvec,which(!is.na(df_lc[, temporary==unique(temporary)[i]])))
+}
+myvec <- unique(myvec)
+# There's always at least one data missing, so I don't really know how to create models with the same number of observation at the moment
+
 library(nlme)
 names(df_lc) <- gsub(" ",".",names(df_lc))
+df_lc$StationID <- as.factor(df_lc$StationID)
+df_lc$Day <- as.numeric(paste0(year(as.Date(df_lc$VisitDate,format="%d/%m/%Y")),yday(as.Date(df_lc$VisitDate,format="%d/%m/%Y"))))
+
 M0 <- gls(Bloom ~ Temperature, data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Bloom),])
 summary(M0)
 M1 <- gls(Bloom ~ Temperature + Total.Phosphorus, data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Bloom),])
@@ -255,4 +291,63 @@ summary(M1)
 M2 <- gls(Bloom ~ Temperature + Total.Phosphorus + Total.Nitrogen, data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),])
 summary(M2)
 AIC(M0,M1,M2) # but models are not fitted to the same number of observations...
+
+library(mgcv)
+M3 <- gamm(Bloom ~ s(Temperature), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Bloom),])
+summary(M3$lme)
+M4 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Bloom),])
+summary(M4$lme)
+M5 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),])
+summary(M5$lme)
+M6 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen) + factor(StationID), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),])
+summary(M6$lme)
+par(mfrow=c(1,3));plot(M6$gam);par(mfrow=c(1,1))
+# M7 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),],correlation = corAR1(form=~Day|StationID))
+# summary(M7$lme)
+# M8 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen) + factor(StationID), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),],correlation = corAR1(form=~Day))
+# summary(M8$lme)
+
+logLik(M0)
+logLik(M1)
+logLik(M2)
+logLik(M3$lme)
+logLik(M4$lme)
+logLik(M5$lme)
+logLik(M6$lme)
+
+## Look at correlation between variables ####
+cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "complete.obs")
+cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "pairwise.complete.obs")
+cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "na.or.complete")
+names(df_lc2)
+df_lc2_correlation <- as.data.frame(matrix(rep(NA,(ncol(df_lc2)-3)^2), ncol = (ncol(df_lc2)-3)))
+colnames(df_lc2_correlation) <- names(df_lc2)[3:(ncol(df_lc2)-1)]
+rownames(df_lc2_correlation) <- names(df_lc2)[4:ncol(df_lc2)]
+
+for (i in 3:(ncol(df_lc2)-1)) {
+  for (j in (i+1):ncol(df_lc2)) df_lc2_correlation[j-3,i-2] <- cor(df_lc2[,i], df_lc2[,j], use = "na.or.complete")
+}
+
+names(df_lc2)
+X1 <- rep(4:ncol(df_lc2), times=(ncol(df_lc2)-3))
+Y1 <- -rep(3:(ncol(df_lc2)-1), each=(ncol(df_lc2)-3))
+correlation <- as.vector(t(df_lc2_correlation))
+#color[is.na(color)] <- 0
+dat <- data.frame(X1,Y1,correlation)
+head(dat)
+
+library(ggplot2)
+library(plotly)
+c <- dat %>%
+  ggplot(aes(X1,Y1, fill = correlation)) + geom_tile() + 
+  theme_bw() + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                                                                                                                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+c <- ggplotly(c)
+c 
+
+
+## check the average difference between two measurements days
+
+
 
