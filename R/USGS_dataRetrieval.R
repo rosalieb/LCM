@@ -4,22 +4,62 @@ library(dataRetrieval)
 vignette("dataRetrieval",package = "dataRetrieval")
 
 siteNo <- "05427718"
-pCode <- "00060"
-start.date <- "2014-10-01"
+siteNo <- "503387" #Lake Champlain STORET for station 02
+siteNo <- "04294620" #Lake Champlain near Grand Isle
+siteNo <- "04294500" #Lake Champlain near Burlington According to site mapper https://maps.waterdata.usgs.gov/mapper/
+siteNo <- "04150408" # site 9 according to STORET DATABASE https://www.waterqualitydata.us/portal/#within=50&lat=44.47653735690138&long=-73.22058662436186&mimeType=csv
+siteNo <- "1VTDECWQ-500449" # site 07 according to STORET DATABASE https://www.waterqualitydata.us/portal/#within=50&lat=44.47653735690138&long=-73.22058662436186&mimeType=csv
+siteNo <- "1VTDECWQ-503519" # site 25
+
+pCode <- "00010" #sample data Temperature
+start.date <- "1996-10-01"
 end.date <- "2015-09-30"
 
-yahara <- readNWISuv(siteNumbers = siteNo,
+readNWISsite(siteNo)
+
+LC_grandIsle <- readNWISuv(siteNumbers = siteNo,
                      parameterCd = pCode,
                      startDate = start.date,
                      endDate = end.date)
-names(attributes(yahara))
-head(attributes(yahara))
+names(attributes(LC_grandIsle))
+head(attributes(LC_grandIsle))
+
+#Other option:
+#the website https://www.waterqualitydata.us/portal/#within=50&lat=44.47653735690138&long=-73.22058662436186&siteType=Lake%2C%20Reservoir%2C%20Impoundment&organization=1VTDECWQ&siteid=1VTDECWQ-503535&siteid=1VTDECWQ-500449&providers=STORET&mimeType=csv
+#gives an URL at the end, where we can add the sites we're interested in
+startDate <- "01-01-1990" #a very early date
+endDate   <- format(Sys.Date(), "%m-%d-%Y") #today
+listSites <- paste0("1VTDECWQ-",c("503387", #02
+                                  "503288", #04
+                                  "500449", #07
+                                  "500451", #09
+                                  "503506", #16
+                                  "500458", #19
+                                  "500459", #21
+                                  "503519", #25
+                                  "500468", #33
+                                  "503485", #34
+                                  "500470", #36
+                                  "503488", #40
+                                  "503535", #46
+                                  "503515", #50
+                                  "500476" #51
+                                  ))
+url <- paste0("https://www.waterqualitydata.us/portal/#within=50&lat=44.47653735690138&long=-73.22058662436186&siteType=Lake%2C%20Reservoir%2C%20Impoundment&",
+              "organization=1VTDECWQ&siteid=",
+              paste(listSites,sep="", collapse = "&siteid="),
+              "&startDateLo=",startDate,
+              "&startDateHi=",endDate,
+              "&providers=STORET&mimeType=csv&sorted=yes")
+url
+
+
 
 url <- attr(yahara, "url")
 url
 library(ggplot2)
 ts <- ggplot(data = yahara,
-             aes(dateTime, Flow_Inst)) +
+             aes(dateTime, X_00010_00000)) +
   geom_line()
 ts
 
