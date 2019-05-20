@@ -1,0 +1,192 @@
+---
+title: "Temporal variability in Lake Champlain basins"
+author: "Rosalie Bruel"
+date: "24/01/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Introduction
+
+A significant advantage to using Lake Champlain to compare food web models is that the lake is divided (by causeways) into four trophically different basins. The **Main Lake** is deep (122 m) and meso-oligotrophic, **Malletts Bay** is moderately deep (50 m) and oligotrophic, and the **Inland Sea** is moderately deep (35 m) and meso-eutrophic, whereas **Missisquoi Bay** is shallow (7 m) and highly eutrophic. Therefore, comparisons can be made among models and among different trophic systems within the same lake. For example, coldwater fish species avoid Missisquoi Bay, and stocked lake trout avoid the Inland Sea in summer, resulting in lower pressures on the forage base and different upper food webs compared to the Main Lake. Forage fish monitoring has been conducted in all of the basins except Missisquoi Bay; long-term ecological monitoring stations are present in all basins.
+
+
+```{r load packages and data, include=FALSE}
+# Load packages
+# Give the path of a specific script I want to load
+source(paste(getwd(),"/R/packages.R", sep=""))
+
+# Load data ####
+# There should be 15 monitoring points on the lake
+(Sys.glob(paste0(getpath4data(),"LakeMonitoringPoints/","*.txt")))
+filenames <- list.files(paste0(getpath4data(),"Data/LakeMonitoringPoints"), pattern="*.txt", full.names=TRUE)
+ldf <- lapply(filenames, read.csv, header=T, sep="\t")
+res <- lapply(ldf, summary)
+# The function below substr() will allow us to extract the number of the lake
+#    monitoring site in order to rename our new dataframes
+# The way data are formated in the folder, the site code is the two first characters
+#    of the file name
+# Because path changes for different users, we'll access it by getting the length
+#    of the path, and then adding 2 (to get pass the change in folder to the first
+#    character)
+location_name <- nchar(paste0(getpath4data(),"LakeMonitoringPoints"))+2
+
+names(res) <- paste("LCM",substr(filenames, location_name, location_name+1), sep="")
+for (i in 1:length(ldf))
+  assign(paste0("LCM",substr(filenames, location_name, location_name+1))[i], ldf[[i]]) # Create individual dataframes
+
+# Clean data - the date-time format varies ####
+for (i in 1:length(ldf)) {
+  temporary <- ldf[[i]] 
+  temporary$VisitDate <- parse_date_time(x = temporary$VisitDate, orders = c("m/d/y", "m/d/Y"))
+  assign(paste("LCM",substr(filenames, location_name, location_name+1), sep="")[i], temporary)
+  ldf[[i]] <- temporary
+  rm(temporary)
+}
+names(ldf) <- names(res)
+# Create one global data set ####
+total <- NULL
+for (i in 1:length(ldf)) {
+  total <- rbind(total,ldf[[i]])
+}
+summary(total)
+
+# transform the data to average per year
+total_year <- total
+total_year$VisitDate <- year(total_year$VisitDate )
+
+# transform the datasets
+total <- dcast(data = total,formula = VisitDate + StationID~Test,value.var = "Result",fun.aggregate = mean, na.rm = TRUE)
+total_year <- dcast(data = total_year,formula = VisitDate + StationID~Test,value.var = "Result",fun.aggregate = mean, na.rm = TRUE)
+dim(total)
+dim(total_year)
+
+```
+
+# 2. Materials and methods
+## 2.1. Prep data
+I edited the data and will work from mainly two datasets:
+- a dataset where intra-annual variability has been preserved (each measurement is still linked to its measurement date),
+- a dataset where I averaged the parameter per year.
+
+```{r view datasets I will work with}
+total[1:5,1:7]
+total_year[1:5,1:7]
+```
+
+## 2.2. Check outliers
+Running the code below takes a lot of time, so summary of outliers given below. Uncomment the 'dotchart()' to see individual plots. 
+```{r, echo=FALSE}
+par(mfrow=c(ceiling((ncol(total)-1)/5),5))
+for (i in 3:ncol(total)) {
+  #dotchart(total[,i], main=colnames(total[i]))
+}
+par(mfrow=c(1,1))
+```
+
+It seems that there might be an outlier for the Net Phytoplankton, Chlorophyta biovolume + density (one value is 4 times hogher than the previous max). The outlier is for station 4 (South Lake) on 2006-09-27 - not a site I'm using so not too bad.
+
+Outlier too for Chrysophyta biovolume, station 50 (Missisquoi Bay) on 2014-09-19.
+
+Max value (but doesn't behave as an outlier) for Cyanobacteria on 2013-07-30, at station 51 (Missiquoi Bay).
+
+No outlier for Pyrrophyta biovolume either, max value on 2008-06-27, station 25 (Malletts Bay). Max values for Pyrrophyta density on 2007-07-16	for stations 34 and 40 (Northeast Arm, Inland Sea).
+
+For Net phytoplankton, total biovolume, max value on 2014-09-19 for station 50 (Missisquoi Bay). For Net phytoplankton, total density, max value on 2013-07-30 for station 51 (Missisquoi Bay).
+
+For Ortho-Phosphorus, max value for station 2 on 1994-07-27 (most likely an outlier).
+
+Total Phosphorus, max value for station 2 on 2004-08-17	(235 µg/L).
+
+Max Total Suspended solids for station 2 (South Lake, southern most station) on 2004-08-17.
+
+```{r check outliers}
+total[order(total$`Net phytoplankton, Chlorophyta biovolume`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, Chlorophyta density`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, Chrysophyta biovolume`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, Cyanobacteria biovolume`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, Cyanobacteria density`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, Pyrrophyta biovolume`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, Pyrrophyta density`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, total biovolume`, decreasing = T),][1:5,1:2]
+total[order(total$`Net phytoplankton, total density`, decreasing = T),][1:5,1:2]
+
+total[order(total$`Ortho-Phosphorus`, decreasing = T),][1:5,1:2]
+total[order(total$`Total Phosphorus`, decreasing = T),][1:5,1:2]
+total[order(total$`Total Suspended Solids`, decreasing = T),][1:5,1:2]
+
+```
+
+
+## 2.3. Write a function to do PCAs
+Creating a function to repeat the PCA more easily accross station.
+```{r prep dataset for PCA function}
+# Parameters of the function should be:
+#  mstationID= the number of the monitoring site, e.g., 2= South Lake B
+#  replaceNas= logical argument to indicate whether NAs should be replaced by average mean. Default to TRUE
+mpca_data <- function(mstationID, replaceNAs=T)
+{
+  mdata <- total_year[total_year$StationID==mstationID,]
+
+  # First, deleting the columns that have only NAs (could happen when some parameters where never measured at the specific station)
+  mdata <- mdata[colSums(!is.na(mdata)) > 0]
+  
+  # NAs cannot be handled by the PCA. 
+  # I'm replacing the NAs by the column average, so they won't get any weight in the analysis
+  if (replaceNAs) for (i in 3:ncol(mdata)) {
+    mdata[is.na(mdata[,i]),i] <- mean(mdata[,i], na.rm=T)
+  }
+  
+  return(mdata)
+}
+
+```
+
+
+
+# 3. Results
+## 3.1. Main Lake
+The Main Lake is deep (122 m) and meso-oligotrophic. The monitoring point 19 is in the middle of the main lake. 
+
+```{r PCA for Main Lake}
+mydata <- mpca_data(mstationID = 19, replaceNAs = TRUE)
+ 
+  acpR<-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
+  summary(acpR)
+  s.corcircle(acpR$co, clab=0.8)
+  s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
+#  legend("topleft", legend = c(paste("PC1:",round(acpR$eig[1]/sum(acpR$eig)*100,2),"%",sep=""), paste("PC2:",round(acpR$eig[2]/sum(acpR$eig)*100,2),"%"),sep=""), cex=.4)
+  #s.arrow(acpR$co, add.p=TRUE)
+  
+```
+
+## 3.2. Mallets Bay
+Malletts Bay is moderately deep (50 m) and oligotrophic
+
+```{r PCA for Mallets Bay}
+mydata <- mpca_data(mstationID = 25, replaceNAs = TRUE)
+ 
+acpR<-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
+summary(acpR)
+s.corcircle(acpR$co, clab=0.8)
+s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
+
+  
+```
+
+## 3.3. Inland Sea
+The Inland Sea is moderately deep (35 m) and meso-eutrophice. 
+
+```{r PCA for Inland Sea}
+mydata <- mpca_data(mstationID = 34, replaceNAs = TRUE)
+ 
+acpR<-dudi.pca(mydata[,-c(1,2)], scannf = FALSE)
+summary(acpR)
+s.corcircle(acpR$co, clab=0.8)
+s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
+
+  
+```
