@@ -481,14 +481,14 @@ tg$tl_mm <- tg$tl_mm  %>% paste() %>% as.numeric()
 # mean 
 mu <- ddply(tg, "fyear", summarise, grp.mean=mean(tl_mm, na.rm=T))
 # Density plot
-ggplot(tg, aes(x=tl_mm, fill=fyear)) +
+p <- ggplot(tg, aes(x=tl_mm, fill=fyear)) +
   geom_density()+
   geom_vline(data=mu, aes(xintercept=grp.mean, color=fyear),
              linetype="dashed") +
   geom_density(alpha=0.2) +
   xlab("total length (mm)") + 
   labs(fill='Year')
-
+ ggplotly(p)
 
 ```
 
