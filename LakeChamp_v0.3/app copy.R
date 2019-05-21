@@ -10,11 +10,11 @@
 library(shiny)
 library(ggplot2)
 library(gridExtra)
-library(shiny)
 library(DT)
 library(yaml)
 library(shinydashboard)
 library(leaflet)
+
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
@@ -33,6 +33,21 @@ boatIcon <- makeIcon(
 xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
+
+
+# tweaks, a list object to set up multicols for checkboxGroupInput
+tweaks <- 
+  list(tags$head(tags$style(HTML("
+                                 .multicol { 
+                                   height: 150px;
+                                   -webkit-column-count: 5; /* Chrome, Safari, Opera */ 
+                                   -moz-column-count: 5;    /* Firefox */ 
+                                   column-count: 5; 
+                                   -moz-column-fill: auto;
+                                   -column-fill: auto;
+                                 } 
+                                 ")) 
+  ))
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -72,6 +87,7 @@ ui <- dashboardPage(
         icon = icon("bar-chart"),
         menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
+        menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
         sliderInput("range", "Years selected",
                     min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
                     value = c(2000,2012),sep = ""),
@@ -102,14 +118,19 @@ ui <- dashboardPage(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
         box(
-          title = "Station Selection",
+          title = "Instructions",
           collapsible = TRUE,
           width = "100%", 
-          height = "70%",
+          height = "20%",
+          #Render an output text
+          htmlOutput("Instructions_plot_1"),
           conditionalPanel(
             'input$id2 == "sites"',
-            checkboxGroupInput("param_toshow", "Sites to show:",
-                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)))
+            tags$div(tweaks,
+                     align = 'left', 
+                     class = 'multicol',
+                     checkboxGroupInput("param_toshow", "Sites to show:",
+                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)),inline   = FALSE))
           )
         ),
         box(
@@ -130,6 +151,10 @@ ui <- dashboardPage(
       tabItem(
         tabName = "d_table",
         DT::dataTableOutput("mytable1")
+      ),
+      tabItem(
+        tabName = "d_stats",
+        htmlOutput("Stats")
       )
     )
   )
@@ -145,6 +170,11 @@ server <- function(input, output) {
     linkToSite <- "To visit the Lake Champlain Basin Program's website, click <a href = 'http://www.lcbp.org/'>here</a>. <br/> <br/>"
     linkToData <- "To retrieve the data on Lake Champlain used for this project, click <a href = 'https://dec.vermont.gov/watershed/lakes-ponds/monitor/lake-champlain'>here</a>."
     HTML(paste(header, myparagraph1, myparagraph2, linkToSite, linkToData))
+  })
+  
+  output$Instructions_plot_1 <- renderUI({ 
+    Instruction1 <- paste0("Select on the left side the parameters to plot (you need to select at least one), as well as the period for which you want to visualize the data. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period.<br/>Then, select the sites you want to see the data for.<br/><br/>")
+    HTML(paste(Instruction1))
   })
   
   output$mymap1 <- renderLeaflet({
@@ -163,7 +193,7 @@ server <- function(input, output) {
       ggplot(data.frame())
     } else {
       gl <- lapply(input$sites_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
+                   function(b) ggplotlyggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
                      as.numeric(input$param_toshow), b]), color = grp) +
                      geom_point() +
@@ -197,6 +227,15 @@ server <- function(input, output) {
   # table
   output$mytable1 <- DT::renderDataTable({
     DT::datatable(out[out$year >= as.numeric(input$range[1]) & out$year <= as.numeric(input$range[2]), ], filter = 'top', options = list(orderClasses = TRUE, scrollX = TRUE))
+  })
+  
+  # Stats
+  output$Stats <- renderUI({ 
+    Header       <- "<h1>Stat tools</h1> <br/>"
+    Header1      <- "<h2>Correlation</h2> <br/>"
+    Instruction1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
+                           </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>")
+    HTML(paste(Header,Header1,Instruction1))
   })
   
 }
