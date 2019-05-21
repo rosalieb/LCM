@@ -253,7 +253,7 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step4.txt"))){
 
 
 # Assign the same value to E and H when no distinction is done ####
-df_lc2 <- df_lc
+df_lc2 <- df_lc[,-which(names(df_lc)=="NA")]
 head(df_lc2)
 grep("_E",x = names(df_lc2))
 gsub("_E","", names(df_lc2)[grep("_E",x = names(df_lc2))])
@@ -320,14 +320,56 @@ cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "complete.obs")
 cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "pairwise.complete.obs")
 cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "na.or.complete")
 names(df_lc2)
-df_lc2_correlation <- as.data.frame(matrix(rep(NA,(ncol(df_lc2)-3)^2), ncol = (ncol(df_lc2)-3)))
-colnames(df_lc2_correlation) <- names(df_lc2)[3:(ncol(df_lc2)-1)]
-rownames(df_lc2_correlation) <- names(df_lc2)[4:ncol(df_lc2)]
+r <- as.data.frame(matrix(rep(NA,(ncol(df_lc2)-2)^2), ncol = (ncol(df_lc2)-2)))
+colnames(r) <- names(df_lc2)[3:ncol(df_lc2)]
+rownames(r) <- names(df_lc2)[3:ncol(df_lc2)]
+p <- r
+n <- r
 
-for (i in 3:(ncol(df_lc2)-1)) {
-  for (j in (i+1):ncol(df_lc2)) df_lc2_correlation[j-3,i-2] <- cor(df_lc2[,i], df_lc2[,j], use = "na.or.complete")
+for (i in 3:(ncol(df_lc2))) {
+  for (j in 3:ncol(df_lc2)) {
+    z <- !is.na(df_lc2[!is.na(df_lc2[,j]),i])
+    z <- length(z[z==TRUE])
+    n[j-2,i-2] <- z
+    if(z>5) {
+      res <- cor.test(df_lc2[,i], df_lc2[,j])#, use = "na.or.complete")
+      r[j-2,i-2] <- res$estimate
+      p[j-2,i-2] <- res$p.value
+    }
+  }
 }
+res <- list(r=r, P=p, n=n)
 
+# Correlation matrix
+# ++++++++++++++++++++++++++++
+# flattenCorrMatrix
+# ++++++++++++++++++++++++++++
+# cormat : matrix of the correlation coefficients
+# pmat : matrix of the correlation p-values
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+  )
+}
+library(Hmisc)
+flattenCorrMatrix(res$r, res$P)
+
+library(corrplot)
+res$r2 <- res$r
+res$r2[is.na(res$r2)] <- 0
+
+# rename to inprove visibility
+colnames(res$r2) <-c("Alk_E","Alk_H","Ca", "Chl_E","Chl_H","Cond","DIC_E", "DIC_H","DOC_E","DOC_H","DO_E","DO_H","DP_E","DP_H","DSi_E" ,
+                     "DSi_H","Fe_E","Fe_H","Pb_E","Pb_H","Mg_E","Mg_H","OrtP_E","OrtP_H",  "pH_E", "pH_H","Pot_E","Pot_H","Secchi","Na_E",
+                     "Na_H","T_E","T_H","NH3_E","NH3_H","TKN_E","TKN_H","NO23_E","NO23_H","N_E", "N_H","TOC_E","TOC_H","TP_E","TP_H","TSS_E","TSS_H","Bloom")
+rownames(res$r2) <- colnames(res$r2)
+p <- corrplot(as.matrix(res$r2), type="upper", order="hclust", tl.col="black", tl.srt=45)
+
+# Try to do it interactively with ggplotly:
 names(df_lc2)
 X1 <- rep(4:ncol(df_lc2), times=(ncol(df_lc2)-3))
 Y1 <- -rep(3:(ncol(df_lc2)-1), each=(ncol(df_lc2)-3))
@@ -345,6 +387,7 @@ c <- dat %>%
                                                                                                                      panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 c <- ggplotly(c)
 c 
+
 
 
 ## check the average difference between two measurements days
