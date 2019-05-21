@@ -194,7 +194,7 @@ server <- function(input, output) {
       ggplot(data.frame())
     } else {
       gl <- lapply(input$sites_toshow, 
-                   function(b) ggplotlyggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
                      as.numeric(input$param_toshow), b]), color = grp) +
                      geom_point() +
