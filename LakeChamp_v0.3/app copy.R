@@ -14,7 +14,8 @@ library(DT)
 library(yaml)
 library(shinydashboard)
 library(leaflet)
-
+# names(tags) # list of tags recognized by shiny.
+library(htmlTable)
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
@@ -233,9 +234,33 @@ server <- function(input, output) {
   output$Stats <- renderUI({ 
     Header       <- "<h1>Stat tools</h1> <br/>"
     Header1      <- "<h2>Correlation</h2> <br/>"
-    Instruction1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
-                           </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>")
-    HTML(paste(Header,Header1,Instruction1))
+    Header11     <- "<h3>Theory</h3> <br/>"
+    Theory1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
+                           </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
+                           </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
+                           </br>")
+    Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
+    Header12     <- "<h3>Try it for yourself</h3> <br/>"
+    mcor         <- if(length(input$sites_toshow)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
+    n            <- if(length(input$sites_toshow)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[2]]),input$sites_toshow[1]])) else "NA"
+    Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the left menu. If you select more than that, the correlation will be calculated for the two firsts parameters.</br>
+                           </br>The correlation between <b>", input$sites_toshow[1], "</b> and <b>", input$sites_toshow[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
+                           If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
+    Header2      <- "<h2>Basic stats</h2> <br/>"
+    Header21     <- "<h3>Theory</h3> <br/>"
+    Theory2      <- paste0("</br>This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
+                           </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow to chose what to visualize (raw dataset or annual averages).)
+                           </br>")
+    Header22     <- "<h3>Try it for yourself</h3> <br/>"
+    mmean        <- NULL
+    if(length(input$sites_toshow)>0) for (i in 1:length(input$sites_toshow)) mmean <- paste(mmean, input$sites_toshow[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$param_toshow) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$sites_toshow[i]]))," observations. </br>")
+    mstations <- paste(as.numeric(input$param_toshow),sep="", collapse=", ")
+    Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the left menu. </br>
+                                    The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
+    HTML(paste(Header,
+               Header1,Header11,Theory1, Img1, Header12,Results_Corr,
+               Header2,Header21,Theory2, Header22,Results_basic_stats, mmean))
+   
   })
   
 }
