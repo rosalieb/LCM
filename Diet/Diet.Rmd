@@ -17,7 +17,7 @@ library(ggplot2)
 library(binr)
 library(matrixStats)
 
-LTdata <- read.csv("LT_2016-2018.csv")
+LTdata <- read.csv("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2016-2018.csv")
 
 LTdata$Weight[LTdata$Weight < 3000 & LTdata$Total.Length > 750] <- NA
 LTdata$Total.Length[LTdata$Weight < 3000 & LTdata$Total.Length > 750] <- NA
