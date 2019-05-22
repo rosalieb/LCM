@@ -43,12 +43,18 @@ library(rgeos)
 library(lubridate)
 library(reshape2)
 
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
 
 ```
 
 
 ```{r read data, include=FALSE}
-LTcond <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_ConditionOverall.txt")
+LTcond <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_ConditionOverall.txt"))
+
 ```
 
 Displaying some summary data, including number of wild vs. stocked fish per year and basins, and number of fish collected per year (lot more in 2018 than the previous years).
@@ -279,7 +285,7 @@ panel.background = element_blank(), axis.line = element_line(colour = "black")) 
 
 ## Map trips
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-bathy<-readOGR("/Users/Rosalie/Desktop/Travail/QGIS/LakeChamplainBathy/LakeChamplain_Shapefile/LakeChamplain.shp")
+bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
 lcgroupmap=c("lake",rep("island", 84562))
 
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -389,13 +395,13 @@ First, import the data. They are all kept in different files, so that need to be
 ```{r read data catch, include=FALSE}
 # Read data
 # target catch
-tg16 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2016_targetcatch.txt");tg16$notes <- rep(NA, nrow(tg16))
-tg17 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2017_targetcatch.txt")
-tg18 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2018_targetcatch.txt")
+tg16 <- read.delim(paste0(getpath4data(), "data_from_Pascal/LT_2016_targetcatch.txt"));tg16$notes <- rep(NA, nrow(tg16))
+tg17 <- read.delim(paste0(getpath4data(), "data_from_Pascal/LT_2017_targetcatch.txt"))
+tg18 <- read.delim(paste0(getpath4data(), "data_from_Pascal/LT_2018_targetcatch.txt"))
 # bycatch
-byc16 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2016_bycatch.txt")
-byc17 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2017_bycatch.txt")
-byc18 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2018_bycatch.txt")
+byc16 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2016_bycatch.txt"))
+byc17 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2017_bycatch.txt"))
+byc18 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2018_bycatch.txt"))
 
 # merge dataframe
 tg <- merge(t(tg17),t(tg16), by = "row.names", all = T)
@@ -475,14 +481,14 @@ tg$tl_mm <- tg$tl_mm  %>% paste() %>% as.numeric()
 # mean 
 mu <- ddply(tg, "fyear", summarise, grp.mean=mean(tl_mm, na.rm=T))
 # Density plot
-ggplot(tg, aes(x=tl_mm, fill=fyear)) +
+p <- ggplot(tg, aes(x=tl_mm, fill=fyear)) +
   geom_density()+
   geom_vline(data=mu, aes(xintercept=grp.mean, color=fyear),
              linetype="dashed") +
   geom_density(alpha=0.2) +
   xlab("total length (mm)") + 
   labs(fill='Year')
-
+ ggplotly(p)
 
 ```
 
@@ -540,7 +546,7 @@ ggplot(data=summ_sc, aes(x=rownames(summ_sc),y=summ_sc[,1])) +
 
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-LTdiet <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_diet_2016-2018.txt")
+LTdiet <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_diet_2016-2018.txt"))
 LTdiet$Total.Length <- as.numeric(paste(LTdiet$Total.Length..mm.))
 LTdiet$Start.Depth <- as.numeric(paste(LTdiet$Start.Depth..m.))
 LTdiet$Food.in.Stomach..Y.N.
