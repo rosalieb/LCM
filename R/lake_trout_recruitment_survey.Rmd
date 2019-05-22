@@ -220,6 +220,10 @@ First, import the data. They are all kept in different files, so that need to be
 LTeff16 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2016_effort.txt")
 LTeff17 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2017_effort.txt")
 LTeff18 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2018_effort.txt")
+
+LTeff16 <- read.delim("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2016_effort.txt")
+LTeff17 <- read.delim("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2017_effort.txt")
+LTeff18 <- read.delim("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2018_effort.txt")
 order_name <- colnames(LTeff18)
 
 # Check which columns match and which don't

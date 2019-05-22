@@ -197,7 +197,7 @@ server <- function(input, output) {
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
                      as.numeric(input$param_toshow), b]), color = grp) +
-                     geom_point() +
+                     geom_point(color = out$StationID) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
                      #ggcolors(~input$mysites)
