@@ -11,6 +11,10 @@ editor_options:
 
 I always have to include the code for my libraries so everything functions properly. In addition, I'm reading in the data file I'll be using for the analysis. I'm also getting rid of two outliers. They were very long fish that were quite skinny. 
 
+Since Rosalie and I have different paths to the data we're using, there's some code to fix this.
+
+Please take advantage of the very useful package, ggplotly, which allows the viewer of this html document to hover over the graphs to obtain precise calculations. For example, one can see the exact values of points on a scatterplot or a bar on a bar chart just by placing the mouse over the graph.
+
 ```{r setup, message = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -18,6 +22,7 @@ library(dplyr)
 library(ggplot2)
 library(binr)
 library(matrixStats)
+library(plotly)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -35,17 +40,21 @@ LTdiet$Total.Length[LTdiet$Weight < 3000 & LTdiet$Total.Length > 750] <- NA
 
 ## Relationship Between Length and Weight, Separated by Age
 
-Here, I'm creating a scatterplot of the weight of the fish by their length. I included a filter for age to see how this relationship varies by age. In addition, I included a log-transformed version of this plot. 
+Here, I'm creating a scatterplot of the weight of the fish by their length. I included a filter for age to see how this relationship varies by age. In addition, I included a log-transformed version of this plot to be able to interpret it in a linear fashion. 
 
 ```{r age, warning=FALSE}
-LTdiet %>% ggplot(mapping = aes(x = Total.Length,
+# This is the code for the scatterplot without the log-transformation. 
+LW.age.nolog <- LTdiet %>% ggplot(mapping = aes(x = Total.Length,
                                 y = Weight, 
                                 color = Age)) +
   geom_point() +
   labs(x = "Total Length (mm)", y = "Weight (g)") +
   geom_smooth(method = "loess", color = "black")
 
-LTdiet %>%  ggplot(mapping = aes(x = Total.Length, 
+ggplotly(LW.age.nolog)
+
+# This is the code for the scatterplot with the log-transformation. 
+LW.age.log <- LTdiet %>%  ggplot(mapping = aes(x = Total.Length, 
                                  y = Weight,
                                  color = Age)) +
   geom_point() +
@@ -53,6 +62,8 @@ LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
   scale_y_log10() +
   labs(x = "Total Length (mm)", y = "Weight (g)") +
   geom_smooth(method = "lm", color = "black")
+
+ggplotly(LW.age.log)
 ```
 
 ## Relationship Between Length and Weight, Separated by Clip Location
@@ -60,14 +71,18 @@ LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
 Here, I'm creating another scatterplot of the weight/length relationship for lake trout, but included the location of the clip as a filter. I also included a log-transformed version of this plot.
 
 ```{r cliplocation, warning=FALSE}
-LTdiet %>% ggplot(mapping = aes(x = Total.Length,
+# This is the code for the scatterplot without the log-transformation. 
+LW.clip.nolog <- LTdiet %>% ggplot(mapping = aes(x = Total.Length,
                                 y = Weight, 
                                 color = Clip.Location)) +
   geom_point() +
   labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
   geom_smooth(method = "loess", color = "black")
 
-LTdiet %>%  ggplot(mapping = aes(x = Total.Length, 
+ggplotly(LW.clip.nolog)
+
+# This is the code for the scatterplot with the log-transformation. 
+LW.clip.log <- LTdiet %>%  ggplot(mapping = aes(x = Total.Length, 
                                  y = Weight,
                                  color = Clip.Location)) +
   geom_point() +
@@ -75,6 +90,8 @@ LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
   scale_y_log10() +
   labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
   geom_smooth(method = "lm", color = "black")
+
+ggplotly(LW.clip.log)
 ```
 
 ## Length and Weight Relationship between Stocked and Wild Lake Trout
@@ -82,7 +99,9 @@ LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
 Stocked trout are typically larger than wild fish. They often have longer lengths and greater weights than wild fish. 
 
 ```{r stocked, warning = FALSE}
-LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
+# Here, I'm recoding the clip types to either "Wild" or "Stocked". This is the code for the scatterplot without the 
+# log transformation. 
+LW.stocked.nolog <- LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
                                     Clip.Location == "AD" ~ "Stocked",
                                     Clip.Location == "LP" ~ "Stocked",
                                     Clip.Location == "LV" ~ "Stocked",
@@ -97,7 +116,10 @@ LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
   labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
   geom_smooth(method = "loess", color = "black")
 
-LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
+ggplotly(LW.stocked.nolog)
+
+# This is the code for the scatterplot with the log-transformation. 
+LW.stocked.log <- LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
                                     Clip.Location == "AD" ~ "Stocked",
                                     Clip.Location == "LP" ~ "Stocked",
                                     Clip.Location == "LV" ~ "Stocked",
@@ -115,6 +137,8 @@ LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
   scale_y_log10() +
   labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
   geom_smooth(method = "lm", color = "black")
+
+ggplotly(LW.stocked.log)
 ```
 
 ## Proportion of Empty Stomachs For Each Length Class
@@ -125,10 +149,13 @@ Here, I'm creating a bar chart of the proportion of empty stomachs size classes 
 if(Sys.getenv("USER")=="Rosalie") {
   LTdiet$Food.in.Stomach <- LTdiet$Food.in.Stomach..Y.N.
   LTdiet$Stomach.Weight  <- LTdiet$Stomach.Weight..g.
-  LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="no"] <- "N"
-  LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="yes"|LTdiet$Food.in.Stomach=="T"] <- "Y"
 }
-  
+
+# Recoding some typos and inconsistencies so we're all on the same track.
+LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="no"] <- "N"
+LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="yes"|LTdiet$Food.in.Stomach=="T"] <- "Y"
+
+# Creating some classes based on the length of the lake trout. 
 LTdiet <- LTdiet  %>% mutate(size_class = case_when(
   Total.Length <= 100 ~ "[0,100]",
   Total.Length > 100 & Total.Length <= 200 ~ "]100,200]", 
@@ -137,36 +164,161 @@ LTdiet <- LTdiet  %>% mutate(size_class = case_when(
   Total.Length > 400 & Total.Length <= 500 ~ "]400,500]",
   Total.Length > 500 ~ "]500,∞]"))
 
+# This creates a tabular output that gives the count of "N" and "Y" to the question, "Is there food in the stomach?" for 
+# each size class. 
 (summ_sc <- with(LTdiet, tapply(rep(1,nrow(LTdiet)),list("Size class" = size_class, "Food" = Food.in.Stomach), sum)))
 
+# This converts the tabular output of counts into percentages.
 (summ_sc <- as.data.frame(summ_sc / rowSums(summ_sc, na.rm=T) * 100))
 
-ggplot(data = summ_sc, aes(x = rownames(summ_sc),y = summ_sc[,"N"])) +
+# This uses the calculated percentages to create a bar chart of the percentage of empty stomachs for each size class.
+empty.sizeclass <- ggplot(data = summ_sc, aes(x = rownames(summ_sc),y = summ_sc[,"N"])) +
   geom_bar(stat = "identity") + xlab("Size Class") + ylab("Percentage of Empty Stomachs")
+
+ggplotly(empty.sizeclass)
 ```
 
 ## Lake Trout Diet by Length
 
-The relationship between the size of stomachs and the length of the fish is not well summarized by a linear model. 
+The relationship between the size of stomachs and the length of the fish is not well summarized by a linear model. Log-transforming the plot does not do anything beneficial in terms of interpretation. There may not be a pattern/relationship between their diet and the length. 
 
 ```{r stomach.weight.by.length, warning=FALSE}
-LTdiet %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(Stomach.Weight))) +
+# This is the code for the scatterplot of stomach weight by total length of the fish. 
+stomachweight.length <- LTdiet %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(Stomach.Weight))) +
   geom_point() + 
   xlab("Length (mm)") + 
   ylab("Stomach Weight (g)") +
-  stat_smooth(method = "lm") 
+  stat_smooth(method = "lm")
+
+ggplotly(stomachweight.length)
 ```
 
 ## Lake Trout Diet by Weight
 
-The relationship between the size of the stomachs and the weight of the fish is not well summarized by a linear model. 
+The relationship between the size of the stomachs and the weight of the fish is not well summarized by a linear model. In addition to the previous plot, log-transforming is not beneficial. There may not be a pattern/relationship between the weight of their stomachs and their total body weight. 
 
 ```{r stomach.weight.by.weight, warning=FALSE}
-LTdiet %>% ggplot(mapping = aes(x = Weight, y = as.numeric(Stomach.Weight))) +
+# This is the code for the scatterplot of stomach weight by weight of the fish. 
+stomachweight.weight <- LTdiet %>% ggplot(mapping = aes(x = Weight, y = as.numeric(Stomach.Weight))) +
   geom_point() + 
   xlab("Weigth (g)") + 
   ylab("Stomach Weight (g)") +
   stat_smooth(method = "lm") 
+
+ggplotly(stomachweight.weight)
 ```
 
+## Lake Trout Stomach Weight by Month
+
+There does not appear to be any month in which lake trout stomach weights are larger or smaller. This is probably for the best, because this indicates that sampling at a certain time of the year will not bias the results. December has very few data points (n = 1), which is why it looks odd.  
+
+```{r stomach.weight.by.capture.month, warning=FALSE}
+# Here, I'm recoding some of the months so they're all consistent. There was a mixture of numbers and months, so I picked one method and went with it. 
+LTdiet$Capture.Month[LTdiet$Capture.Month == 4] <- "April"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 5] <- "May"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 6] <- "June"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 7] <- "July"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 8] <- "August"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 9] <- "September"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 10] <- "October"
+LTdiet$Capture.Month[LTdiet$Capture.Month == 11] <- "November"
+
+# This is the code for the boxplot of stomach weights for each month of sampling. 
+stomachweight.month <- LTdiet %>% ggplot(mapping = aes(x = Capture.Month, y = as.numeric(paste(Stomach.Weight)), fill = Capture.Month)) +
+  geom_boxplot() +
+  xlab("Capture Month") +
+  ylab("Stomach Weight (g)") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_discrete()
+
+ggplotly(stomachweight.month)
+```
+
+## Lake Trout Length by Nativity
+
+Stocked lake trout (n = 1129) tend to be much longer than wild lake trout (n = 1135). In fact, a 95% confidence interval suggests the true difference in mean length between stocked and wild lake trout lies between 103.7 and 120.1 mm. The difference is statistically significant, as indicated by the very low p-value of 2.2e-16.
+
+```{r length.by.origin, warning=FALSE}
+# This is a quick chunk of code to make a new variable called "stock.wild", which will tell the user whether or not the trout is stocked based on the presence of a fin clip. 
+LTdiet$stock.wild <- ifelse(LTdiet$Clip.Location == "NC", "Wild", "Stocked")
+
+# This is the code for a bar chart of the average total length of stocked vs. wild lake trout. 
+length.stock.wild <- LTdiet %>% ggplot(mapping = aes(x = stock.wild, y = Total.Length, fill = stock.wild)) +
+  geom_bar(stat = "summary", fun.y = "mean") +
+  labs(y = "Average Total Length (mm)", fill = "") +
+  theme(axis.title.x = element_blank()) 
+
+ggplotly(length.stock.wild)
+
+# This computes the t-test for the difference in average total length between stocked and wild lake trout. 
+t.test(LTdiet$Total.Length ~ LTdiet$stock.wild)
+
+# This is just calculating the number of observations of wild and stocked lake trout. 
+(num.wild <- length(LTdiet$stock.wild[LTdiet$stock.wild == "Wild"]))
+(num.stocked <- length(LTdiet$stock.wild[LTdiet$stock.wild == "Stocked"]))
+```
+
+## Lake Trout Weight by Nativity
+
+Stocked lake trout (n = 1129) tend to be much heavier than wild lake trout (n = 1135). We are 95% confident that the true difference in mean weight between stocked and wild lake trout is between 220.5 and 306.0 g (p = 2.2e-16).
+
+```{r weight.by.origin, warning=FALSE}
+# This is the code for tha bar chart of the difference in weight between stocked and wild lake trout. 
+weight.stock.wild <- LTdiet %>% ggplot(mapping = aes(x = stock.wild, y = Weight, fill = stock.wild)) +
+  geom_bar(stat = "summary", fun.y = "mean") +
+  labs(y = "Average Weight (g)", fill = "") +
+  theme(axis.title.x = element_blank()) 
+
+ggplotly(weight.stock.wild)
+
+# Again, this is code for the t-test for the difference in average weight between stocked and wild lake trout. 
+t.test(LTdiet$Weight ~ LTdiet$stock.wild)
+```
+
+## Stomach Contents for All Lake Trout
+
+Here is a distribution of the food items preyed upon by lake trout. Some of the most common food items include alewife, mysus, and daphnia, which make up over 58.3% of their diet. The next sections will break down their diet for each length class. The "other" category contributes over 35.6% of the lake trout's diet, so there's a large portion of their diet that was unidentified.
+
+```{r, contents.for.all}
+LTdiet$Smelt <- as.numeric(LTdiet$Smelt)
+LTdiet$Smelt.YOY <- as.numeric(LTdiet$Smelt.YOY)
+LTdiet$Alewife <- as.numeric(LTdiet$Alewife)
+LTdiet$Alewife.YOY <- as.numeric(LTdiet$Alewife.YOY)
+LTdiet$Sculpin <- as.numeric(LTdiet$Sculpin)
+LTdiet$Sculpin.YOY <- as.numeric(LTdiet$Sculpin.YOY)
+LTdiet$YOY <- as.numeric(LTdiet$YOY)
+LTdiet$Mysis <- as.numeric(LTdiet$Mysis)
+LTdiet$Yellow.Perch <- as.numeric(LTdiet$Yellow.Perch)
+LTdiet$Unidentifiable.Fish <- as.numeric(LTdiet$Unidentifiable.Fish)
+LTdiet$Daphnia <- as.numeric(LTdiet$Daphnia)
+LTdiet$Copepod <- as.numeric(LTdiet$Copepod)
+LTdiet$zoops <- as.numeric(LTdiet$zoops)
+LTdiet$Spiny.Water.Flea <- as.numeric(LTdiet$Spiny.Water.Flea)
+LTdiet$Trout.perch <- as.numeric(LTdiet$Trout.perch)
+LTdiet$Tess..Darter <- as.numeric(LTdiet$Tess..Darter)
+LTdiet$Macroinvert <- as.numeric(LTdiet$Macroinvert)
+LTdiet$fishes <- as.numeric(LTdiet$fishes)
+LTdiet$Other <- as.numeric(LTdiet$Other)
+
+sumFoods <- colSums(LTdiet[, 21:39], na.rm = FALSE, dims = 1)
+sumFoods <- sumFoods[!is.na(sumFoods)]
+contents.all <- as.data.frame(sumFoods)
+ID <- rownames(contents.all)
+propFoods <- sumFoods / sum(sumFoods) * 100
+
+contents.all <- data.frame(sumFoods, propFoods, ID)
+
+diet.total <- ggplot(data = contents.all, mapping = aes(x = "", y = propFoods, fill = contents.all$ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item")
+
+ggplotly(diet.total)
+```
+
+## Stomach Contents for Each Length Class
+
+```{r contents.by.size_class}
+
+```
 
