@@ -314,32 +314,34 @@ diet.total <- ggplot(data = contents.all, mapping = aes(x = "", y = propFoods, f
   labs(y = "Proportion of Total Diet", fill = "Food Item")
 
 ggplotly(diet.total)
-
-my_sizeclass <- c(seq(50,400,50),seq(500,700,100)) # a vector you may edit to create more size class
-for (i in seq_along(my_sizeclass)) {
-  if (i==1) { # everything smaller than the first value of the my_sizeclass vector
-    LTdiet_summary <- colSums(LTdiet[which(LTdiet$Total.Length<=my_sizeclass[i]),21:38], na.rm=T)
-    message(paste0(nrow(LTdiet[which(LTdiet$Total.Length<=my_sizeclass[i]),])," individuals are smaller than ",my_sizeclass[i], " mm"))
-  }
-  else { # everything larger than the last value of the my_sizeclass vector
-    if (i == length(my_sizeclass)) { 
-       LTdiet_summary <- rbind(LTdiet_summary, colSums(LTdiet[which(LTdiet$Total.Length>my_sizeclass[i]),21:38], na.rm=T))
-       message(paste0(nrow(LTdiet[which(LTdiet$Total.Length>my_sizeclass[i]),])," individuals are larger than ",my_sizeclass[i], " mm"))
-    }
-       else     {# everything else
-         LTdiet_summary <- rbind(LTdiet_summary, colSums(LTdiet[which(LTdiet$Total.Length>=my_sizeclass[i-1]&LTdiet$Total.Length<my_sizeclass[i]),21:38], na.rm=T))
-         message(paste0(nrow(LTdiet[which(LTdiet$Total.Length>=my_sizeclass[i-1]&LTdiet$Total.Length<my_sizeclass[i]),]), " individuals are in the ", my_sizeclass[i-1], "-", my_sizeclass[i], " mm size-range"))
-       }
-  }
-}
-
-rownames(LTdiet_summary) <- my_sizeclass
-
 ```
 
 ## Stomach Contents for Each Length Class
 
 ```{r contents.by.size_class}
+sumFoods_0_100 <- colSums(LTdiet[which(LTdiet$size_class == "[0,100]"), 21:39], na.rm = FALSE, dims = 1)
+#sumFoods_0_100 <- sumFoods_0_100[!is.na(sumFoods_0_100)]
+sumFoods_100_200 <- colSums(LTdiet[which(LTdiet$size_class == "]100,200]"), 21:39], na.rm = FALSE, dims = 1)
+#sumFoods_100_200 <- sumFoods_100_200[!is.na(sumFoods_100_200)]
+sumFoods_200_300 <- colSums(LTdiet[which(LTdiet$size_class == "]200,300]"), 21:39], na.rm = FALSE, dims = 1)
+#sumFoods_200_300 <- sumFoods_200_300[!is.na(sumFoods_200_300)]
+sumFoods_300_400 <- colSums(LTdiet[which(LTdiet$size_class == "]300,400]"), 21:39], na.rm = FALSE, dims = 1)
+#sumFoods_300_400 <- sumFoods_300_400[!is.na(sumFoods_300_400)]
+sumFoods_400_500 <- colSums(LTdiet[which(LTdiet$size_class == "]400,500]"), 21:39], na.rm = FALSE, dims = 1)
+#sumFoods_400_500 <- sumFoods_400_500[!is.na(sumFoods_400_500)]
+sumFoods_500_up <- colSums(LTdiet[which(LTdiet$size_class == "]500,∞]"), 21:39], na.rm = FALSE, dims = 1)
+#sumFoods_500_up <- sumFoods_500_up[!is.na(sumFoods_500_up)]
+
+contents.all.SC <- data.frame(sumFoods_0_100, sumFoods_100_200, sumFoods_200_300, sumFoods_300_400, sumFoods_400_500, sumFoods_500_up)
+ID <- rownames(contents.all.SC)
+propFoods_0_100 <- sumFoods_0_100 / sum(sumFoods_0_100, na.rm = TRUE) * 100
+propFoods_100_200 <- sumFoods_100_200 / sum(sumFoods_100_200, na.rm = TRUE) * 100
+propFoods_200_300 <- sumFoods_200_300 / sum(sumFoods_200_300, na.rm = TRUE) * 100
+propFoods_300_400 <- sumFoods_300_400 / sum(sumFoods_300_400, na.rm = TRUE) * 100
+propFoods_400_500 <- sumFoods_400_500 / sum(sumFoods_400_500, na.rm = TRUE) * 100
+propFoods_500_up <- sumFoods_500_up / sum(sumFoods_500_up, na.rm = TRUE) * 100
+
+contents.all.SC <- data.frame(sumFoods_0_100,p sumFoods_100_200, sumFoods_200_300, sumFoods_300_400, sumFoods_400_500, sumFoods_500_up)
 
 ```
 
