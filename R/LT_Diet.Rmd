@@ -23,6 +23,7 @@ library(ggplot2)
 library(binr)
 library(matrixStats)
 library(plotly)
+library(ggpubr)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -318,22 +319,26 @@ ggplotly(diet.total)
 
 ## Stomach Contents for Each Length Class
 
-```{r contents.by.size_class}
-sumFoods_0_100 <- colSums(LTdiet[which(LTdiet$size_class == "[0,100]"), 21:39], na.rm = FALSE, dims = 1)
-#sumFoods_0_100 <- sumFoods_0_100[!is.na(sumFoods_0_100)]
-sumFoods_100_200 <- colSums(LTdiet[which(LTdiet$size_class == "]100,200]"), 21:39], na.rm = FALSE, dims = 1)
-#sumFoods_100_200 <- sumFoods_100_200[!is.na(sumFoods_100_200)]
-sumFoods_200_300 <- colSums(LTdiet[which(LTdiet$size_class == "]200,300]"), 21:39], na.rm = FALSE, dims = 1)
-#sumFoods_200_300 <- sumFoods_200_300[!is.na(sumFoods_200_300)]
-sumFoods_300_400 <- colSums(LTdiet[which(LTdiet$size_class == "]300,400]"), 21:39], na.rm = FALSE, dims = 1)
-#sumFoods_300_400 <- sumFoods_300_400[!is.na(sumFoods_300_400)]
-sumFoods_400_500 <- colSums(LTdiet[which(LTdiet$size_class == "]400,500]"), 21:39], na.rm = FALSE, dims = 1)
-#sumFoods_400_500 <- sumFoods_400_500[!is.na(sumFoods_400_500)]
-sumFoods_500_up <- colSums(LTdiet[which(LTdiet$size_class == "]500,∞]"), 21:39], na.rm = FALSE, dims = 1)
-#sumFoods_500_up <- sumFoods_500_up[!is.na(sumFoods_500_up)]
+I'm creating six different bar plots to show the distribution of feeding patterns for each of the size classes we created earlier. From a quick glance at the outputs, it appears that lake trout of larger size tend to consume more alewife. In addition, longer lake trout tend to utilize smelt more than smaller lake trout. Mysis of smaller sizes utilize mysis and zooplankton much more than lake trout of larger size as well. It appears their diet shifts from small items such as mysis and zooplankton early on in their life to larger prey items such as smelt and alewife. 
 
+And just a note for all of us, there are much more efficient ways of obtaining what I wanted here. However, I'm not that advanced! Rosalie has created code with a loop that is much more concise and accomplishes the same thing, but for now, this will do.
+
+```{r contents.by.size_class}
+# I'm first creating column sums for each of the prey items. 
+sumFoods_0_100 <- colSums(LTdiet[which(LTdiet$size_class == "[0,100]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_100_200 <- colSums(LTdiet[which(LTdiet$size_class == "]100,200]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_200_300 <- colSums(LTdiet[which(LTdiet$size_class == "]200,300]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_300_400 <- colSums(LTdiet[which(LTdiet$size_class == "]300,400]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_400_500 <- colSums(LTdiet[which(LTdiet$size_class == "]400,500]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_500_up <- colSums(LTdiet[which(LTdiet$size_class == "]500,∞]"), 21:39], na.rm = FALSE, dims = 1)
+
+# I'm placing these sums in a data frame for now, so I can obtain row names for the next little code chunk. 
 contents.all.SC <- data.frame(sumFoods_0_100, sumFoods_100_200, sumFoods_200_300, sumFoods_300_400, sumFoods_400_500, sumFoods_500_up)
-ID <- rownames(contents.all.SC)
+
+# Now I'm obtaining the prey ID's so I can eventually use them as a filter in my barplots. 
+Food.ID <- rownames(contents.all.SC)
+
+# I'm now calculating percentages of each of the prey items for each size class. 
 propFoods_0_100 <- sumFoods_0_100 / sum(sumFoods_0_100, na.rm = TRUE) * 100
 propFoods_100_200 <- sumFoods_100_200 / sum(sumFoods_100_200, na.rm = TRUE) * 100
 propFoods_200_300 <- sumFoods_200_300 / sum(sumFoods_200_300, na.rm = TRUE) * 100
@@ -341,7 +346,125 @@ propFoods_300_400 <- sumFoods_300_400 / sum(sumFoods_300_400, na.rm = TRUE) * 10
 propFoods_400_500 <- sumFoods_400_500 / sum(sumFoods_400_500, na.rm = TRUE) * 100
 propFoods_500_up <- sumFoods_500_up / sum(sumFoods_500_up, na.rm = TRUE) * 100
 
-contents.all.SC <- data.frame(sumFoods_0_100,p sumFoods_100_200, sumFoods_200_300, sumFoods_300_400, sumFoods_400_500, sumFoods_500_up)
+# Tossing in the proportions as well as prey ID into the data frame. 
+contents.all.SC <- data.frame(sumFoods_0_100, propFoods_0_100, sumFoods_100_200, propFoods_100_200, sumFoods_200_300, propFoods_200_300, sumFoods_300_400, propFoods_300_400, sumFoods_400_500, propFoods_400_500, sumFoods_500_up, propFoods_500_up, Food.ID)
+
+# Making sure all of the NAs in the data frame are 0, because ggplot doesn't like creating graphs with NAs.
+contents.all.SC[is.na(contents.all.SC)] <- 0
+
+# Barplot for 0-100 size class.
+barplot_0_100 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_0_100, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "[0-100]")
+
+# Barplot for 101-200 size class.
+barplot_100_200 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_100_200, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]100-200]")
+
+# Barplot for 201-300 size class. 
+barplot_200_300 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_200_300, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]200-300]")
+
+# Barplot for 301-400 size class. 
+barplot_300_400 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_300_400, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]300-400]")
+
+# Barplot for 401-500 size class. 
+barplot_400_500 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_400_500, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]400-500]")
+
+# Barplot for 501 and up size class. 
+barplot_500_up <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_500_up, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]500-∞]")
+
+# Converting all of my ggplot outputs to ggplotly outputs so the users can be interactive with the outputs. 
+ggplotly(barplot_0_100)
+ggplotly(barplot_100_200)
+ggplotly(barplot_200_300)
+ggplotly(barplot_300_400)
+ggplotly(barplot_400_500)
+ggplotly(barplot_500_up)
+```
+
+## Stomach Contents Between Stocked and Wild Lake Trout
+
+Wild lake trout tend to utilize fewer alewife than stocked lake trout (25.0% vs 33.6%). Wild lake trout's diets consist of over 2.5 times the number of mysis than stocked lake trout (23.4% vs. 8.9%). In addition, no smelt were found in the stomachs of stocked lake trout, whereas over 3% of wild lake trout's diets consisted of smelt. This doesn't neccessarily mean that stocked lake trout don't prey on smelt at all, but the chances they do are quite slim. Again, there is a lot of unknown for both stocked and wild lake trout that isn't accounted for (39.4% for stocked, 31.3% for wild). 
+
+```{r contents.by.nativity}
+# I'm first creating column sums for each of the prey items.
+sumFoods_stocked <- colSums(LTdiet[which(LTdiet$stock.wild == "Stocked"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_wild <- colSums(LTdiet[which(LTdiet$stock.wild == "Wild"), 21:39], na.rm = FALSE, dims = 1)
+
+# Converting counts to proportion/percentage of total diet. 
+propFoods_stocked <- sumFoods_stocked / sum(sumFoods_stocked, na.rm = TRUE) * 100
+propFoods_wild <- sumFoods_wild / sum(sumFoods_wild, na.rm = TRUE) * 100
+
+# Tossing all of these new columns into a data frame. 
+contents.stock.wild <- data.frame(sumFoods_stocked, propFoods_stocked, sumFoods_wild, propFoods_wild)
+
+# Making sure all NAs are 0 so ggplot doesn't get mad at me. 
+contents.stock.wild[is.na(contents.stock.wild)] <- 0
+
+# Code for the creation of the barplot for stocked lake trout diet. 
+barplot_stocked <- ggplot(data = contents.stock.wild, mapping = aes(x = "", y = propFoods_stocked, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "Stocked Lake Trout")
+
+# Code for the creation of the barplot for wild lake trout diet. 
+barplot_wild <- ggplot(data = contents.stock.wild, mapping = aes(x = "", y = propFoods_wild, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "Wild Lake Trout")
+
+# Converting from ggplot outputs to ggplotly outputs.
+ggplotly(barplot_stocked)
+ggplotly(barplot_wild)
+
+```
+
+## Stomach Contents Between Capture Locations
+
+```{r contents.by.location}
+LTdiet <- LTdiet %>% mutate(Lake.Area = case_when(Capture.Location == "Au Sable Point" ~ "Main Lake",
+                                    Capture.Location == "Boquet Bay" ~ "Main Lake",
+                                    Capture.Location == "Boquet Delta to Essex" ~ "Main Lake",
+                                    Capture.Location == "Boquet River" ~ "Main Lake",
+                                    Capture.Location == "Boquet River Delta" ~ "Main Lake",
+                                    Capture.Location == "Burlington Bay" ~ "Main Lake",
+                                    Capture.Location == "Burlington Bay Far" ~ "Main Lake",
+                                    Capture.Location == "Burlington Far" ~ "Main Lake",
+                                    Capture.Location == "Essex" ~ "Main Lake",
+                                    Capture.Location == "Essex  " ~ "Main Lake",
+                                    Capture.Location == "Essex to Bouquet Delta" ~ "Main Lake",
+                                    Capture.Location == "Essex, NY" ~ "Main Lake",
+                                    Capture.Location == "Essex, NY to Whallon" ~ "Main Lake",
+                                    Capture.Location == "Jackson Point" ~ "Main Lake",
+                                    Capture.Location == "Port Kent" ~ "Main Lake",
+                                    Capture.Location == "Providence Island" ~ "Main Lake",
+                                    Capture.Location == "Rockwell" ~ "Main Lake",
+                                    Capture.Location == "Rockwell Bay" ~ "Main Lake",
+                                    Capture.Location == "South Hero- Jackson Pt" ~ "Main Lake",
+                                    Capture.Location == "South Hero- Rockwell Bay" ~ "Main Lake",
+                                    Capture.Location == "Trembleau Point" ~ "Main Lake",
+                                    Capture.Location == "Valcour" ~ "Main Lake",
+                                    Capture.Location == "Whallon" ~ "Main Lake",
+                                    Capture.Location == "Whallon Bay" ~ "Main Lake",
+                                    Capture.Location == "Whallon-Essex" ~ "Main Lake",
+                                    Capture.Location == "Wilcox" ~ "Main Lake",
+                                    Capture.Location == "Willsboro Bay, NY" ~ "Main Lake",
+                                    Capture.Location == "Winooski" ~ "Main Lake"))
 
 ```
 
