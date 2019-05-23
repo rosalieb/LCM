@@ -265,9 +265,9 @@ gps_monitor <- gps_monitor_df
 gps_monitor_df <- gps_monitor_df[gps_monitor_df$CoreStation==TRUE&gps_monitor_df$WaterbodyType=="Lake",]
 ```
 
-Over the years, `r nrow(gps_monitor)` monitoring stations have been monitored as part of the Lake Champlain monitoring program. `r nrow(gps_monitor[gps_monitor_df$CoreStation==TRUE,])` of these stations are core stations, and `r nrow(gps_monitor[gps_monitor_df$CoreStation==TRUE$WaterbodyType=="Lake",])` are core lake stations.
+Over the years, `r nrow(gps_monitor)` monitoring stations have been monitored as part of the Lake Champlain monitoring program. `r nrow(gps_monitor[gps_monitor_df$CoreStation==TRUE,])` of these stations are core stations, and `r nrow(gps_monitor_df[gps_monitor_df$CoreStation==TRUE&gps_monitor_df$WaterbodyType=="Lake",])` are core lake stations.
 
-```{r map, echo=FALSE}
+```{r map, echo=FALSE, message=FALSE, warning=FALSE}
 p <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
   scale_fill_manual(values = c("white","darkgrey")) +
   geom_point(data=gps_monitor, aes(x=Longitude, y=Latitude, color=CoreStation)) +
@@ -292,13 +292,16 @@ max_yr    <- 2018
 mysubset <- total[which(as.numeric(substring(total$VisitDate, 1, 4))>=min_yr & as.numeric(substring(total$VisitDate, 1, 4))<=max_yr),]
 ```
 
-Some parameters were not measured for the whole period. _`r length(which(!is.na(mysubset[,parameter])))`_ are available for the above parameters.
+Some parameters were not measured for the whole period. __`r length(which(!is.na(mysubset[,parameter])))`__ are available for the above parameters.
 
 Parameters to chose from are:  
-   -`r paste(names(total)[-c(1:2)],collapse = "\n   -")`
+   -`r paste(names(total)[-c(1:2)],collapse = "</br>   -")`
    
 ```{r match gps data, include=FALSE}
-length(which(!is.na(mysubset[,parameter])))
+n <- length(which(!is.na(mysubset[,parameter])))
+
+if(n>1) min_yr    <- min(as.numeric(substring(mysubset$VisitDate, 1, 4)))
+if(n>1) max_yr    <- max(as.numeric(substring(mysubset$VisitDate, 1, 4)))
 
 summ_subset <- with(mysubset, 
                     tapply(mysubset[,parameter],list("Sites"=as.factor(mysubset$StationID)), mean, na.rm=T))
@@ -317,14 +320,14 @@ for (i in 1:nrow(summ_subset)) {
 Plot that on the map.
 
 
-```{r map, echo=FALSE}
+```{r map one selected parameter, echo=FALSE, message=FALSE, warning=FALSE}
 #muted("red") creates some color that are nicer looking
 p <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
   scale_fill_manual(values = c("white","grey")) +
   geom_point(data=summ_subset, aes(x=lon, y=lat,size = summ_subset)) +
   #scale_colour_gradient2(low = muted("black"), mid = "white", high = "red", midpoint = mean(summ_subset$summ_subset, na.rm=T), space = "Lab",na.value = "grey50", guide = "colourbar", aesthetics = "colour") +
   xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
-  ggtitle(parameter) +
+  ggtitle(paste0(parameter, " (",min_yr,"-",max_yr,")")) +
   theme_set(theme_bw()) +
   coord_equal(ratio=1) 
 
@@ -332,3 +335,20 @@ p
 
 ```
  
+ 
+# Weather data
+
+## Read data
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+weather <- read.delim(paste0(getpath4data(), "Weather/allWeatherBTV_join.txt"))
+head(weather)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+weather$date <- parse_date_time(weather$date,orders = c("d/m/Y"))
+ggplot(weather,aes(x = date, y= AvgApparentTemperatureCelsius)) + geom_line()
+
+```
+
