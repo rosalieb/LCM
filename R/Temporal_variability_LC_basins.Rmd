@@ -114,6 +114,32 @@ dim(total_year)
 ```
 
 # Materials and methods
+
+## Lake Champlain location
+
+```{r}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+p1 <- ggplot() +  
+  geom_sf(data = world) +
+  coord_sf(xlim = c(-165, -50), ylim = c(10, 80))  + 
+  geom_point(aes(x=-73.212074, y=44.475883)) + 
+  geom_label(aes(x=-73.212074, y=44.475883, label="Lake Champlain"),hjust=1, vjust=0, label.size = 0.15)  + 
+  theme_set(theme_bw()) +
+  annotation_scale(location = "bl", width_hint = 0.5) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+                         style = north_arrow_fancy_orienteering) +
+  xlab("Longitude") + ylab("Latitude") 
+p1
+
+#ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/GeneralMap_NorthAmerica.pdf"), p1,  width = 5.6, height = 4.4)
+
+
+
+```
+
+
 ## Prep data
 I edited the data and will work from mainly two datasets:
 - a data set where intra-annual variability has been preserved (each measurement is still linked to its measurement date),
@@ -285,7 +311,6 @@ This is an interactive tool if you go back to the script. Here, the visualizatio
 
 ```{r}
 parameter <- "Total Phosphorus"
-parameter <- "Temperature"
 
 min_yr    <- 1990
 max_yr    <- 2018
@@ -323,7 +348,7 @@ Plot that on the map.
 ```{r map one selected parameter, echo=FALSE, message=FALSE, warning=FALSE}
 #muted("red") creates some color that are nicer looking
 p <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
-  scale_fill_manual(values = c("white","grey")) +
+  scale_fill_manual(values = c("white","darkgrey")) +
   geom_point(data=summ_subset, aes(x=lon, y=lat,size = summ_subset)) +
   #scale_colour_gradient2(low = muted("black"), mid = "white", high = "red", midpoint = mean(summ_subset$summ_subset, na.rm=T), space = "Lab",na.value = "grey50", guide = "colourbar", aesthetics = "colour") +
   xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
@@ -332,6 +357,7 @@ p <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=l
   coord_equal(ratio=1) 
 
 p
+ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Map_",gsub(" ", "_",parameter),"_",min_yr,"-",max_yr,".pdf"), p)
 
 ```
  

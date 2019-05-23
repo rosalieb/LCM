@@ -276,6 +276,14 @@ for (i in 1:length(grep("_H",x = names(df_lc2)))) {
 }
 dim(df_lc);dim(df_lc2)
 
+#Save output
+if(file.exists(paste0(getpath4data(),"LCM_unique_param_step5.txt"))){
+  message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
+  answer <- readline()
+  if(answer=="Y") write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step5.txt"), col.names = T, row.names = F, sep="\t")
+} else write.table(df_lc2, file = paste0(getpath4data(),"LCM_unique_param_step5.txt"), col.names = T, row.names = F, sep="\t")
+
+
 # Attemp model ####
 temporary <- gsub("_E|_H","",names(df_lc))
 for (i in 3:length(unique(temporary))) {
