@@ -2,14 +2,25 @@
 title: "Temporal variability in Lake Champlain basins"
 author: "Rosalie Bruel"
 date: "24/01/2019"
-output: html_document
+output: 
+  html_document: 
+    df_print: paged
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+  df_print: paged
+fontsize: 11pt
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# 1. Introduction
+# Introduction
 
 A significant advantage to using Lake Champlain to compare food web models is that the lake is divided (by causeways) into four trophically different basins. The **Main Lake** is deep (122 m) and meso-oligotrophic, **Malletts Bay** is moderately deep (50 m) and oligotrophic, and the **Inland Sea** is moderately deep (35 m) and meso-eutrophic, whereas **Missisquoi Bay** is shallow (7 m) and highly eutrophic. Therefore, comparisons can be made among models and among different trophic systems within the same lake. For example, coldwater fish species avoid Missisquoi Bay, and stocked lake trout avoid the Inland Sea in summer, resulting in lower pressures on the forage base and different upper food webs compared to the Main Lake. Forage fish monitoring has been conducted in all of the basins except Missisquoi Bay; long-term ecological monitoring stations are present in all basins.
 
@@ -17,12 +28,48 @@ A significant advantage to using Lake Champlain to compare food web models is th
 ```{r load packages and data, include=FALSE}
 # Load packages
 # Give the path of a specific script I want to load
-source(paste(getwd(),"/R/packages.R", sep=""))
+pkgTest <- function(x)
+{
+  if (!require(x,character.only = TRUE))
+  {
+    install.packages(x,dep=TRUE)
+    if(!require(x,character.only = TRUE)) stop("Package not found")
+  }
+}
+
+pkgTest("lubridate") # Handle different date time format
+# also used to get the day number in a year, e.g. January 1st is day 1
+# https://stackoverflow.com/questions/25463523/convert-variable-with-mixed-date-formats-to-one-format
+pkgTest("vegan");pkgTest("ade4") # PCA
+pkgTest("reshape2") # to unmelt data
+pkgTest("ggplot2")
+pkgTest("dplyr")
+pkgTest("rgdal") # to read bathymetry
+pkgTest("rnaturalearth")
+pkgTest("rnaturalearthdata")
+pkgTest("ggspatial")
+#load spatial packages
+pkgTest("raster")
+pkgTest("rgeos")
+pkgTest("scales")
+
+#function which user
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to download the data from the VTDEC website and place them in a folder we can reach")
+}
+
+myconstant <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return(16)
+  if(Sys.getenv("USER")=="alexnaccarato") return(21)
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to download the data from the VTDEC website and place them in a folder we can reach")
+}
 
 # Load data ####
 # There should be 15 monitoring points on the lake
 (Sys.glob(paste0(getpath4data(),"LakeMonitoringPoints/","*.txt")))
-filenames <- list.files(paste0(getpath4data(),"Data/LakeMonitoringPoints"), pattern="*.txt", full.names=TRUE)
+filenames <- list.files(paste0(getpath4data(),"LakeMonitoringPoints"), pattern="*.txt", full.names=TRUE)
 ldf <- lapply(filenames, read.csv, header=T, sep="\t")
 res <- lapply(ldf, summary)
 # The function below substr() will allow us to extract the number of the lake
@@ -66,18 +113,18 @@ dim(total_year)
 
 ```
 
-# 2. Materials and methods
-## 2.1. Prep data
+# Materials and methods
+## Prep data
 I edited the data and will work from mainly two datasets:
-- a dataset where intra-annual variability has been preserved (each measurement is still linked to its measurement date),
-- a dataset where I averaged the parameter per year.
+- a data set where intra-annual variability has been preserved (each measurement is still linked to its measurement date),
+- a data set where I averaged the parameter per year.
 
 ```{r view datasets I will work with}
 total[1:5,1:7]
 total_year[1:5,1:7]
 ```
 
-## 2.2. Check outliers
+## Check outliers
 Running the code below takes a lot of time, so summary of outliers given below. Uncomment the 'dotchart()' to see individual plots. 
 ```{r, echo=FALSE}
 par(mfrow=c(ceiling((ncol(total)-1)/5),5))
@@ -87,7 +134,7 @@ for (i in 3:ncol(total)) {
 par(mfrow=c(1,1))
 ```
 
-It seems that there might be an outlier for the Net Phytoplankton, Chlorophyta biovolume + density (one value is 4 times hogher than the previous max). The outlier is for station 4 (South Lake) on 2006-09-27 - not a site I'm using so not too bad.
+It seems that there might be an outlier for the Net Phytoplankton, Chlorophyta biovolume + density (one value is 4 times higher than the previous max). The outlier is for station 4 (South Lake) on 2006-09-27 - not a site I'm using so not too bad.
 
 Outlier too for Chrysophyta biovolume, station 50 (Missisquoi Bay) on 2014-09-19.
 
@@ -121,8 +168,8 @@ total[order(total$`Total Suspended Solids`, decreasing = T),][1:5,1:2]
 ```
 
 
-## 2.3. Write a function to do PCAs
-Creating a function to repeat the PCA more easily accross station.
+## Write a function to do PCAs
+Creating a function to repeat the PCA more easily across station.
 ```{r prep dataset for PCA function}
 # Parameters of the function should be:
 #  mstationID= the number of the monitoring site, e.g., 2= South Lake B
@@ -147,8 +194,8 @@ mpca_data <- function(mstationID, replaceNAs=T)
 
 
 
-# 3. Results
-## 3.1. Main Lake
+# Results
+## Main Lake
 The Main Lake is deep (122 m) and meso-oligotrophic. The monitoring point 19 is in the middle of the main lake. 
 
 ```{r PCA for Main Lake}
@@ -163,7 +210,7 @@ mydata <- mpca_data(mstationID = 19, replaceNAs = TRUE)
   
 ```
 
-## 3.2. Mallets Bay
+## Mallets Bay
 Malletts Bay is moderately deep (50 m) and oligotrophic
 
 ```{r PCA for Mallets Bay}
@@ -177,7 +224,7 @@ s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
   
 ```
 
-## 3.3. Inland Sea
+## Inland Sea
 The Inland Sea is moderately deep (35 m) and meso-eutrophice. 
 
 ```{r PCA for Inland Sea}
@@ -190,3 +237,98 @@ s.label(acpR$l1, clabel=0.6, label = mydata$VisitDate)
 
   
 ```
+
+# Mapping
+
+## Visualize the monitoring stations
+
+```{r load files for map, message=FALSE, warning=FALSE, include=FALSE}
+bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
+lcgroupmap=c("lake",rep("island", 84562))
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+class(bathy)
+crs(bathy)
+crs(world)
+bathy <- spTransform(bathy,crs(world))
+crs(bathy)
+
+gps_monitor <- read.delim(paste0(getpath4data(),"GIS/GPS_station_LCM.txt"))
+gps_monitor_df <- gps_monitor
+coordinates(gps_monitor)<-~Longitude+Latitude
+proj4string(gps_monitor)<-CRS("+proj=longlat +datum=WGS84")
+gps_monitor <- spTransform(gps_monitor,crs(world))
+gps_monitor_df$Longitude <- gps_monitor$Longitude
+gps_monitor_df$Latitude <- gps_monitor$Latitude
+gps_monitor <- gps_monitor_df
+gps_monitor_df <- gps_monitor_df[gps_monitor_df$CoreStation==TRUE&gps_monitor_df$WaterbodyType=="Lake",]
+```
+
+Over the years, `r nrow(gps_monitor)` monitoring stations have been monitored as part of the Lake Champlain monitoring program. `r nrow(gps_monitor[gps_monitor_df$CoreStation==TRUE,])` of these stations are core stations, and `r nrow(gps_monitor[gps_monitor_df$CoreStation==TRUE$WaterbodyType=="Lake",])` are core lake stations.
+
+```{r map, echo=FALSE}
+p <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+  scale_fill_manual(values = c("white","darkgrey")) +
+  geom_point(data=gps_monitor, aes(x=Longitude, y=Latitude, color=CoreStation)) +
+  xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
+  theme_set(theme_bw()) +
+  coord_equal(ratio=1)
+
+p
+
+```
+
+## Plot some parameters and see the average per sites
+
+This is an interactive tool if you go back to the script. Here, the visualization is for the following parameters:
+
+```{r}
+parameter <- "Total Phosphorus"
+parameter <- "Temperature"
+
+min_yr    <- 1990
+max_yr    <- 2018
+mysubset <- total[which(as.numeric(substring(total$VisitDate, 1, 4))>=min_yr & as.numeric(substring(total$VisitDate, 1, 4))<=max_yr),]
+```
+
+Some parameters were not measured for the whole period. _`r length(which(!is.na(mysubset[,parameter])))`_ are available for the above parameters.
+
+Parameters to chose from are:  
+   -`r paste(names(total)[-c(1:2)],collapse = "\n   -")`
+   
+```{r match gps data, include=FALSE}
+length(which(!is.na(mysubset[,parameter])))
+
+summ_subset <- with(mysubset, 
+                    tapply(mysubset[,parameter],list("Sites"=as.factor(mysubset$StationID)), mean, na.rm=T))
+summ_subset <- as.data.frame(summ_subset)
+summ_subset$StationID <- as.numeric(rownames(summ_subset))
+
+summ_subset$lon <- rep(NA, nrow(summ_subset))
+summ_subset$lat <- rep(NA, nrow(summ_subset))
+for (i in 1:nrow(summ_subset)) {
+    summ_subset$lon[i] <- gps_monitor_df$Longitude[which(as.numeric(gps_monitor_df$StationID)==summ_subset$StationID[i])]
+    summ_subset$lat[i] <- gps_monitor_df$Latitude[which(as.numeric(gps_monitor_df$StationID)==summ_subset$StationID[i])]
+}
+
+```
+   
+Plot that on the map.
+
+
+```{r map, echo=FALSE}
+#muted("red") creates some color that are nicer looking
+p <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+  scale_fill_manual(values = c("white","grey")) +
+  geom_point(data=summ_subset, aes(x=lon, y=lat,size = summ_subset)) +
+  #scale_colour_gradient2(low = muted("black"), mid = "white", high = "red", midpoint = mean(summ_subset$summ_subset, na.rm=T), space = "Lab",na.value = "grey50", guide = "colourbar", aesthetics = "colour") +
+  xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
+  ggtitle(parameter) +
+  theme_set(theme_bw()) +
+  coord_equal(ratio=1) 
+
+p
+
+```
+ 

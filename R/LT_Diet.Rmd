@@ -25,12 +25,12 @@ getpath4data <- function() {
   if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
 }
 
-if(Sys.getenv("USER")=="Rosalie") LTdata <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_diet_2016-2018.txt"))
+if(Sys.getenv("USER")=="Rosalie") LTdiet <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_diet_2016-2018.txt"))
 
-if(Sys.getenv("USER")=="alexnaccarato") LTdata <- read.csv("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2016-2018.csv")
+if(Sys.getenv("USER")=="alexnaccarato") LTdiet <- read.csv("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2016-2018.csv")
 
-LTdata$Weight[LTdata$Weight < 3000 & LTdata$Total.Length > 750] <- NA
-LTdata$Total.Length[LTdata$Weight < 3000 & LTdata$Total.Length > 750] <- NA
+LTdiet$Weight[LTdiet$Weight < 3000 & LTdiet$Total.Length > 750] <- NA
+LTdiet$Total.Length[LTdiet$Weight < 3000 & LTdiet$Total.Length > 750] <- NA
 ```
 
 ## Relationship Between Length and Weight, Separated by Age
@@ -60,14 +60,14 @@ LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
 Here, I'm creating another scatterplot of the weight/length relationship for lake trout, but included the location of the clip as a filter. I also included a log-transformed version of this plot.
 
 ```{r cliplocation, warning=FALSE}
-LTdata %>% ggplot(mapping = aes(x = Total.Length,
+LTdiet %>% ggplot(mapping = aes(x = Total.Length,
                                 y = Weight, 
                                 color = Clip.Location)) +
   geom_point() +
   labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
   geom_smooth(method = "loess", color = "black")
 
-LTdata %>%  ggplot(mapping = aes(x = Total.Length, 
+LTdiet %>%  ggplot(mapping = aes(x = Total.Length, 
                                  y = Weight,
                                  color = Clip.Location)) +
   geom_point() +
@@ -82,7 +82,7 @@ LTdata %>%  ggplot(mapping = aes(x = Total.Length,
 Stocked trout are typically larger than wild fish. They often have longer lengths and greater weights than wild fish. 
 
 ```{r stocked, warning = FALSE}
-LTdata %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
+LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
                                     Clip.Location == "AD" ~ "Stocked",
                                     Clip.Location == "LP" ~ "Stocked",
                                     Clip.Location == "LV" ~ "Stocked",
@@ -97,7 +97,7 @@ LTdata %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
   labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
   geom_smooth(method = "loess", color = "black")
 
-LTdata %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
+LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "Wild",
                                     Clip.Location == "AD" ~ "Stocked",
                                     Clip.Location == "LP" ~ "Stocked",
                                     Clip.Location == "LV" ~ "Stocked",
@@ -123,13 +123,13 @@ Here, I'm creating a bar chart of the proportion of empty stomachs size classes 
 
 ```{r empty.by.lengthclass}
 if(Sys.getenv("USER")=="Rosalie") {
-  LTdata$Food.in.Stomach <- LTdata$Food.in.Stomach..Y.N.
-  LTdata$Stomach.Weight  <- LTdata$Stomach.Weight..g.
-  LTdata$Food.in.Stomach[LTdata$Food.in.Stomach=="no"] <- "N"
-  LTdata$Food.in.Stomach[LTdata$Food.in.Stomach=="yes"|LTdata$Food.in.Stomach=="T"] <- "Y"
+  LTdiet$Food.in.Stomach <- LTdiet$Food.in.Stomach..Y.N.
+  LTdiet$Stomach.Weight  <- LTdiet$Stomach.Weight..g.
+  LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="no"] <- "N"
+  LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="yes"|LTdiet$Food.in.Stomach=="T"] <- "Y"
 }
   
-LTdata <- LTdata  %>% mutate(size_class = case_when(
+LTdiet <- LTdiet  %>% mutate(size_class = case_when(
   Total.Length <= 100 ~ "[0,100]",
   Total.Length > 100 & Total.Length <= 200 ~ "]100,200]", 
   Total.Length > 200 & Total.Length <= 300 ~ "]200,300]",
@@ -137,7 +137,7 @@ LTdata <- LTdata  %>% mutate(size_class = case_when(
   Total.Length > 400 & Total.Length <= 500 ~ "]400,500]",
   Total.Length > 500 ~ "]500,∞]"))
 
-(summ_sc <- with(LTdata, tapply(rep(1,nrow(LTdata)),list("Size class" = size_class, "Food" = Food.in.Stomach), sum)))
+(summ_sc <- with(LTdiet, tapply(rep(1,nrow(LTdiet)),list("Size class" = size_class, "Food" = Food.in.Stomach), sum)))
 
 (summ_sc <- as.data.frame(summ_sc / rowSums(summ_sc, na.rm=T) * 100))
 
@@ -150,7 +150,7 @@ ggplot(data = summ_sc, aes(x = rownames(summ_sc),y = summ_sc[,"N"])) +
 The relationship between the size of stomachs and the length of the fish is not well summarized by a linear model. 
 
 ```{r stomach.weight.by.length, warning=FALSE}
-LTdata %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(Stomach.Weight))) +
+LTdiet %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(Stomach.Weight))) +
   geom_point() + 
   xlab("Length (mm)") + 
   ylab("Stomach Weight (g)") +
@@ -162,7 +162,7 @@ LTdata %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(Stomach.Weight)
 The relationship between the size of the stomachs and the weight of the fish is not well summarized by a linear model. 
 
 ```{r stomach.weight.by.weight, warning=FALSE}
-LTdata %>% ggplot(mapping = aes(x = Weight, y = as.numeric(Stomach.Weight))) +
+LTdiet %>% ggplot(mapping = aes(x = Weight, y = as.numeric(Stomach.Weight))) +
   geom_point() + 
   xlab("Weigth (g)") + 
   ylab("Stomach Weight (g)") +
