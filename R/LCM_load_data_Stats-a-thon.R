@@ -235,11 +235,18 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step3.txt"))){
 
 # Create a dataframe without all biological data  ####
 df_lc <- df_output
-bloom_thresh <- 1*10^8 # Set here our threshold for bloom
+bloom_thresh <- exp(5) # Set here our threshold for bloom
 df_lc$Bloom <- ifelse(is.na(df_lc$`Net phytoplankton, Cyanobacteria biovolume`),
                           NA,ifelse(df_lc$`Net phytoplankton, Cyanobacteria biovolume`>=bloom_thresh, 1,0))
 summary(df_lc$Bloom)
-hist(log10(df_lc$`Net phytoplankton, Cyanobacteria biovolume`+.1), main="", xlab="Net phytoplankton, Cyanobacteria biovolume")
+hist(log(df_lc$`Net phytoplankton, Cyanobacteria biovolume`+.1), main="", xlab="log(Net phytoplankton, Cyanobacteria biovolume)")
+
+df_lc_june <- df_lc[as.numeric(substr(df_lc$VisitDate,4,5))==6,]
+likelihood_bloom_june <-
+  as.data.frame(with(df_lc_june, tapply(Bloom,list("Year"=as.factor(substr(df_lc_june$VisitDate,7,10)), "StationID"=StationID), sum, na.rm=T)))/
+  as.data.frame(with(df_lc_june, tapply(rep(1,nrow(df_lc_june)),list("Year"=as.factor(substr(df_lc_june$VisitDate,7,10)), "StationID"=StationID), sum, na.rm=T)))
+likelihood_bloom_june <- likelihood_bloom_june[as.numeric(rownames(likelihood_bloom_june))>=2006,]  
+barplot(colSums(likelihood_bloom_june)/nrow(likelihood_bloom_june))
 
 todelete <- grep("phytoplankton|Day|Chlorophyll-a", names(df_lc))
 if(length(todelete)>0) df_lc <- df_lc[,-todelete]
