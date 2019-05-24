@@ -434,10 +434,13 @@ ggplotly(barplot_wild)
 
 ```
 
-## Stomach Contents Between Capture Locations
+## Stomach Contents in the Main Lake
+
+Here, I'm creating a diet distribution for lake trout in the Main Lake (n = 2188). This is only here to ensure that the other lake segments were not giving us widely different results than observed throughout the whole lake. There are not any noticable discrepancies between the lake trout in the Main Lake and the lake trout in the rest of the lake (n = 76), but the sample sizes are quite different. 
 
 ```{r contents.by.location}
-LTdiet <- LTdiet %>% mutate(Lake.Area = case_when(Capture.Location == "Au Sable Point" ~ "Main Lake",
+# Creating a new variable called Lake.Segment based on the capture location. Segments determined from epa.gov document. Hill Bay and Central Lake, NY locations were unidentified on Google Maps, and were therefore placed in the "Unknown" lake segment. 
+LTdiet <- LTdiet %>% mutate(Lake.Segment = case_when(Capture.Location == "Au Sable Point" ~ "Main Lake",
                                     Capture.Location == "Boquet Bay" ~ "Main Lake",
                                     Capture.Location == "Boquet Delta to Essex" ~ "Main Lake",
                                     Capture.Location == "Boquet River" ~ "Main Lake",
@@ -457,6 +460,7 @@ LTdiet <- LTdiet %>% mutate(Lake.Area = case_when(Capture.Location == "Au Sable 
                                     Capture.Location == "Rockwell Bay" ~ "Main Lake",
                                     Capture.Location == "South Hero- Jackson Pt" ~ "Main Lake",
                                     Capture.Location == "South Hero- Rockwell Bay" ~ "Main Lake",
+                                    Capture.Location == "South Hero-Jackson Pt" ~ "Main Lake",
                                     Capture.Location == "Trembleau Point" ~ "Main Lake",
                                     Capture.Location == "Valcour" ~ "Main Lake",
                                     Capture.Location == "Whallon" ~ "Main Lake",
@@ -465,6 +469,27 @@ LTdiet <- LTdiet %>% mutate(Lake.Area = case_when(Capture.Location == "Au Sable 
                                     Capture.Location == "Wilcox" ~ "Main Lake",
                                     Capture.Location == "Willsboro Bay, NY" ~ "Main Lake",
                                     Capture.Location == "Winooski" ~ "Main Lake"))
+
+# Summing up food items for each lake segment.
+sumFoods_MainLake <- colSums(LTdiet[which(LTdiet$Lake.Segment == "Main Lake"), 21:39], na.rm = FALSE, dims = 1)
+
+# Converting sums to proportions of total diet.
+propFoods_MainLake <- sumFoods_MainLake / sum(sumFoods_MainLake, na.rm = TRUE) * 100
+
+# Creating a data frame with all sums and proportions.
+contents.lake.segment <- data.frame(sumFoods_MainLake, propFoods_MainLake)
+
+# Making sure all of my NAs are 0's again.
+contents.lake.segment[is.na(contents.lake.segment)] <- 0
+
+# Barplot for diet distribution in Main Lake. 
+barplot_MainLake <- ggplot(data = contents.lake.segment, mapping = aes(x = "", y = propFoods_MainLake, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "Main Lake")
+
+# Converting ggplot outputs to ggplotly outputs. 
+ggplotly(barplot_MainLake)
 
 ```
 
