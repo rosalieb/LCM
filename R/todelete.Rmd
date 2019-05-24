@@ -33,10 +33,6 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 
 ```{r}
 head(1:100)
-<<<<<<< HEAD
-summary(1:20)
-=======
-summary(1:50)
->>>>>>> b3e7510deadb2bed51e378b52296dfab5fc04ab8
+summary(1:500)
 ```
 
