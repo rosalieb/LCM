@@ -12,6 +12,9 @@ editor_options:
   chunk_output_type: console
 ---
 
+<span style="color:red">Note from Rosalie: Good job! I added at the beginning of your script 'toc: yes' which gives you a table of content to access rapidly your sections. 'number_sections' will... number sections. I started removing the capital letters to your titles but didn't do it everywhere: you don't need to capitalize every word of a title, only name and first word of the title.</span>
+
+
 # The basics
 
 I always have to include the code for my libraries so everything functions properly. In addition, I'm reading in the data file I'll be using for the analysis. I'm also getting rid of two outliers. They were very long fish that were quite skinny. 
