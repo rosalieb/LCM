@@ -17,6 +17,7 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r cars}
 summary(cars)
+hi <- c(1, 2, 3, 4)
 ```
 
 ## Including Plots
