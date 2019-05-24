@@ -2,12 +2,17 @@
 title: "Lake Trout Diet Analysis"
 author: "Alex Naccarato"
 date: "5/14/2019"
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
 editor_options: 
   chunk_output_type: console
 ---
 
-## The Basics
+# The basics
 
 I always have to include the code for my libraries so everything functions properly. In addition, I'm reading in the data file I'll be using for the analysis. I'm also getting rid of two outliers. They were very long fish that were quite skinny. 
 
@@ -19,11 +24,13 @@ Please take advantage of the very useful package, ggplotly, which allows the vie
 knitr::opts_chunk$set(echo = TRUE)
 
 library(dplyr)
+library(plyr)
 library(ggplot2)
 library(binr)
 library(matrixStats)
 library(plotly)
 library(ggpubr)
+library(forcats)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -39,7 +46,7 @@ LTdiet$Weight[LTdiet$Weight < 3000 & LTdiet$Total.Length > 750] <- NA
 LTdiet$Total.Length[LTdiet$Weight < 3000 & LTdiet$Total.Length > 750] <- NA
 ```
 
-## Relationship Between Length and Weight, Separated by Age
+# Relationship between length and weight, separated by age
 
 Here, I'm creating a scatterplot of the weight of the fish by their length. I included a filter for age to see how this relationship varies by age. In addition, I included a log-transformed version of this plot to be able to interpret it in a linear fashion. 
 
@@ -67,9 +74,11 @@ LW.age.log <- LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
 ggplotly(LW.age.log)
 ```
 
-## Relationship Between Length and Weight, Separated by Clip Location
+# Relationship between length and weight, separated by clip location
 
 Here, I'm creating another scatterplot of the weight/length relationship for lake trout, but included the location of the clip as a filter. I also included a log-transformed version of this plot.
+
+<span style="color:red">Note from Rosalie: clip location gives an info on age, so you're computing the same plot here.</span>
 
 ```{r cliplocation, warning=FALSE}
 # This is the code for the scatterplot without the log-transformation. 
@@ -95,9 +104,11 @@ LW.clip.log <- LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
 ggplotly(LW.clip.log)
 ```
 
-## Length and Weight Relationship between Stocked and Wild Lake Trout
+# Length and weight relationship between stocked and wild Lake Trout
 
 Stocked trout are typically larger than wild fish. They often have longer lengths and greater weights than wild fish. 
+
+<span style="color:red">Note from Rosalie: Stocked LT are stocked larger than their counterparts born in the lake (they had access to higher food quality). But Pascal's research shows that they then lose condition over the season. No needs to change anything here, just some backup info for you.</span>
 
 ```{r stocked, warning = FALSE}
 # Here, I'm recoding the clip types to either "Wild" or "Stocked". This is the code for the scatterplot without the 
@@ -142,9 +153,11 @@ LW.stocked.log <- LTdiet %>% mutate(group = case_when(Clip.Location == "NC" ~ "W
 ggplotly(LW.stocked.log)
 ```
 
-## Proportion of Empty Stomachs For Each Length Class
+# Proportion of empty stomachs for each length class
 
-Here, I'm creating a bar chart of the proportion of empty stomachs size classes of lake trout. It appears that the likelihood of finding a trout with an empty stomach is more likely in older fish. 
+Here, I'm creating a bar chart of the proportion of empty stomachs size classes of lake trout. It appears that the likelihood of finding a trout with an empty stomach is more likely in <span style="color:red">larger</span> fish. 
+
+<span style="color:red">Note from Rosalie: Is it a sampling bias? Larger fish with empty stomachs are not fast enough to avoid the trawl?</span>
 
 ```{r empty.by.lengthclass}
 if(Sys.getenv("USER")=="Rosalie") {
@@ -179,41 +192,48 @@ empty.sizeclass <- ggplot(data = summ_sc, aes(x = rownames(summ_sc),y = summ_sc[
 ggplotly(empty.sizeclass)
 ```
 
-## Lake Trout Diet by Length
+# Lake Trout diet by length
 
 The relationship between the size of stomachs and the length of the fish is not well summarized by a linear model. Log-transforming the plot does not do anything beneficial in terms of interpretation. There may not be a pattern/relationship between their diet and the length. 
 
+<span style="color:red">Note from Rosalie: rework on the interpretation: no stomach can weight 600 g. Here, the as.numeric() didn't convert the data to numeric because you had some values that were "<0.001". __Always__ be careful when you use "as.numeric" without paste. Here, you can also try to remove the "<" signs with gsub. 
+New interpretaton: there's not a strong relationship but there's definitely a trend (heaviest stomachs are only found for fish larger than 400mm). You were constraining the stat_smooth method with "lm", but in fact a non-linear model seems better. By not specifiying your choice, ggplot will find the best model, here a GAM with smooth parameters. </span>
+
 ```{r stomach.weight.by.length, warning=FALSE}
 # This is the code for the scatterplot of stomach weight by total length of the fish. 
-stomachweight.length <- LTdiet %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(Stomach.Weight))) +
+stomachweight.length <- LTdiet %>% ggplot(mapping = aes(x = Total.Length, y = as.numeric(paste(gsub("<","",Stomach.Weight))))) +
   geom_point() + 
   xlab("Length (mm)") + 
   ylab("Stomach Weight (g)") +
-  stat_smooth(method = "lm")
+  stat_smooth()
 
 ggplotly(stomachweight.length)
 ```
 
-## Lake Trout Diet by Weight
+# Lake Trout diet by weight
 
 The relationship between the size of the stomachs and the weight of the fish is not well summarized by a linear model. In addition to the previous plot, log-transforming is not beneficial. There may not be a pattern/relationship between the weight of their stomachs and their total body weight. 
 
+<span style="color:red">Note from Rosalie: same edit than above. Log transformation reduced the degree of freedom </span>
+
 ```{r stomach.weight.by.weight, warning=FALSE}
 # This is the code for the scatterplot of stomach weight by weight of the fish. 
-stomachweight.weight <- LTdiet %>% ggplot(mapping = aes(x = Weight, y = as.numeric(Stomach.Weight))) +
+stomachweight.weight <- LTdiet %>% ggplot(mapping = aes(x = Weight, y = as.numeric(paste(gsub("<","",Stomach.Weight))))) +
   geom_point() + 
   xlab("Weigth (g)") + 
   ylab("Stomach Weight (g)") +
-  stat_smooth(method = "lm") 
+  stat_smooth() 
 
 ggplotly(stomachweight.weight)
 ```
 
-## Lake Trout Stomach Weight by Month
+# Lake Trout Stomach Weight by Month
 
 There does not appear to be any month in which lake trout stomach weights are larger or smaller. This is probably for the best, because this indicates that sampling at a certain time of the year will not bias the results. December has very few data points (n = 1), which is why it looks odd.  
 
-```{r stomach.weight.by.capture.month, warning=FALSE}
+<span style="color:red">Note from Rosalie: in scale_x_discrete() you can specify the order of the boxplots, to order them chronologically.</span>
+
+```{r stomach.weight.by.capture.month, message=FALSE, warning=FALSE}
 # Here, I'm recoding some of the months so they're all consistent. There was a mixture of numbers and months, so I picked one method and went with it. 
 LTdiet$Capture.Month[LTdiet$Capture.Month == 4] <- "April"
 LTdiet$Capture.Month[LTdiet$Capture.Month == 5] <- "May"
@@ -226,16 +246,15 @@ LTdiet$Capture.Month[LTdiet$Capture.Month == 11] <- "November"
 
 # This is the code for the boxplot of stomach weights for each month of sampling. 
 stomachweight.month <- LTdiet %>% ggplot(mapping = aes(x = Capture.Month, y = as.numeric(paste(Stomach.Weight)), fill = Capture.Month)) +
-  geom_boxplot() +
+  geom_boxplot() + scale_x_discrete(limits=c("April","May","June","July","August","September","October","November"))+
   xlab("Capture Month") +
   ylab("Stomach Weight (g)") + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_x_discrete()
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ggplotly(stomachweight.month)
 ```
 
-## Lake Trout Length by Nativity
+# Lake Trout Length by Nativity
 
 Stocked lake trout (n = 1129) tend to be much longer than wild lake trout (n = 1135). In fact, a 95% confidence interval suggests the true difference in mean length between stocked and wild lake trout lies between 103.7 and 120.1 mm. The difference is statistically significant, as indicated by the very low p-value of 2.2e-16.
 
@@ -259,7 +278,7 @@ t.test(LTdiet$Total.Length ~ LTdiet$stock.wild)
 (num.stocked <- length(LTdiet$stock.wild[LTdiet$stock.wild == "Stocked"]))
 ```
 
-## Lake Trout Weight by Nativity
+# Lake Trout weight by origin
 
 Stocked lake trout (n = 1129) tend to be much heavier than wild lake trout (n = 1135). We are 95% confident that the true difference in mean weight between stocked and wild lake trout is between 220.5 and 306.0 g (p = 2.2e-16).
 
@@ -276,7 +295,51 @@ ggplotly(weight.stock.wild)
 t.test(LTdiet$Weight ~ LTdiet$stock.wild)
 ```
 
-## Stomach Contents for All Lake Trout
+<span style="color:red">Note from Rosalie: Size distribution really varies between stocked and wild fish. It prevents us from directly comparing the average weight of the two populations. That's why we calculate the "Condition factor" for fish. It's a function of weigth and length (you'll see that with WFB161): $K=W/L^3$.</span>
+
+```{r density plot for size stocked vs. wild LT, message=FALSE, warning=FALSE}
+# mean 
+mu <- ddply(LTdiet, "stock.wild", summarise, grp.mean=mean(Total.Length, na.rm=T))
+# Density plot
+p <- ggplot(LTdiet, aes(x=Total.Length, fill=stock.wild)) +
+  geom_density()+
+  geom_vline(data=mu, aes(xintercept=grp.mean, color=stock.wild),
+             linetype="dashed") +
+  geom_density(alpha=0.2) +
+  xlab("total length (mm)") + 
+  labs(fill='Origin')
+ ggplotly(p)
+```
+
+
+<span style="color:red">Note from Rosalie: I'm reusing your script from two chunks away but using this formula to compare condition. However, you're still not supposed to compare condition over too many size classes, because fish weight change with e.g. gonad development, etc. If you want to anything for wild vs. stocked, you first need to work on a smaller size-class.  
+I've done that below, and the wild fish actually have a better condition than the stocked fish, for the size class 150-250. </span>
+
+
+```{r condition.by.origin, warning=FALSE}
+# This is the code for tha bar chart of the difference in weight between stocked and wild lake trout. 
+condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight/(Total.Length^3), fill = stock.wild)) +
+  geom_bar(stat = "summary", fun.y = "mean") +
+  labs(y = "Average Weight (g)", fill = "") +
+  theme(axis.title.x = element_blank()) 
+
+ggplotly(condition.stock.wild)
+```
+
+<span style="color:red">Note from Rosalie: If I do the same for the size class 250-350, stocked fish have a better condition. </span>
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+condition.stock.wild <- LTdiet[LTdiet$Total.Length>250&LTdiet$Total.Length<350,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight/(Total.Length^3), fill = stock.wild)) +
+  geom_bar(stat = "summary", fun.y = "mean") +
+  labs(y = "Average Weight (g)", fill = "") +
+  theme(axis.title.x = element_blank()) 
+
+ggplotly(condition.stock.wild)
+
+```
+
+
+# Stomach contents for all Lake Trout
 
 Here is a distribution of the food items preyed upon by lake trout. Some of the most common food items include alewife, mysus, and daphnia, which make up over 58.3% of their diet. The next sections will break down their diet for each length class. The "other" category contributes over 35.6% of the lake trout's diet, so there's a large portion of their diet that was unidentified.
 
@@ -317,11 +380,14 @@ diet.total <- ggplot(data = contents.all, mapping = aes(x = "", y = propFoods, f
 ggplotly(diet.total)
 ```
 
-## Stomach Contents for Each Length Class
+# Stomach Contents for Each Length Class
 
-I'm creating six different bar plots to show the distribution of feeding patterns for each of the size classes we created earlier. From a quick glance at the outputs, it appears that lake trout of larger size tend to consume more alewife. In addition, longer lake trout tend to utilize smelt more than smaller lake trout. Mysis of smaller sizes utilize mysis and zooplankton much more than lake trout of larger size as well. It appears their diet shifts from small items such as mysis and zooplankton early on in their life to larger prey items such as smelt and alewife. 
+I'm creating six different bar plots to show the distribution of feeding patterns for each of the size classes we created earlier. From a quick glance at the outputs, it appears that lake trout of larger size tend to consume more alewife. In addition, longer lake trout tend to utilize smelt more than smaller lake trout. LT of smaller sizes utilize mysis and zooplankton much more than lake trout of larger size as well. It appears their diet shifts from small items such as mysis and zooplankton early on in their life to larger prey items such as smelt and alewife. 
 
 And just a note for all of us, there are much more efficient ways of obtaining what I wanted here. However, I'm not that advanced! Rosalie has created code with a loop that is much more concise and accomplishes the same thing, but for now, this will do.
+
+<span style="color:red">Note from Rosalie: Hey, it's impressive you've learned so much in 7 months! 80% of being a researcher seems to be about not giving up based on my experience.</span>
+
 
 ```{r contents.by.size_class}
 # I'm first creating column sums for each of the prey items. 
@@ -397,9 +463,11 @@ ggplotly(barplot_400_500)
 ggplotly(barplot_500_up)
 ```
 
-## Stomach Contents Between Stocked and Wild Lake Trout
+# Stomach Contents Between Stocked and Wild Lake Trout
 
 Wild lake trout tend to utilize fewer alewife than stocked lake trout (25.0% vs 33.6%). Wild lake trout's diets consist of over 2.5 times the number of mysis than stocked lake trout (23.4% vs. 8.9%). In addition, no smelt were found in the stomachs of stocked lake trout, whereas over 3% of wild lake trout's diets consisted of smelt. This doesn't neccessarily mean that stocked lake trout don't prey on smelt at all, but the chances they do are quite slim. Again, there is a lot of unknown for both stocked and wild lake trout that isn't accounted for (39.4% for stocked, 31.3% for wild). 
+
+<span style="color:red">Note from Rosalie: Look at the density plot up there. You cannot compare wild vs stocked diet with origin, since wild LT are smaller. An option would be to compare diet for fish stocked vs. wild for the 150-300mm interval. Could you edit your script to do this please? You would need to select these fish with: LTdiet[Total.Length>150 & Total.Length <300,]. Use the same script than in the chunk 'condition.by.origin' for example. </span>
 
 ```{r contents.by.nativity}
 # I'm first creating column sums for each of the prey items.
@@ -434,7 +502,7 @@ ggplotly(barplot_wild)
 
 ```
 
-## Stomach Contents in the Main Lake
+# Stomach Contents in the Main Lake
 
 Here, I'm creating a diet distribution for lake trout in the Main Lake (n = 2188). This is only here to ensure that the other lake segments were not giving us widely different results than observed throughout the whole lake. There are not any noticable discrepancies between the lake trout in the Main Lake and the lake trout in the rest of the lake (n = 76), but the sample sizes are quite different. 
 
