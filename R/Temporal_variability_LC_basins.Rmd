@@ -16,6 +16,9 @@ editor_options:
 fontsize: 11pt
 ---
 
+_Last updated: `r Sys.Date()`_
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
