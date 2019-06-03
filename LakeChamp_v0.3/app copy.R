@@ -23,7 +23,17 @@ str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
 out <- round(out, digits = 2)
 
-LCMinfo <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
+out$StationID[out$Station == "2"] <- "02"
+out$StationID[out$Station == "4"] <- "04"
+out$StationID[out$Station == "7"] <- "07"
+out$StationID[out$Station == "9"] <- "09"
+as.numeric(out$StationID)
+
+stations_metadata <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
+lake_stations_subset <- stations_metadata[stations_metadata$StationID %in% out$StationID,]
+trib_stations_subset <- stations_metadata[stations_metadata$StationID %in% LCMcoord$TStation,]
+stations_metadata_subset <- rbind(lake_stations_subset, trib_stations_subset)
+
 
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
@@ -91,7 +101,7 @@ ui <- dashboardPage(
                     value = c(2000,2012),sep = ""),
         conditionalPanel(
           'input$id == "graph"',
-          checkboxGroupInput("sites_toshow", "Columns to show:",
+          checkboxGroupInput("parameters_toshow", "Columns to show:",
                              colnames(out)))#, selected = colnames(out)))
       )
     )
@@ -107,9 +117,11 @@ ui <- dashboardPage(
         tabName = "m_lake",
         box(
           title = "Lake Champlain Monitoring Sites",
+          width = "100%",
+          height = "100%",
           collapsible = TRUE,
           tags$style(type = "text/css", "#map {height: calc(100vh - 80px) !important;}"),
-          leafletOutput("mymap1", height = 900, width = 600)
+          leafletOutput("mymap1", height = 900, width = 660)
         )
       ),
       tabItem(
@@ -126,7 +138,7 @@ ui <- dashboardPage(
             tags$div(tweaks,
                      align = 'left', 
                      class = 'multicol',
-                     checkboxGroupInput("param_toshow", "Sites to show:",
+                     checkboxGroupInput("stations_toshow", "Sites to show:",
                                sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))
           )
         ),
@@ -188,24 +200,27 @@ server <- function(input, output) {
   })
   
   output$mymap1 <- renderLeaflet({
-    leaflet(LCMcoord) %>% 
+    leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
-      addMarkers(data = LCMcoord, icon = boatIcon, lat = as.numeric(LCMcoord$LLatitude), 
-                 lng = as.numeric(LCMcoord$LLongitude), 
-                 popup = LCMcoord$LStation) %>%
-      addMarkers(data = LCMcoord, icon = xIcon, lat = as.numeric(LCMcoord$TLatitude), 
-                 lng = as.numeric(LCMcoord$TLongitude),
-                 popup = LCMcoord$TStation)
+      addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
+                 lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
+                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName, "</br><b> StationID: </b>", stations_metadata_subset$StationID, 
+                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude, "</br><b> Longitude: </b>", stations_metadata_subset$Longitude)) %>%
+      addMarkers(data = stations_metadata_subset, icon = xIcon, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"]), 
+                 lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]),
+                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName, "</br><b> StationID: </b>", stations_metadata_subset$StationID, 
+                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude, "</br><b> Longitude: </b>", stations_metadata_subset$Longitude))
   })
+  # <b>Instructions:</b>
   
   output$myplot1 <- renderPlot({
-    if (length(input$sites_toshow) == 0) {
+    if (length(input$parameters_toshow) == 0) {
       ggplot(data.frame())
     } else {
-      gl <- lapply(input$sites_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
-                     aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
-                     as.numeric(input$param_toshow), b])) +
+      gl <- lapply(input$parameters_toshow, 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
+                     aes(x=out[out$StationID %in% as.numeric(input$stations_toshow),1],y=out[out$StationID %in% 
+                     as.numeric(input$stations_toshow), b])) +
                      geom_point(color = out$StationID) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
@@ -217,13 +232,13 @@ server <- function(input, output) {
   })
   
   output$myplot2 <- renderPlot({
-    if (length(input$sites_toshow) == 0) {
+    if (length(input$parameters_toshow) == 0) {
       ggplot(data.frame())
     } else {
-      gl <- lapply(input$sites_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
-                     aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
-                     as.numeric(input$param_toshow), b])) +
+      gl <- lapply(input$parameters_toshow, 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
+                     aes(x=out[out$StationID %in% as.numeric(input$stations_toshow),1],y=out[out$StationID %in% 
+                     as.numeric(input$stations_toshow), b])) +
                      geom_point() + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
@@ -236,12 +251,12 @@ server <- function(input, output) {
   
   # An attempt to put in a bar plot of a single parameter's average by StationID, also should be dependent upon the time range selected
   output$myplot3 <- renderPlot({
-    if (length(input$sites_toshow) == 0) {
+    if (length(input$parameters_toshow) == 0) {
       ggplot(data.frame())
     } else {
-      gl <- lapply(input$sites_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
-                                      aes(x=as.factor(out[out$StationID %in% as.numeric(input$param_toshow),"StationID"]), y=out[out$StationID %in% as.numeric(input$param_toshow), b])) +
+      gl <- lapply(input$parameters_toshow, 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
+                                      aes(x=as.factor(out[out$StationID %in% as.numeric(input$stations_toshow),"StationID"]), y=out[out$StationID %in% as.numeric(input$stations_toshow), b])) +
                      geom_bar(stat = "summary", fun.y = "mean") +
                      labs(x = "Station ID", y = b)
       )
@@ -266,10 +281,10 @@ server <- function(input, output) {
                            </br>")
     Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
     Header12     <- "<h3>Try it for yourself!</h3> <br/>"
-    mcor         <- if(length(input$sites_toshow)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
-    n            <- if(length(input$sites_toshow)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[2]]),input$sites_toshow[1]])) else "NA"
+    mcor         <- if(length(input$parameters_toshow)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
+    n            <- if(length(input$parameters_toshow)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[2]]),input$parameters_toshow[1]])) else "NA"
     Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the left menu. If you select more than that, the correlation will be calculated for the two first parameters.</br>
-                           </br>The correlation between <b>", input$sites_toshow[1], "</b> and <b>", input$sites_toshow[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
+                           </br>The correlation between <b>", input$parameters_toshow[1], "</b> and <b>", input$parameters_toshow[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
     Header2      <- "<h2>Basic stats</h2> <br/>"
     Header21     <- "<h3>Theory</h3> <br/>"
@@ -278,8 +293,8 @@ server <- function(input, output) {
                            </br>")
     Header22     <- "<h3>Try it for yourself!</h3> <br/>"
     mmean        <- NULL
-    if(length(input$sites_toshow)>0) for (i in 1:length(input$sites_toshow)) mmean <- paste(mmean, input$sites_toshow[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$param_toshow) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$sites_toshow[i]]))," observations. </br>")
-    mstations <- paste(as.numeric(input$param_toshow),sep="", collapse=", ")
+    if(length(input$parameters_toshow)>0) for (i in 1:length(input$parameters_toshow)) mmean <- paste(mmean, input$parameters_toshow[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$stations_toshow) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$parameters_toshow[i]]))," observations. </br>")
+    mstations <- paste(as.numeric(input$stations_toshow),sep="", collapse=", ")
     Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the left menu. </br>
                                     The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
     HTML(paste(Header,
