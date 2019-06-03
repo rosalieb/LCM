@@ -77,41 +77,10 @@ LW.age.log <- LTdiet %>%  ggplot(mapping = aes(x = Total.Length,
 ggplotly(LW.age.log)
 ```
 
-# Relationship between length and weight, separated by clip location
-
-Here, I'm creating another scatterplot of the weight/length relationship for lake trout, but included the location of the clip as a filter. I also included a log-transformed version of this plot.
-
-<span style="color:red">Note from Rosalie: clip location gives an info on age, so you're computing the same plot here.</span>
-
-```{r cliplocation, warning=FALSE}
-# This is the code for the scatterplot without the log-transformation. 
-LW.clip.nolog <- LTdiet %>% ggplot(mapping = aes(x = Total.Length,
-                                y = Weight, 
-                                color = Clip.Location)) +
-  geom_point() +
-  labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
-  geom_smooth(method = "loess", color = "black")
-
-ggplotly(LW.clip.nolog)
-
-# This is the code for the scatterplot with the log-transformation. 
-LW.clip.log <- LTdiet %>%  ggplot(mapping = aes(x = Total.Length, 
-                                 y = Weight,
-                                 color = Clip.Location)) +
-  geom_point() +
-  scale_x_log10() +
-  scale_y_log10() +
-  labs(x = "Total Length (mm)", y = "Weight (g)", color = "Clip Location") +
-  geom_smooth(method = "lm", color = "black")
-
-ggplotly(LW.clip.log)
-```
-
 # Length and weight relationship between stocked and wild Lake Trout
 
-Stocked trout are typically larger than wild fish. They often have longer lengths and greater weights than wild fish. 
+Stocked trout are typically larger than wild fish as they've had access to higher quality food. They often have longer lengths and greater weights than wild fish. However, Pascal's research shows that these stocked fish eventually lose their condition over the season.  
 
-<span style="color:red">Note from Rosalie: Stocked LT are stocked larger than their counterparts born in the lake (they had access to higher food quality). But Pascal's research shows that they then lose condition over the season. No needs to change anything here, just some backup info for you.</span>
 
 ```{r stocked, warning = FALSE}
 # Here, I'm recoding the clip types to either "Wild" or "Stocked". This is the code for the scatterplot without the 
@@ -158,9 +127,7 @@ ggplotly(LW.stocked.log)
 
 # Proportion of empty stomachs for each length class
 
-Here, I'm creating a bar chart of the proportion of empty stomachs size classes of lake trout. It appears that the likelihood of finding a trout with an empty stomach is more likely in <span style="color:red">larger</span> fish. 
-
-<span style="color:red">Note from Rosalie: Is it a sampling bias? Larger fish with empty stomachs are not fast enough to avoid the trawl?</span>
+Here, I'm creating a bar chart of the proportion of empty stomachs size classes of lake trout. It appears that the likelihood of finding a trout with an empty stomach is more likely in <span style="color:red">larger</span> fish. This may be due to sampling bias...perhaps larger fish with empty stomachs are not fast enough to avoid the trawl due to depleted resources? This may be a possible explanation, but more work would need to be done to know for sure. There may also be other explanations...
 
 ```{r empty.by.lengthclass}
 if(Sys.getenv("USER")=="Rosalie") {
@@ -197,7 +164,7 @@ ggplotly(empty.sizeclass)
 
 # Lake Trout diet by length
 
-The relationship between the size of stomachs and the length of the fish is not well summarized by a linear model. Log-transforming the plot does not do anything beneficial in terms of interpretation. There may not be a pattern/relationship between their diet and the length. 
+While the relationship between the size of stomachs and the length of the fish is not strong, there is definitely an observed trend in the data. We are only observing fish over 400 mm with large stomachs. Overall, stomach weights of lake trout tend to increase as their length increases. 
 
 <span style="color:red">Note from Rosalie: rework on the interpretation: no stomach can weight 600 g. Here, the as.numeric() didn't convert the data to numeric because you had some values that were "<0.001". __Always__ be careful when you use "as.numeric" without paste. Here, you can also try to remove the "<" signs with gsub. 
 New interpretaton: there's not a strong relationship but there's definitely a trend (heaviest stomachs are only found for fish larger than 400mm). You were constraining the stat_smooth method with "lm", but in fact a non-linear model seems better. By not specifiying your choice, ggplot will find the best model, here a GAM with smooth parameters. </span>
@@ -215,7 +182,7 @@ ggplotly(stomachweight.length)
 
 # Lake Trout diet by weight
 
-The relationship between the size of the stomachs and the weight of the fish is not well summarized by a linear model. In addition to the previous plot, log-transforming is not beneficial. There may not be a pattern/relationship between the weight of their stomachs and their total body weight. 
+While the relationship between the size of stomachs and the weight of the fish is not strong, there is definitely an observed trend in the data. Right around the 900 g mark for weight of the fish, we start observing more extreme stomach weights. Overall, stomach weight tends to increase as the weight of the lake trout increases. 
 
 <span style="color:red">Note from Rosalie: same edit than above. Log transformation reduced the degree of freedom </span>
 
@@ -223,16 +190,16 @@ The relationship between the size of the stomachs and the weight of the fish is 
 # This is the code for the scatterplot of stomach weight by weight of the fish. 
 stomachweight.weight <- LTdiet %>% ggplot(mapping = aes(x = Weight, y = as.numeric(paste(gsub("<","",Stomach.Weight))))) +
   geom_point() + 
-  xlab("Weigth (g)") + 
+  xlab("Weight (g)") + 
   ylab("Stomach Weight (g)") +
   stat_smooth() 
 
 ggplotly(stomachweight.weight)
 ```
 
-# Lake Trout Stomach Weight by Month
+# Lake Trout stomach weight by month
 
-There does not appear to be any month in which lake trout stomach weights are larger or smaller. This is probably for the best, because this indicates that sampling at a certain time of the year will not bias the results. December has very few data points (n = 1), which is why it looks odd.  
+There does not appear to be any month in which lake trout stomach weights are larger or smaller. This is probably for the best, because this indicates that sampling at a certain time of the year will not bias the results. December was not included because it only had one observation (n = 1).
 
 <span style="color:red">Note from Rosalie: in scale_x_discrete() you can specify the order of the boxplots, to order them chronologically.</span>
 
@@ -320,7 +287,7 @@ I've done that below, and the wild fish actually have a better condition than th
 
 
 ```{r condition.by.origin, warning=FALSE}
-# This is the code for tha bar chart of the difference in weight between stocked and wild lake trout. 
+# This is the code for the bar chart of the difference in weight between stocked and wild lake trout. 
 condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight/(Total.Length^3), fill = stock.wild)) +
   geom_bar(stat = "summary", fun.y = "mean") +
   labs(y = "Average Weight (g)", fill = "") +
