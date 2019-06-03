@@ -129,6 +129,7 @@ ggplot(data=stkvt[grep("Champ",stkvt$WATER),], aes(x=SPECIES,y=ACTUAL.NUMBER.STO
   labs(fill="Year") + ggtitle("Lake Champlain waters")
 
 
+
 ```
 
 
@@ -412,6 +413,22 @@ summ_sp_yr <- Reduce(custom_rbind,list(summ_sp_yr_vt,summ_sp_yr_ny))
 rownames(summ_sp_yr) <- paste(summ_sp_yr$Year, summ_sp_yr$State, sep="_")
 
 ```
+
+```{r}
+ggplot() +
+  geom_line(data=summ_sp_yr, aes(x=as.numeric(Year),y=BNT, linetype=State), col="darkred", size=1.5) +
+  geom_line(data=summ_sp_yr, aes(x=as.numeric(Year),y=LAS, linetype=State), col="#E69F00", size=1.5) +
+  geom_line(data=summ_sp_yr, aes(x=as.numeric(Year),y=LAT, linetype=State), col="#56B4E9", size=1.5) +
+  geom_line(data=summ_sp_yr, aes(x=as.numeric(Year),y=STT, linetype=State), size=1.5) + 
+  scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9", "black"), 
+                       name="Species",
+                       breaks=c("BNT", "LAS", "LAT", "STT"),
+                       labels=c('Brown Trout','Landlocked Atlantic Salmon', 'Lake Trout','Steelhead Trout')) +
+  xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("Lake Champlain waters")
+
+```
+
 
 The dataframe below gives the average lentgh of fish released this year. The average length of fish changed over the season, so I balanced the length by the proportion released on that month vs. fish from the same specie release over the year.
 
