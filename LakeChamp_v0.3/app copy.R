@@ -21,11 +21,9 @@ out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
 str(out$VisitDate)
 out <- out[order(out$year,decreasing = F),]
+out <- round(out, digits = 2)
 
-colors1 <- colors(distinct = TRUE)
-set.seed(1585) # to set random generator seed
-colors2 <- sample(colors1, 15)
-colScale <- scale_color_manual(name = "grp", values = colors2)
+LCMinfo <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
 
 boatIcon <- makeIcon(
   iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
@@ -34,7 +32,6 @@ boatIcon <- makeIcon(
 xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
-
 
 # tweaks, a list object to set up multicols for checkboxGroupInput
 tweaks <- 
@@ -109,10 +106,10 @@ ui <- dashboardPage(
       tabItem(
         tabName = "m_lake",
         box(
-          title = "Lake Champlain monitoring sites",
+          title = "Lake Champlain Monitoring Sites",
           collapsible = TRUE,
           tags$style(type = "text/css", "#map {height: calc(100vh - 80px) !important;}"),
-          leafletOutput("mymap1")
+          leafletOutput("mymap1", height = 900, width = 600)
         )
       ),
       tabItem(
@@ -120,9 +117,8 @@ ui <- dashboardPage(
         title = "Instruction: Select data to plot",
         box(
           title = "Instructions",
-          collapsible = TRUE,
           width = "100%", 
-          height = "20%",
+          height = "100%",
           #Render an output text
           htmlOutput("Instructions_plot_1"),
           conditionalPanel(
@@ -131,22 +127,30 @@ ui <- dashboardPage(
                      align = 'left', 
                      class = 'multicol',
                      checkboxGroupInput("param_toshow", "Sites to show:",
-                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)),inline   = FALSE))
+                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))
           )
         ),
         box(
           title = "Dot Charts",
           collapsible = TRUE,
           width = "100%",
-          height = "70%",
+          height = "100%",
           plotOutput("myplot1")
         ),
         box(
           title = "Line Charts",
           collapsible = TRUE,
           width = "100%",
-          height = "70%",
+          height = "100%",
           plotOutput("myplot2")
+        ),
+        box(
+          title = "Bar Plots",
+          collapsible = TRUE,
+          width = "100%",
+          height = "100%",
+          htmlOutput("info_plot_3"),
+          plotOutput("myplot3")
         )
       ),
       tabItem(
@@ -178,6 +182,11 @@ server <- function(input, output) {
     HTML(paste(Instruction1))
   })
   
+  output$info_plot_3 <- renderUI({ 
+    info3 <- paste0("Values for each parameter are averages for the date range selected with the slider. You can select which stations to view with the selection boxes at the top of this page.")
+    HTML(paste(info3))
+  })
+  
   output$mymap1 <- renderLeaflet({
     leaflet(LCMcoord) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
@@ -196,13 +205,13 @@ server <- function(input, output) {
       gl <- lapply(input$sites_toshow, 
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
-                     as.numeric(input$param_toshow), b]), color = grp) +
+                     as.numeric(input$param_toshow), b])) +
                      geom_point(color = out$StationID) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
                      #ggcolors(~input$mysites)
       )
-      grid.arrange(grobs = gl, nrow = 1)
+      ifelse(length(gl) == 1, gl, grid.arrange(grobs = gl, nrow = round(length(gl)/2)))
     }
     
   })
@@ -214,16 +223,32 @@ server <- function(input, output) {
       gl <- lapply(input$sites_toshow, 
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$param_toshow),1],y=out[out$StationID %in% 
-                     as.numeric(input$param_toshow), b]), color = StationID) +
-                     geom_point(colScale = out$StationID) + 
+                     as.numeric(input$param_toshow), b])) +
+                     geom_point() + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
       )
-      grid.arrange(grobs = gl, nrow = 1)
+      ifelse(length(gl) == 1, gl, grid.arrange(grobs = gl, nrow = round(length(gl)/2)))
     }
     
   })
+  
+  # An attempt to put in a bar plot of a single parameter's average by StationID, also should be dependent upon the time range selected
+  output$myplot3 <- renderPlot({
+    if (length(input$sites_toshow) == 0) {
+      ggplot(data.frame())
+    } else {
+      gl <- lapply(input$sites_toshow, 
+                   function(b) ggplot(out[out$StationID %in% as.numeric(input$param_toshow),], 
+                                      aes(x=as.factor(out[out$StationID %in% as.numeric(input$param_toshow),"StationID"]), y=out[out$StationID %in% as.numeric(input$param_toshow), b])) +
+                     geom_bar(stat = "summary", fun.y = "mean") +
+                     labs(x = "Station ID", y = b)
+      )
+      ifelse(length(gl) == 1, gl, grid.arrange(grobs = gl, nrow = round(length(gl)/2)))
+    }
+  })
+
   
   # table
   output$mytable1 <- DT::renderDataTable({
@@ -240,18 +265,18 @@ server <- function(input, output) {
                            </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
                            </br>")
     Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
-    Header12     <- "<h3>Try it for yourself</h3> <br/>"
+    Header12     <- "<h3>Try it for yourself!</h3> <br/>"
     mcor         <- if(length(input$sites_toshow)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
     n            <- if(length(input$sites_toshow)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[2]]),input$sites_toshow[1]])) else "NA"
-    Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the left menu. If you select more than that, the correlation will be calculated for the two firsts parameters.</br>
+    Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the left menu. If you select more than that, the correlation will be calculated for the two first parameters.</br>
                            </br>The correlation between <b>", input$sites_toshow[1], "</b> and <b>", input$sites_toshow[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
     Header2      <- "<h2>Basic stats</h2> <br/>"
     Header21     <- "<h3>Theory</h3> <br/>"
     Theory2      <- paste0("</br>This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
-                           </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow to chose what to visualize (raw dataset or annual averages).)
+                           </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
                            </br>")
-    Header22     <- "<h3>Try it for yourself</h3> <br/>"
+    Header22     <- "<h3>Try it for yourself!</h3> <br/>"
     mmean        <- NULL
     if(length(input$sites_toshow)>0) for (i in 1:length(input$sites_toshow)) mmean <- paste(mmean, input$sites_toshow[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$param_toshow) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$sites_toshow[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$sites_toshow[i]]))," observations. </br>")
     mstations <- paste(as.numeric(input$param_toshow),sep="", collapse=", ")
