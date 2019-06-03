@@ -361,15 +361,10 @@ LTeff_coord$start.lon.dd <- LTeff_start_df$start.lon.dd
 LTeff_coord$start.lat.dd <- LTeff_start_df$start.lat.dd
 LTeff_coord$end.lon.dd   <- LTeff_end_df$end.lon.dd
 LTeff_coord$end.lat.dd   <- LTeff_end_df$end.lat.dd
-<<<<<<< HEAD
 
 ```
 
-=======
 
-```
-
->>>>>>> 7ec9b45a5255e22fae964d76ccadde4271c3d5a0
 There are some outliers, so deleting all longitude < -73.48 (2 points) and thus > -73.1.
 
 ```{r}
@@ -478,11 +473,6 @@ p5 <- grid.arrange(p3, p4, ncol=2, widths=c(2,4))
 p5
 
 #ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_day_trip_",choose_day,".pdf"), p5)
-
-<<<<<<< HEAD
-
-=======
->>>>>>> 7ec9b45a5255e22fae964d76ccadde4271c3d5a0
 ```
 
 
