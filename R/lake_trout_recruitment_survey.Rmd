@@ -42,6 +42,8 @@ library(raster)
 library(rgeos)
 library(lubridate)
 library(reshape2)
+library(gridExtra) # get two plots side by side
+
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -217,18 +219,18 @@ Year and sites were significant when we tested for interaction: I should probabl
 First, import the data. They are all kept in different files, so that need to be processed a little bit.  
 ```{r read data effort, include=FALSE}
 # Read data
-LTeff16 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2016_effort.txt")
-LTeff17 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2017_effort.txt")
-LTeff18 <- read.delim("/Volumes/-/Script R/LCM_GitHub_Data_LCM/data_from_Pascal/LT_2018_effort.txt")
-
-LTeff16 <- read.delim("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2016_effort.txt")
-LTeff17 <- read.delim("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2017_effort.txt")
-LTeff18 <- read.delim("/Users/alexnaccarato/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/data_from_Pascal/LT_2018_effort.txt")
-order_name <- colnames(LTeff18)
+LTeff16 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2016_effort2.txt"))
+LTeff17 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2017_effort2.txt"))
+LTeff18 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2018_effort2.txt"))
 
 # Check which columns match and which don't
+colnames(LTeff16)[!colnames(LTeff16) %in% colnames(LTeff17)]
+colnames(LTeff16)[!colnames(LTeff16) %in% colnames(LTeff18)]
 colnames(LTeff18)[!colnames(LTeff18) %in% colnames(LTeff16)]
 colnames(LTeff18)[!colnames(LTeff18) %in% colnames(LTeff17)]
+
+# Vector to reordinate columns at the end following LTeff18 template
+order_name <- names(LTeff18)
 
 # Order so all columns are in the same order
 LTeff16 <- LTeff16[,c(order(colnames(LTeff16)))]
@@ -249,11 +251,6 @@ sum(nrow(LTeff16)+nrow(LTeff17)+nrow(LTeff18))
 
 LTeff <- LTeff[,c(order(order_name))]
 
-LTeff$fyear <- as.factor(LTeff$year)
-LTeff$year <- as.numeric(paste(LTeff$year))
-LTeff$netID2 <- paste(LTeff$year,as.numeric(paste(LTeff$netID)),sep="_")
-LTeff <- LTeff[order(LTeff$date),]
-
 head(LTeff)
 
 LTeff$AvDepth_m <- (as.numeric(paste(LTeff$start.depth.m)) + as.numeric(paste(LTeff$end.depth.m)))/2
@@ -267,10 +264,19 @@ names(LTeff)
 When where the trips done? There are two x-scales here (on top of the depth): year and hour of the day.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-LTeff$date <- as.POSIXlt(LTeff$date, format = "%d/%m/%Y")
+LTeff$date <- as.POSIXlt(substr(parse_date_time(x = LTeff$date,orders = c("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d")),1,10), format = "%Y-%m-%d")
 LTeff$yday <- LTeff$date$yday
+
+LTeff$fyear <- as.factor(LTeff$year)
+LTeff$year <- as.numeric(paste(LTeff$year))
+
 LTeff$year_hour <- LTeff$year + as.numeric(paste0(substr(LTeff$start.time, 1,2),substr(LTeff$start.time, 4,5)))/5000-.24
 
+LTeff$netID2 <- paste(LTeff$year,as.numeric(paste(LTeff$netID)),sep="_")
+LTeff <- LTeff[order(LTeff$date),]
+
+
+LTeff <- LTeff[!is.na(LTeff$year),]
 
 ggplot(LTeff, aes(x=year_hour, y=-yday, color=LTeff$AvDepth_m)) + 
   geom_point() +
@@ -305,21 +311,14 @@ LTeff$start.lon.dd <- as.numeric(paste(LTeff$start.lon.dd))
 LTeff$end.lat.dd <- as.numeric(paste(LTeff$end.lat.dd))
 LTeff$end.lon.dd <- as.numeric(paste(LTeff$end.lon.dd))
 
-
-convert<-function(deg, min, sec){
-  as.numeric(paste(deg)) + as.numeric(paste(min))/60 + as.numeric(paste(sec))/3600
-} 
-
-LTeff$start.lat <- convert(LTeff$start.lat.deg,LTeff$start.lat.min, LTeff$start.lat.sec)
-LTeff$start.lon <- -convert(LTeff$start.lon.deg,LTeff$start.lon.min, LTeff$start.lon.sec)
-LTeff$end.lat <- convert(LTeff$end.lat.deg,LTeff$end.lat.min, LTeff$end.lat.sec)
-LTeff$end.lon <- -convert(LTeff$end.lon.deg,LTeff$end.lon.min, LTeff$end.lon.sec)
-
-LTeff_start <- LTeff[,c("start.lon","start.lat")]
-LTeff_start <- LTeff_start[complete.cases(LTeff_start),]
-class(LTeff_start)
+# Step not necessary at the moment but make sure we're in the right projection.
+LTeff_coord <- LTeff[,c("date","start.lon.dd","start.lat.dd","end.lon.dd","end.lat.dd")]
+LTeff_coord <- LTeff_coord[complete.cases(LTeff_coord$start.lon.dd),]
+LTeff_coord <- LTeff_coord[complete.cases(LTeff_coord$end.lon.dd),]
+class(LTeff_coord)
 ## [1] "data.frame"
-coordinates(LTeff_start)<-~start.lon+start.lat
+LTeff_start <- LTeff_coord[,c("start.lon.dd","start.lat.dd")]
+coordinates(LTeff_start)<-~start.lon.dd+start.lat.dd
 class(LTeff_start)
 ## [1] "SpatialPointsDataFrame"
 ## attr(,"package")
@@ -344,19 +343,36 @@ LTeff_start<-spTransform(LTeff_start, CRS(proj4string(bathy)))
 # double check that they match
 identical(proj4string(LTeff_start),proj4string(bathy))
 
-LTeff_start_df <- as.data.frame(LTeff_start)
+# Do the same for end coords
+LTeff_end <- LTeff_coord[,c("end.lon.dd","end.lat.dd")]
+coordinates(LTeff_end)<-~end.lon.dd+end.lat.dd
+proj4string(LTeff_end)<-CRS("+proj=longlat +datum=WGS84")
+LTeff_end<-spTransform(LTeff_end, CRS(proj4string(bathy)))
 
+# double check that they match
+identical(proj4string(LTeff_end),proj4string(bathy))
+
+
+# Go back to dataframe
+LTeff_start_df <- as.data.frame(LTeff_start)
+LTeff_end_df <- as.data.frame(LTeff_end)
+# Include to initial dataframe
+LTeff_coord$start.lon.dd <- LTeff_start_df$start.lon.dd
+LTeff_coord$start.lat.dd <- LTeff_start_df$start.lat.dd
+LTeff_coord$end.lon.dd   <- LTeff_end_df$end.lon.dd
+LTeff_coord$end.lat.dd   <- LTeff_end_df$end.lat.dd
 
 ```
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
-  scale_fill_manual(values = c("white","darkgrey")) +
-  geom_point(data=LTeff_start_df, aes(x=start.lon, y=start.lat), color="red") +
-  xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
-  theme_set(theme_bw()) +
-  coord_equal(ratio=1) # square plot to avoid the distortion
+There are some outliers, so deleting all longitude < -73.48 (2 points) and thus > -73.1.
 
+```{r}
+LTeff_coord <- LTeff_coord[LTeff_coord$start.lon.dd<(-73.1) & LTeff_coord$start.lon.dd > (-73.48),]
+```
+
+Map visualising all the trips
+
+```{r map visualize all trips, echo=FALSE, message=FALSE, warning=FALSE}
 p1 <- ggplot(data = world) +  
   geom_sf()  + 
   theme_set(theme_bw()) +
@@ -372,21 +388,91 @@ p <- p1 +
   scale_fill_manual(values = c("lightgrey","darkgrey"))
 
 p
+
+p2 <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+  scale_fill_manual(values = c("white","darkgrey")) +
+  geom_point(data=LTeff_coord, aes(x=start.lon.dd, y=start.lat.dd), color=NA) +
+  xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
+  theme_set(theme_bw()) +
+  coord_equal(ratio=1) # square plot to avoid the distortion
+
   
-# for (i in which(complete.cases(LTeff$start.lat.dd))) {
-#    p <- p + geom_segment(aes(x = LTeff$start.lon.dd[i], y = LTeff$start.lat.dd[i], xend = LTeff$end.lon.dd[i], yend = LTeff$end.lat.dd[i]))
-# }
-# p
 
-plot(1, pch=NA, xlim = c(-74, -73), ylim = c(44, 45.2), ylab="Latitude", xlab="Longitude")
-for (i in which(complete.cases(LTeff$start.lat.dd))) {
-   lines(c(LTeff$start.lon.dd[i], LTeff$end.lon.dd[i]),
-         c(LTeff$start.lat.dd[i], LTeff$end.lat.dd[i]),
-         col=adjustcolor("black", alpha.f=.6))
-}
+p2 <- p2 + geom_segment(aes(x = LTeff_coord$start.lon.dd, y = LTeff_coord$start.lat.dd, xend = LTeff_coord$end.lon.dd, yend = LTeff_coord$end.lat.dd))
 
+p2
+
+
+#ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_trips_",min(LTeff$year, na.rm=T),"-",max(LTeff$year, na.rm=T),".pdf"), p2)
 
 ## Scale on map varies by more than 10%, scale bar may be inaccurate
+
+```
+
+Select one day to visualize the trips (go back in the .Rmd to edit that day).
+Right now, it is possible to choose from:
+```{r echo=FALSE}
+unique(LTeff_coord$date)
+```
+
+
+```{r choose day for plotting on map, message=FALSE, warning=FALSE}
+choose_day <- "2018-05-22 CEST"
+```
+
+
+```{r map visualize one day worth of trip, echo=FALSE, message=FALSE, warning=FALSE}
+
+# First, create vectors of min and max coordinates that I will use several times.
+xmin_coord <- LTeff_coord$start.lon.dd[LTeff_coord$date==choose_day]
+ymin_coord <- LTeff_coord$start.lat.dd[LTeff_coord$date==choose_day]
+xmax_coord <- LTeff_coord$end.lon.dd[LTeff_coord$date==choose_day]
+ymax_coord <- LTeff_coord$end.lat.dd[LTeff_coord$date==choose_day]
+
+myxmin_coord <- min(xmin_coord, xmax_coord)-0.01
+myymin_coord <- min(ymin_coord, ymax_coord)-0.01
+myxmax_coord <- max(xmin_coord, xmax_coord)+0.01
+myymax_coord <- max(ymin_coord, ymax_coord)+0.01
+
+# Get metadata
+subset_trawl <- LTeff[LTeff$date==choose_day,]
+
+# Base layer
+p3 <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+  scale_fill_manual(values = c("white","darkgrey")) +
+  xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
+  theme_set(theme_bw()) +
+  #ylim(44.4,44.5) +
+  coord_equal(ratio=1) # square plot to avoid the distortion
+
+# Add trips
+p3 <- p3 + geom_segment(aes(x = xmin_coord, y = ymin_coord, xend = xmax_coord, yend = ymax_coord))
+
+# Add box for zoom
+p3 <- p3 +
+  geom_rect(mapping=aes(xmin=myxmin_coord,
+                        ymin=myymin_coord,
+                        xmax=myxmax_coord,
+                        ymax=myymax_coord),
+            color="black", size=0.5, fill=NA)
+
+# Create the zoom
+
+p4 <- ggplot() + geom_segment(aes(x = xmin_coord, y = ymin_coord, xend = xmax_coord, yend = ymax_coord)) +
+  geom_label(aes(x = xmin_coord, y = ymin_coord, label= paste( subset_trawl$start.depth.m, "m")), size = 2.5) +
+  geom_label(aes(x = xmax_coord, y = ymax_coord, label= paste( subset_trawl$end.depth.m, "m")), size = 2.5) +
+  #theme_set(theme_bw()) +
+  theme(panel.background = element_rect(fill = "lightgrey"),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        plot.margin = unit(c(1,1,1,1), "cm")) +
+  ggtitle(paste0(choose_day," trawls")) +
+  xlab("Longitude") + ylab("Latitude") + coord_equal(ratio=1) + xlim(myxmin_coord+0.008,myxmax_coord-0.008) + ylim(myymin_coord+0.008, myymax_coord-0.008)
+
+p5 <- grid.arrange(p3, p4, ncol=2, widths=c(2,4))
+p5
+
+#ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_day_trip_",choose_day,".pdf"), p5)
+
 
 ```
 
