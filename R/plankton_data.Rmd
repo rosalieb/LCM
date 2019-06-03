@@ -1,7 +1,44 @@
-#plankton data
-source("R/getpath4data.R")
+---
+title: "Plankton data"
+author: "Rosalie Bruel"
+date: "02/05/2019"
+output: 
+  html_document: 
+    df_print: paged
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+  df_print: paged
+fontsize: 11pt
+---
+
+_Last updated: `r Sys.Date()`_
+
+# Read data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(gtable) # to get two plots aligned ggplot
+library(grid) # low-level grid functions are required
+
 library(reshape2)
 
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
+```
+
+```{r load datasets, echo=TRUE, message=FALSE, warning=FALSE}
 plktn_pre2010  <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data pre 2010.txt"))
 plktn_post2010 <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data after 2010.txt"))
 sites_raw      <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data stations.txt"))
@@ -20,6 +57,27 @@ summary(plktn$ResultType[plktn$PlanktonType=="Phyto"])
 summary(plktn$ResultType[plktn$PlanktonType=="Zoo"])
 summary(plktn$SampleType[plktn$PlanktonType=="Zoo"])
 
+```
+
+
+# Size to weight conversion
+
+We use Mc Cauley 1994 work (Chapter 7 of ...).
+Average sizes were obtained by browsing the web for pictures of individuals.
+
+
+```{r calculate weight from size, echo=FALSE, message=FALSE, warning=FALSE}
+# Size data, from McCauley 1984 (Chapter 7)
+size_zoop      <- read.delim(paste0(getpath4data(),"plankton/Zoop_size.txt"))
+# Calculate average weight to get biomass
+size_zoop$weight <- exp(size_zoop$a +  size_zoop$b*log(size_zoop$Average_Size))
+size_zoop
+```
+
+
+# Separate zoo and phyto
+
+```{r message=FALSE, warning=FALSE}
 # Reshape the dataframe with the type of plankton+name as column name
 plktn$Type_SpeciesID <- paste(plktn$PlanktonType, plktn$SpeciesID, sep="_")
 plktn2 <- dcast(plktn,  VisitDate + LocationID ~ Type_SpeciesID,value.var = "Result",fun.aggregate = sum, na.rm = TRUE )
@@ -42,31 +100,38 @@ rowSums(phyto[,-c(1:2)])
 summary(which(rowSums(zoo[,-c(1,2)])!=0) %in% which(rowSums(phyto[,-c(1,2)])!=0))
 summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0))
 
+
+```
+
+# Work on zooplankton
+
+```{r}
 # Group the data by at least genus
 names(zoo)
 whatsleft <- 
   names(zoo[,-c(grep("aphni",     names(zoo)),
-              grep("osmin",     names(zoo)),
-              grep("epto",      names(zoo)),
+              grep("osmin",       names(zoo)),
+              grep("epto",        names(zoo)),
               grep("otifer|Anuraeopsis|Ascomorpha|Asplanchna|Brachi|Collotheca|Conochilus|Cupelopagis|Euchlanis|Filinia|Kellicottia|Keratella|Lecane|Monostyla|Nothalca|Ploesoma|Polyarthra|Synchaeta|Trichocerca",    names(zoo)),
-              grep("iaphanoso", names(zoo)),
-              grep("yclop",     names(zoo)),
-              grep("alanoid|Limnocalanus",   names(zoo)),
+              grep("iaphanoso",               names(zoo)),
+              grep("yclop",                   names(zoo)),
+              grep("alanoid|Limnocalanus",    names(zoo)),
               grep("opepo|Epischura|Harpacticoid",names(zoo)))])
 zoo$BOSMINA      <- rowSums(zoo[,grep("osmin",names(zoo))])     # small grazer
 zoo$DAPHNIA      <- rowSums(zoo[,grep("aphni",names(zoo))])     # medium grazer
 zoo$DIAPHANOSOMA <- rowSums(zoo[,grep("iaphanoso",names(zoo))]) # medium grazer
-zoo$LEPTO        <- rowSums(zoo[,grep("epto",names(zoo))])      # predator
+zoo$LEPTO        <- rowSums(zoo[,grep("epto", names(zoo))])      # predator
 zoo$CYCLOP       <- rowSums(zoo[,grep("yclop",names(zoo))])     # copepod
-zoo$CALANOID     <- rowSums(zoo[,grep("alanoid|Limnocalanus",names(zoo))])   # copepod
+zoo$CALANOID     <- rowSums(zoo[,grep("alanoid|Limnocalanus",
+                                              names(zoo))])   # copepod
 zoo$ROTIFER      <- rowSums(zoo[,grep("otifer|Anuraeopsis|Ascomorpha|Asplanchna|Brachi|Collotheca|Conochilus|Cupelopagis|Euchlanis|Filinia|Kellicottia|Keratella|Lecane|Monostyla|Nothalca|Ploesoma|Polyarthra|Synchaeta|Trichocerca",names(zoo))])    # small grazer
 zoo$COPEPOD      <- rowSums(zoo[,grep("opepo|Epischura|Harpacticoid",names(zoo))])    # large grazer
 
 
 # Group by very large groups (i.e. grazers, predators)
 zoo$PREDATOR    <- rowSums(zoo[,grep("Polyphemus|LEPTO|Holopedium",names(zoo))])   
-zoo$GRAZER_sm   <- rowSums(zoo[,grep("BOSMINA|Sida|Alon|Chyd|ROTIF|leurox|ladocer",names(zoo))])  
-zoo$GRAZER_lr   <- rowSums(zoo[,grep("DAPHNIA|DIAPHA|CYCLOP|CALANO|opep|Eurycercus|aupl",names(zoo))])  
+zoo$GRAZER_sm   <- rowSums(zoo[,grep("BOSMINA|Alon|Chyd|ROTIF|leurox|ladocer",names(zoo))])  
+zoo$GRAZER_lr   <- rowSums(zoo[,grep("DAPHNIA|Sida|DIAPHA|CYCLOP|CALANO|opep|Eurycercus|aupl",names(zoo))])  
 zoo$PARASITIC   <- zoo[,grep("Ergasilus",names(zoo))]
   
 whatsleft[-c(grep("Polyphemus|LEPTO|Holopedium",whatsleft),
@@ -97,10 +162,10 @@ sites
 
 
 # Add explanatory variables to my dataframe
-zoo$LocationID2 <- sites[match(zoo$LocationID, sites$LocationID), "StationID"]
-zoo$Year        <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%Y"))
+zoo$LocationID2  <- sites[match(zoo$LocationID, sites$LocationID), "StationID"]
+zoo$Year         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%Y"))
 zoo$Month        <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%m"))
-zoo$yday        <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%j"))
+zoo$yday         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%j"))
 
 # Model species
 library(mgcv)
@@ -140,3 +205,6 @@ zoo19_month$Month  <- as.numeric(substr(zoo19_month$Group.1,6,7))
 zoo19_month_Predator <- dcast(zoo19_month, Year ~ Month, value.var = "PREDATOR", fun.aggregate = mean)
 zoo19_month_Grazer_sm <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_sm", fun.aggregate = mean)
 zoo19_month_Grazer_lr <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_lr", fun.aggregate = mean)
+
+```
+
