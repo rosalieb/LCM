@@ -42,6 +42,8 @@ library(raster)
 library(rgeos)
 library(lubridate)
 library(reshape2)
+library(gridExtra) # get two plots side by side
+
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -370,7 +372,7 @@ LTeff_coord <- LTeff_coord[LTeff_coord$start.lon.dd<(-73.1) & LTeff_coord$start.
 
 Map visualising all the trips
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r map visualize all trips, echo=FALSE, message=FALSE, warning=FALSE}
 p1 <- ggplot(data = world) +  
   geom_sf()  + 
   theme_set(theme_bw()) +
@@ -389,7 +391,7 @@ p
 
 p2 <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
   scale_fill_manual(values = c("white","darkgrey")) +
-  #geom_point(data=LTeff_coord, aes(x=start.lon.dd, y=start.lat.dd), color="red") +
+  geom_point(data=LTeff_coord, aes(x=start.lon.dd, y=start.lat.dd), color=NA) +
   xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
   theme_set(theme_bw()) +
   coord_equal(ratio=1) # square plot to avoid the distortion
@@ -401,32 +403,76 @@ p2 <- p2 + geom_segment(aes(x = LTeff_coord$start.lon.dd, y = LTeff_coord$start.
 p2
 
 
-
+#ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_trips_",min(LTeff$year, na.rm=T),"-",max(LTeff$year, na.rm=T),".pdf"), p2)
 
 ## Scale on map varies by more than 10%, scale bar may be inaccurate
 
 ```
 
 Select one day to visualize the trips (go back in the .Rmd to edit that day).
-
-```{r message=FALSE, warning=FALSE}
-choose_day <- "2018-10-22 CEST"
+Right now, it is possible to choose from:
+```{r echo=FALSE}
+unique(LTeff_coord$date)
 ```
 
 
-```{r}
+```{r choose day for plotting on map, message=FALSE, warning=FALSE}
+choose_day <- "2018-05-22 CEST"
+```
 
-p2 <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+
+```{r map visualize one day worth of trip, echo=FALSE, message=FALSE, warning=FALSE}
+
+# First, create vectors of min and max coordinates that I will use several times.
+xmin_coord <- LTeff_coord$start.lon.dd[LTeff_coord$date==choose_day]
+ymin_coord <- LTeff_coord$start.lat.dd[LTeff_coord$date==choose_day]
+xmax_coord <- LTeff_coord$end.lon.dd[LTeff_coord$date==choose_day]
+ymax_coord <- LTeff_coord$end.lat.dd[LTeff_coord$date==choose_day]
+
+myxmin_coord <- min(xmin_coord, xmax_coord)-0.01
+myymin_coord <- min(ymin_coord, ymax_coord)-0.01
+myxmax_coord <- max(xmin_coord, xmax_coord)+0.01
+myymax_coord <- max(ymin_coord, ymax_coord)+0.01
+
+# Get metadata
+subset_trawl <- LTeff[LTeff$date==choose_day,]
+
+# Base layer
+p3 <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
   scale_fill_manual(values = c("white","darkgrey")) +
-#  geom_point(data=LTeff_coord[LTeff_coord$date==choose_day,], aes(x=start.lon.dd, y=start.lat.dd), color="red") +
   xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
   theme_set(theme_bw()) +
-  #ylim(44.3,44.4) +
+  #ylim(44.4,44.5) +
   coord_equal(ratio=1) # square plot to avoid the distortion
 
-p2 <- p2 + geom_segment(aes(x = LTeff_coord$start.lon.dd[LTeff_coord$date==choose_day], y = LTeff_coord$start.lat.dd[LTeff_coord$date==choose_day], xend = LTeff_coord$end.lon.dd[LTeff_coord$date==choose_day], yend = LTeff_coord$end.lat.dd[LTeff_coord$date==choose_day]))
+# Add trips
+p3 <- p3 + geom_segment(aes(x = xmin_coord, y = ymin_coord, xend = xmax_coord, yend = ymax_coord))
 
-p2
+# Add box for zoom
+p3 <- p3 +
+  geom_rect(mapping=aes(xmin=myxmin_coord,
+                        ymin=myymin_coord,
+                        xmax=myxmax_coord,
+                        ymax=myymax_coord),
+            color="black", size=0.5, fill=NA)
+
+# Create the zoom
+
+p4 <- ggplot() + geom_segment(aes(x = xmin_coord, y = ymin_coord, xend = xmax_coord, yend = ymax_coord)) +
+  geom_label(aes(x = xmin_coord, y = ymin_coord, label= paste( subset_trawl$start.depth.m, "m")), size = 2.5) +
+  geom_label(aes(x = xmax_coord, y = ymax_coord, label= paste( subset_trawl$end.depth.m, "m")), size = 2.5) +
+  #theme_set(theme_bw()) +
+  theme(panel.background = element_rect(fill = "lightgrey"),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        plot.margin = unit(c(1,1,1,1), "cm")) +
+  ggtitle(paste0(choose_day," trawls")) +
+  xlab("Longitude") + ylab("Latitude") + coord_equal(ratio=1) + xlim(myxmin_coord+0.008,myxmax_coord-0.008) + ylim(myymin_coord+0.008, myymax_coord-0.008)
+
+p5 <- grid.arrange(p3, p4, ncol=2, widths=c(2,4))
+p5
+
+#ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_day_trip_",choose_day,".pdf"), p5)
+
 
 ```
 
