@@ -265,7 +265,7 @@ ggplotly(weight.stock.wild)
 t.test(LTdiet$Weight ~ LTdiet$stock.wild)
 ```
 
-<span style="color:red">Note from Rosalie: Size distribution really varies between stocked and wild fish. It prevents us from directly comparing the average weight of the two populations. That's why we calculate the "Condition factor" for fish. It's a function of weigth and length (you'll see that with WFB161): $K=W/L^3$.</span>
+<span style="color:red">Note from Rosalie: Size distribution really varies between stocked and wild fish. It prevents us from directly comparing the average weight of the two populations. We can compute "Condition factor" for fish, to kinda standardize the whole thing. It's a function of weigth and length (you'll see that with WFB161): $K=W/L^3$.</span>
 
 ```{r density plot for size stocked vs. wild LT, message=FALSE, warning=FALSE}
 # mean 
@@ -283,13 +283,20 @@ p <- ggplot(LTdiet, aes(x=Total.Length, fill=stock.wild)) +
 
 
 <span style="color:red">Note from Rosalie: I'm reusing your script from two chunks away but using this formula to compare condition. However, you're still not supposed to compare condition over too many size classes, because fish weight change with e.g. gonad development, etc. If you want to anything for wild vs. stocked, you first need to work on a smaller size-class.  
-I've done that below, and the wild fish actually have a better condition than the stocked fish, for the size class 150-250. </span>
+I've done that below, and the wild fish actually have a (slightly) better condition than the stocked fish, for the size class 150-250.
+Note too that barplots are not the most relevant plots to show a discrete value. Barplots can be relevant for percentages, but here, a boxplot or a single point with confidence interval would be better. Here, I'm multiplying the weight by 10<sup>5</sup> so we can actually read something. </span>
 
 
 ```{r condition.by.origin, warning=FALSE}
+<<<<<<< HEAD
 # This is the code for the bar chart of the difference in weight between stocked and wild lake trout. 
 condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight/(Total.Length^3), fill = stock.wild)) +
   geom_bar(stat = "summary", fun.y = "mean") +
+=======
+# This is the code for tha bar chart of the difference in weight between stocked and wild lake trout. 
+condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight*10^5/(Total.Length^3), fill = stock.wild)) +
+  geom_boxplot() +
+>>>>>>> ae3bacf24ac1eefb98b4c5efd07caf11947443a4
   labs(y = "Average Weight (g)", fill = "") +
   theme(axis.title.x = element_blank()) 
 
