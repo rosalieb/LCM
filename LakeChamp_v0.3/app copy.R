@@ -7,6 +7,9 @@
 #    http://shiny.rstudio.com/
 #
 
+# Toggle switch between datasets?
+
+
 library(shiny)
 library(ggplot2)
 library(gridExtra)
@@ -16,6 +19,7 @@ library(shinydashboard)
 library(leaflet)
 # names(tags) # list of tags recognized by shiny.
 library(htmlTable)
+library(shinyWidgets)
 
 out <- total_year
 out$year <- as.numeric(substring(out[,1],1,4))
@@ -158,13 +162,13 @@ ui <- dashboardPage(
           #Render an output text
           htmlOutput("Instructions_plot_1"),
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
-            label = "Stations to plot", status = "default", width = 80, circle = FALSE,
-            checkboxGroupInput("stations_toshow", "Sites to show:",
-                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))),
-            div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
-            checkboxGroupInput("parameters_toshow", "Parameters to show:",
-                               colnames(out))))
+            div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any boxes:",
+                                                                                colnames(out))))),
+          div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
+            label = "Stations to plot", status = "default", width = 80, circle = FALSE,
+            div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow", "Check any boxes:",
+                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))))
         ),
         box(
           title = "Dot charts",
@@ -196,7 +200,16 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_stats",
-        htmlOutput("Stats")
+        htmlOutput("Stats1"),
+        dropdownButton(
+          label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
+          div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow2", "Check any boxes:",
+                             colnames(out)))),
+        htmlOutput("Stats2"),
+        dropdownButton(
+          label = "Stations to plot", status = "default", width = 80, circle = FALSE,
+          div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow2", "Check any boxes:",
+                             sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE)))
       )
     )
   )
@@ -219,7 +232,7 @@ server <- function(input, output) {
   })
 
   output$Instructions_plot_1 <- renderUI({ 
-    Instruction1 <- paste0("Select on the left side the parameters to plot (you need to select at least one), as well as the period for which you want to visualize the data. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period.<br/>Then, select the sites you want to see the data for.<br/><br/>")
+    Instruction1 <- paste0("Select below which parameters to plot (you need to select at least one), as well as the period for which you want to visualize the data on the left sidebar. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period.<br/>Then, select the sites you want to see the data for.<br/><br/>")
     HTML(paste(Instruction1))
   })
   
@@ -316,7 +329,7 @@ server <- function(input, output) {
   })
   
   # Stats
-  output$Stats <- renderUI({ 
+  output$Stats1 <- renderUI({ 
     Header       <- "<h1>Stat tools</h1> <br/>"
     Header1      <- "<h2>Correlation</h2> <br/>"
     Header11     <- "<h3>Theory</h3> <br/>"
@@ -326,27 +339,32 @@ server <- function(input, output) {
                            </br>")
     Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
     Header12     <- "<h3>Try it for yourself!</h3> <br/>"
-    mcor         <- if(length(input$parameters_toshow)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
-    n            <- if(length(input$parameters_toshow)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[2]]),input$parameters_toshow[1]])) else "NA"
-    Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the left menu. If you select more than that, the correlation will be calculated for the two first parameters.</br>
-                           </br>The correlation between <b>", input$parameters_toshow[1], "</b> and <b>", input$parameters_toshow[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
+    mcor         <- if(length(input$parameters_toshow2)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
+    n            <- if(length(input$parameters_toshow2)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[2]]),input$parameters_toshow2[1]])) else "NA"
+    Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br>
+                           </br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
+    HTML(paste(Header,
+               Header1,Header11,Theory1, Img1, Header12, Results_Corr))
+    
+  })
+  
+  output$Stats2 <- renderUI({
     Header2      <- "<h2>Basic stats</h2> <br/>"
     Header21     <- "<h3>Theory</h3> <br/>"
     Theory2      <- paste0("</br>This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
-                           </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
-                           </br>")
+                         </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
+                         </br>")
     Header22     <- "<h3>Try it for yourself!</h3> <br/>"
     mmean        <- NULL
-    if(length(input$parameters_toshow)>0) for (i in 1:length(input$parameters_toshow)) mmean <- paste(mmean, input$parameters_toshow[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$stations_toshow) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$parameters_toshow[i]]))," observations. </br>")
-    mstations <- paste(as.numeric(input$stations_toshow),sep="", collapse=", ")
-    Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the left menu. </br>
-                                    The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
-    HTML(paste(Header,
-               Header1,Header11,Theory1, Img1, Header12,Results_Corr,
-               Header2,Header21,Theory2, Header22,Results_basic_stats, mmean))
-   
-  })
+    if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$stations_toshow2) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$parameters_toshow2[i]]))," observations. </br>")
+    mstations <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
+    Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the dropdown menu below. </br>
+                                  The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
+               
+    HTML(paste(Header2,Header21,Theory2, Header22, Results_basic_stats, mmean))
+    
+  })           
   
 }
 
