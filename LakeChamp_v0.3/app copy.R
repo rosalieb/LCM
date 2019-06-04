@@ -82,7 +82,7 @@ ui <- dashboardPage(
         icon = icon("question")
       ),
       menuItem(
-        "Parameter Descriptions", 
+        "Parameter descriptions", 
         tabName = "parameters_info", 
         icon = icon("list-alt")
       ),
@@ -100,11 +100,21 @@ ui <- dashboardPage(
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
         sliderInput("range", "Years selected",
                     min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
-                    value = c(2000,2012),sep = ""),
-        conditionalPanel(
-          'input$id == "graph"',
-          checkboxGroupInput("parameters_toshow", "Columns to show:",
-                             colnames(out)))#, selected = colnames(out)))
+                    value = c(2000,2012),sep = "")
+        # conditionalPanel(
+        #   'input$id == "graph"',
+        #   checkboxGroupInput("parameters_toshow", "Phosphorus:",
+        #                      colnames(out[,c(36,10,25)])),
+        #   checkboxGroupInput("parameters_toshow", "Nitrogen:",
+        #                      colnames(out[,c(34,32,33,31)])),
+        #   checkboxGroupInput("parameters_toshow", "Carbon:",
+        #                      colnames(out[,c(35,9,8)])),
+        #   checkboxGroupInput("parameters_toshow", "Other minerals/nutrients/elements:",
+        #                      colnames(out[,c(12,4,14,29,27,11,13)])),
+        #   checkboxGroupInput("parameters_toshow", "Water quality",
+        #                      colnames(out[,c(38,37,6,3,5,30,7,26,28)])),
+        #   checkboxGroupInput("parameters_toshow", "Phytoplankton",
+        #                      colnames(out[,c(24,23,20,19,16,15,18,17,22,21)])))#, selected = colnames(out)))
       )
     )
   ),
@@ -118,7 +128,7 @@ ui <- dashboardPage(
       tabItem(
         tabName = "m_lake",
         box(
-          title = "Lake Champlain Monitoring Sites",
+          title = "Lake Champlain monitoring sites",
           width = "100%",
           height = "100%",
           collapsible = TRUE,
@@ -147,31 +157,31 @@ ui <- dashboardPage(
           height = "100%",
           #Render an output text
           htmlOutput("Instructions_plot_1"),
-          conditionalPanel(
-            'input$id2 == "sites"',
-            tags$div(tweaks,
-                     align = 'left', 
-                     class = 'multicol',
-                     checkboxGroupInput("stations_toshow", "Sites to show:",
-                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))
-          )
+          div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
+            label = "Stations to plot", status = "default", width = 80, circle = FALSE,
+            checkboxGroupInput("stations_toshow", "Sites to show:",
+                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))),
+            div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
+            label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
+            checkboxGroupInput("parameters_toshow", "Parameters to show:",
+                               colnames(out))))
         ),
         box(
-          title = "Dot Charts",
+          title = "Dot charts",
           collapsible = TRUE,
           width = "100%",
           height = "100%",
           plotOutput("myplot1")
         ),
         box(
-          title = "Line Charts",
+          title = "Line charts",
           collapsible = TRUE,
           width = "100%",
           height = "100%",
           plotOutput("myplot2")
         ),
         box(
-          title = "Box Plots",
+          title = "Box plots",
           collapsible = TRUE,
           width = "100%",
           height = "100%",
@@ -224,7 +234,7 @@ server <- function(input, output) {
   })
   
   output$mytable1help <- renderUI({ 
-    table1help <- paste0("<h3>Annual Averages Data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
+    table1help <- paste0("<h3>Annual averages data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
     HTML(paste(table1help))
   })
   
@@ -238,13 +248,13 @@ server <- function(input, output) {
       addTiles() %>%  # Add default OpenStreetMap map tiles
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
-                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName, "</br><b> StationID: </b>", stations_metadata_subset$StationID, 
-                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude, "</br><b> Longitude: </b>", stations_metadata_subset$Longitude,
+                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
+                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
                                 "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters")) %>%
       addMarkers(data = stations_metadata_subset, icon = xIcon, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"]), 
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]),
-                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName, "</br><b> StationID: </b>", stations_metadata_subset$StationID, 
-                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude, "</br><b> Longitude: </b>", stations_metadata_subset$Longitude))
+                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Trib"], 
+                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]))
   })
   # <b>Instructions:</b>
   
