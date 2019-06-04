@@ -38,7 +38,7 @@ xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
 
-parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.csv"))
+parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.csv"), stringsAsFactors = FALSE, encoding = "UTF-8")
 
 # tweaks, a list object to set up multicols for checkboxGroupInput
 tweaks <- 
@@ -82,7 +82,7 @@ ui <- dashboardPage(
         icon = icon("question")
       ),
       menuItem(
-        "Parameters", 
+        "Parameter Descriptions", 
         tabName = "parameters_info", 
         icon = icon("list-alt")
       ),
@@ -122,6 +122,7 @@ ui <- dashboardPage(
           width = "100%",
           height = "100%",
           collapsible = TRUE,
+          htmlOutput("mymap1help"),
           tags$style(type = "text/css", "#map {height: calc(100vh - 80px) !important;}"),
           leafletOutput("mymap1", height = 900, width = 660)
         )
@@ -227,13 +228,19 @@ server <- function(input, output) {
     HTML(paste(table1help))
   })
   
+  output$mymap1help <- renderUI({ 
+    map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth. Unfortunately, there are no depths for tributary stations.<br/><br/>")
+    HTML(paste(map1help))
+  })
+  
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName, "</br><b> StationID: </b>", stations_metadata_subset$StationID, 
-                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude, "</br><b> Longitude: </b>", stations_metadata_subset$Longitude)) %>%
+                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude, "</br><b> Longitude: </b>", stations_metadata_subset$Longitude,
+                                "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters")) %>%
       addMarkers(data = stations_metadata_subset, icon = xIcon, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"]), 
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]),
                  popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName, "</br><b> StationID: </b>", stations_metadata_subset$StationID, 
