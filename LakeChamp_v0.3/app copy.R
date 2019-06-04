@@ -34,14 +34,11 @@ lake_stations_subset <- stations_metadata[stations_metadata$StationID %in% out$S
 trib_stations_subset <- stations_metadata[stations_metadata$StationID %in% LCMcoord$TStation,]
 stations_metadata_subset <- rbind(lake_stations_subset, trib_stations_subset)
 
-
-boatIcon <- makeIcon(
-  iconUrl = "https://www.materialui.co/materialIcons/maps/directions_boat_black_192x192.png",
-  iconWidth = 20, iconHeight = 20)
-
 xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
+
+parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.csv"))
 
 # tweaks, a list object to set up multicols for checkboxGroupInput
 tweaks <- 
@@ -85,6 +82,11 @@ ui <- dashboardPage(
         icon = icon("question")
       ),
       menuItem(
+        "Parameters", 
+        tabName = "parameters_info", 
+        icon = icon("list-alt")
+      ),
+      menuItem(
         "Map", 
         tabName = "m_lake", 
         icon = icon("map") #icon("globe"),
@@ -125,6 +127,17 @@ ui <- dashboardPage(
         )
       ),
       tabItem(
+        tabName = "parameters_info",
+        box(
+          title = "Chemical and Biological Parameters",
+          width = "100%",
+          height = "100%",
+          collapsible = TRUE,
+          htmlOutput("parameter_table_help"),
+          DT::dataTableOutput("parameters_table")
+        )
+      ),
+      tabItem(
         tabName = "d_chart",
         title = "Instruction: Select data to plot",
         box(
@@ -157,7 +170,7 @@ ui <- dashboardPage(
           plotOutput("myplot2")
         ),
         box(
-          title = "Bar Plots",
+          title = "Box Plots",
           collapsible = TRUE,
           width = "100%",
           height = "100%",
@@ -167,6 +180,7 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_table",
+        htmlOutput("mytable1help"),
         DT::dataTableOutput("mytable1")
       ),
       tabItem(
@@ -189,6 +203,10 @@ server <- function(input, output) {
     HTML(paste(header, myparagraph1, myparagraph2, linkToSite, linkToData))
   })
   
+  output$parameters_table = DT::renderDataTable({
+    DT::datatable(parameters_info, options = list(lengthMenu = c(50, 100)))
+  })
+
   output$Instructions_plot_1 <- renderUI({ 
     Instruction1 <- paste0("Select on the left side the parameters to plot (you need to select at least one), as well as the period for which you want to visualize the data. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period.<br/>Then, select the sites you want to see the data for.<br/><br/>")
     HTML(paste(Instruction1))
@@ -197,6 +215,16 @@ server <- function(input, output) {
   output$info_plot_3 <- renderUI({ 
     info3 <- paste0("Values for each parameter are averages for the date range selected with the slider. You can select which stations to view with the selection boxes at the top of this page.")
     HTML(paste(info3))
+  })
+  
+  output$parameter_table_help <- renderUI({ 
+    p_table_help <- paste0("Here, you'll find more information on the chemical and biological parameters collected through the Lake Champlain Long-Term Monitoring Project. To organize and quickly find parameters, they are separated into categories. <br/><br/>")
+    HTML(paste(p_table_help))
+  })
+  
+  output$mytable1help <- renderUI({ 
+    table1help <- paste0("<h3>Annual Averages Data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
+    HTML(paste(table1help))
   })
   
   output$mymap1 <- renderLeaflet({
@@ -221,7 +249,7 @@ server <- function(input, output) {
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
                      aes(x=out[out$StationID %in% as.numeric(input$stations_toshow),1],y=out[out$StationID %in% 
                      as.numeric(input$stations_toshow), b])) +
-                     geom_point(color = out$StationID) +
+                     geom_point() +
                      xlab("Year") + ylab(b) +
                      xlim(c(input$range[1],input$range[2]))
                      #ggcolors(~input$mysites)
@@ -257,7 +285,7 @@ server <- function(input, output) {
       gl <- lapply(input$parameters_toshow, 
                    function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
                                       aes(x=as.factor(out[out$StationID %in% as.numeric(input$stations_toshow),"StationID"]), y=out[out$StationID %in% as.numeric(input$stations_toshow), b])) +
-                     geom_bar(stat = "summary", fun.y = "mean") +
+                     geom_boxplot() +
                      labs(x = "Station ID", y = b)
       )
       ifelse(length(gl) == 1, gl, grid.arrange(grobs = gl, nrow = round(length(gl)/2)))
