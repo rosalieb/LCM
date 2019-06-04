@@ -39,6 +39,7 @@ library("rnaturalearthdata")
 library("ggspatial")
 #load spatial packages
 library(raster)
+library(rasterVis)
 library(rgeos)
 library(lubridate)
 library(reshape2)
@@ -297,7 +298,14 @@ panel.background = element_blank(), axis.line = element_line(colour = "black")) 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
 lcgroupmap=c("lake",rep("island", 84562))
+bathy2 <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
+plot(bathy2,
+     main = "Bathymetric map of Lake Champlain",
+     col = grey(1:100/100),
+     axes = FALSE,
+     box = FALSE)
 
+plot(hillshade_wgs84)
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
 class(bathy)
@@ -305,6 +313,7 @@ crs(bathy)
 crs(world)
 bathy <- spTransform(bathy,crs(world))
 crs(bathy)
+bathy2 <- projectRaster(bathy2, crs = crs(world))
 
 LTeff$start.lat.dd <- as.numeric(paste(LTeff$start.lat.dd))
 LTeff$start.lon.dd <- as.numeric(paste(LTeff$start.lon.dd))
@@ -363,6 +372,34 @@ LTeff_coord$end.lon.dd   <- LTeff_end_df$end.lon.dd
 LTeff_coord$end.lat.dd   <- LTeff_end_df$end.lat.dd
 
 ```
+
+Just because I can (and to save the code), plotting the bathymetry from the tif file:
+
+```{r plot bathy with color, echo=FALSE, message=FALSE, warning=FALSE}
+# Define a colour ramp palette
+colr <- colorRampPalette(brewer.pal(11, 'RdYlBu'))
+
+p <- levelplot(bathy2, 
+          margin=TRUE,    # turn to F to suppress marginal graphics
+          colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-120,0,20))      # legend ticks and labels
+            ),    
+          par.settings=list(
+            axis.line=list(col='black') # turn to transparent to suppress axes and legend outline
+          ),
+          scales=list(draw=TRUE),  # turn to F to suppress axis labels
+          col.regions=colr,         # colour ramp
+          at=seq(-130, 0, len=101)) # colour ramp breaks
+
+p
+
+# pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LC_bathy.pdf"),width = 4, height = 9)
+# p
+# dev.off()
+
+```
+
 
 
 There are some outliers, so deleting all longitude < -73.48 (2 points) and thus > -73.1.
