@@ -20,4 +20,11 @@ for (i in seq_along(my_sizeclass)) {
 rownames(LTdiet_summary) <- my_sizeclass
 ### end 'my size class'
 
+# Read .tif for map ####
+# Created on 2019-06-04, delete on 2019-07-04 
+library(raster)
+bathy <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
+plot(bathy,
+     col = grey(1:100/100))
+
 # If you had another piece of code here, label it and write when it's ok to delete it
