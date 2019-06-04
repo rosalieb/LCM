@@ -7,8 +7,9 @@
 #    http://shiny.rstudio.com/
 #
 
-# Toggle switch between datasets?
+# Toggle switch between datasets dt_annual and dt_day?
 
+# dt = data; df = data frame; pl = plot; map = maps; prm = parameters; txt = text/paragraphs
 
 library(shiny)
 library(ggplot2)
@@ -21,20 +22,21 @@ library(leaflet)
 library(htmlTable)
 library(shinyWidgets)
 
-out <- total_year
-out$year <- as.numeric(substring(out[,1],1,4))
-str(out$VisitDate)
-out <- out[order(out$year,decreasing = F),]
-out <- round(out, digits = 2)
+dt_annual <- total_year
+dt_annual$year <- as.numeric(substring(dt_annual[,1],1,4))
+str(dt_annual$VisitDate)
+dt_annual <- dt_annual[order(dt_annual$year,decreasing = F),]
+dt_annual <- round(dt_annual, digits = 2)
+dt_day <- total
 
-out$StationID[out$Station == "2"] <- "02"
-out$StationID[out$Station == "4"] <- "04"
-out$StationID[out$Station == "7"] <- "07"
-out$StationID[out$Station == "9"] <- "09"
-as.numeric(out$StationID)
+dt_annual$StationID[dt_annual$Station == "2"] <- "02"
+dt_annual$StationID[dt_annual$Station == "4"] <- "04"
+dt_annual$StationID[dt_annual$Station == "7"] <- "07"
+dt_annual$StationID[dt_annual$Station == "9"] <- "09"
+as.numeric(dt_annual$StationID)
 
 stations_metadata <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
-lake_stations_subset <- stations_metadata[stations_metadata$StationID %in% out$StationID,]
+lake_stations_subset <- stations_metadata[stations_metadata$StationID %in% dt_annual$StationID,]
 trib_stations_subset <- stations_metadata[stations_metadata$StationID %in% LCMcoord$TStation,]
 stations_metadata_subset <- rbind(lake_stations_subset, trib_stations_subset)
 
@@ -103,7 +105,7 @@ ui <- dashboardPage(
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
         sliderInput("range", "Years selected",
-                    min = min(out$year,na.rm=FALSE), max = max(out$year,na.rm=FALSE),
+                    min = min(dt_annual$year,na.rm=FALSE), max = max(dt_annual$year,na.rm=FALSE),
                     value = c(2000,2012),sep = "")
         # conditionalPanel(
         #   'input$id == "graph"',
@@ -164,11 +166,11 @@ ui <- dashboardPage(
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
             div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any boxes:",
-                                                                                colnames(out))))),
+                                                                                colnames(dt_annual))))),
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Stations to plot", status = "default", width = 80, circle = FALSE,
             div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow", "Check any boxes:",
-                               sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE))))
+                               sort(unique(dt_annual$StationID)), selected = sort(unique(dt_annual$StationID)), inline = FALSE))))
         ),
         box(
           title = "Dot charts",
@@ -204,12 +206,12 @@ ui <- dashboardPage(
         dropdownButton(
           label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
           div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow2", "Check any boxes:",
-                             colnames(out)))),
+                             colnames(dt_annual)))),
         htmlOutput("Stats2"),
         dropdownButton(
           label = "Stations to plot", status = "default", width = 80, circle = FALSE,
           div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow2", "Check any boxes:",
-                             sort(unique(out$StationID)), selected = sort(unique(out$StationID)), inline = FALSE)))
+                             sort(unique(dt_annual$StationID)), selected = sort(unique(dt_annual$StationID)), inline = FALSE)))
       )
     )
   )
@@ -276,8 +278,8 @@ server <- function(input, output) {
       ggplot(data.frame())
     } else {
       gl <- lapply(input$parameters_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
-                     aes(x=out[out$StationID %in% as.numeric(input$stations_toshow),1],y=out[out$StationID %in% 
+                   function(b) ggplot(dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow),], 
+                     aes(x=dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow),1],y=dt_annual[dt_annual$StationID %in% 
                      as.numeric(input$stations_toshow), b])) +
                      geom_point() +
                      xlab("Year") + ylab(b) +
@@ -294,8 +296,8 @@ server <- function(input, output) {
       ggplot(data.frame())
     } else {
       gl <- lapply(input$parameters_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
-                     aes(x=out[out$StationID %in% as.numeric(input$stations_toshow),1],y=out[out$StationID %in% 
+                   function(b) ggplot(dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow),], 
+                     aes(x=dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow),1],y=dt_annual[dt_annual$StationID %in% 
                      as.numeric(input$stations_toshow), b])) +
                      geom_point() + 
                      stat_smooth(method=loess, formula=y~x) +
@@ -313,8 +315,8 @@ server <- function(input, output) {
       ggplot(data.frame())
     } else {
       gl <- lapply(input$parameters_toshow, 
-                   function(b) ggplot(out[out$StationID %in% as.numeric(input$stations_toshow),], 
-                                      aes(x=as.factor(out[out$StationID %in% as.numeric(input$stations_toshow),"StationID"]), y=out[out$StationID %in% as.numeric(input$stations_toshow), b])) +
+                   function(b) ggplot(dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow),], 
+                                      aes(x=as.factor(dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow),"StationID"]), y=dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow), b])) +
                      geom_boxplot() +
                      labs(x = "Station ID", y = b)
       )
@@ -325,7 +327,7 @@ server <- function(input, output) {
   
   # table
   output$mytable1 <- DT::renderDataTable({
-    DT::datatable(out[out$year >= as.numeric(input$range[1]) & out$year <= as.numeric(input$range[2]), ], filter = 'top', options = list(orderClasses = TRUE, scrollX = TRUE))
+    DT::datatable(dt_annual[dt_annual$year >= as.numeric(input$range[1]) & dt_annual$year <= as.numeric(input$range[2]), ], filter = 'top', options = list(orderClasses = TRUE, scrollX = TRUE))
   })
   
   # Stats
@@ -339,11 +341,12 @@ server <- function(input, output) {
                            </br>")
     Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
     Header12     <- "<h3>Try it for yourself!</h3> <br/>"
-    mcor         <- if(length(input$parameters_toshow2)>1) round(cor(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[1]],out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
-    n            <- if(length(input$parameters_toshow2)>1) length(!is.na(out[!is.na(out[out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[2]]),input$parameters_toshow2[1]])) else "NA"
+    mcor         <- if(length(input$parameters_toshow2)>1) round(cor(dt_annual[dt_annual$VisitDate>input$range[1] & dt_annual$VisitDate<input$range[2],input$parameters_toshow2[1]],dt_annual[dt_annual$VisitDate>input$range[1] & dt_annual$VisitDate<input$range[2],input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
+    n            <- if(length(input$parameters_toshow2)>1) length(!is.na(dt_annual[!is.na(dt_annual[dt_annual$VisitDate>input$range[1] & dt_annual$VisitDate<input$range[2],input$parameters_toshow2[2]]),input$parameters_toshow2[1]])) else "NA"
     Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br>
                            </br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
+    
     HTML(paste(Header,
                Header1,Header11,Theory1, Img1, Header12, Results_Corr))
     
@@ -357,7 +360,7 @@ server <- function(input, output) {
                          </br>")
     Header22     <- "<h3>Try it for yourself!</h3> <br/>"
     mmean        <- NULL
-    if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(out[out$StationID %in% as.numeric(input$stations_toshow2) & out$VisitDate>input$range[1] & out$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(out[,input$parameters_toshow2[i]]))," observations. </br>")
+    if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow2) & dt_annual$VisitDate>input$range[1] & dt_annual$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(dt_annual[,input$parameters_toshow2[i]]))," observations. </br>")
     mstations <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
     Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the dropdown menu below. </br>
                                   The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
