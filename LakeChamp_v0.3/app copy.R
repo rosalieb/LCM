@@ -27,13 +27,25 @@ dt_annual$year <- as.numeric(substring(dt_annual[,1],1,4))
 str(dt_annual$VisitDate)
 dt_annual <- dt_annual[order(dt_annual$year,decreasing = F),]
 dt_annual <- round(dt_annual, digits = 2)
+
 dt_day <- total
+dt_day$year <- as.numeric(substring(dt_day[,1],1,4))
+str(dt_day$VisitDate)
+dt_day <- dt_day[order(dt_day$year,decreasing = F),]
+dt_day$VisitDate <- as.numeric(dt_day$VisitDate)
+dt_day <- round(dt_day, digits = 2)
 
 dt_annual$StationID[dt_annual$Station == "2"] <- "02"
 dt_annual$StationID[dt_annual$Station == "4"] <- "04"
 dt_annual$StationID[dt_annual$Station == "7"] <- "07"
 dt_annual$StationID[dt_annual$Station == "9"] <- "09"
 as.numeric(dt_annual$StationID)
+
+dt_day$StationID[dt_day$Station == "2"] <- "02"
+dt_day$StationID[dt_day$Station == "4"] <- "04"
+dt_day$StationID[dt_day$Station == "7"] <- "07"
+dt_day$StationID[dt_day$Station == "9"] <- "09"
+as.numeric(dt_day$StationID)
 
 stations_metadata <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
 lake_stations_subset <- stations_metadata[stations_metadata$StationID %in% dt_annual$StationID,]
@@ -59,6 +71,14 @@ tweaks <-
                                  } 
                                  ")) 
   ))
+
+annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 150px;", radioButtons(
+  inputId = "data_toggle", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
+))
+
+whichdata <- data.frame()
+whichdata <- ifelse(annual_or_daily == 1, dt_annual, dt_day)
+whichdata <- as.data.frame(whichdata)
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -146,7 +166,7 @@ ui <- dashboardPage(
       tabItem(
         tabName = "parameters_info",
         box(
-          title = "Chemical and Biological Parameters",
+          title = "Chemical and biological parameters",
           width = "100%",
           height = "100%",
           collapsible = TRUE,
@@ -163,13 +183,14 @@ ui <- dashboardPage(
           height = "100%",
           #Render an output text
           htmlOutput("Instructions_plot_1"),
+          annual_or_daily,
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
-            div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any boxes:",
+            div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any parameters:",
                                                                                 colnames(dt_annual))))),
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Stations to plot", status = "default", width = 80, circle = FALSE,
-            div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow", "Check any boxes:",
+            div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow", "Check any stations:",
                                sort(unique(dt_annual$StationID)), selected = sort(unique(dt_annual$StationID)), inline = FALSE))))
         ),
         box(
@@ -234,7 +255,7 @@ server <- function(input, output) {
   })
 
   output$Instructions_plot_1 <- renderUI({ 
-    Instruction1 <- paste0("Select below which parameters to plot (you need to select at least one), as well as the period for which you want to visualize the data on the left sidebar. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period.<br/>Then, select the sites you want to see the data for.<br/><br/>")
+    Instruction1 <- paste0("1. Select which dataset you'd like to view data for (annual averages or daily data). <br/> 2. Select below which parameters to plot (you need to select at least one). <br/> 3. Choose the period for which you want to visualize the data on the left sidebar using the slider option. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period. <br/> 4. Lastly, select the stations you want to see the data for using the dropdown menu below.<br/><br/>")
     HTML(paste(Instruction1))
   })
   
