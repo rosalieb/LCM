@@ -94,9 +94,12 @@ ui <- dashboardPage(
   skin = "black",
   # App title ----
   #embedment of logo is not working:
-  dashboardHeader(title = tags$a(href='https://www.uvm.edu/rsenr/rubensteinlab',
-                                 icon("home")),
-                  titleWidth = 200,
+  dashboardHeader(tags$li(class = "dropdown", div(style="display: inline-block; vertical-align:middle; width:60px;",
+                                                  actionBttn("home", "", icon("home"), 
+                                                         size = "lg", style = "gradient",
+                                                         color = "success"))),
+                  tags$li(class = "dropdown", tags$a(href="https://www.uvm.edu/rsenr/rubensteinlab", 
+                                                     icon("desktop"))),
                   tags$li(class = "dropdown", tags$a(href="https://twitter.com/RosalieBruel", 
                                                      icon("twitter"))),
                   tags$li(class = "dropdown", tags$a(href="https://rosalieb.github.io/rosaliebruelweb/index.html",
@@ -110,9 +113,10 @@ ui <- dashboardPage(
     #you can edit the width of the sidebar here
     #width = 200,
     sidebarMenu(
+      id = "main_sidebar",
       menuItem(
         "About this project", 
-        tabName = "about", 
+        tabName = "home", 
         icon = icon("question")
       ),
       menuItem(
@@ -134,7 +138,7 @@ ui <- dashboardPage(
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
         sliderInput("range", "Years selected",
                     min = min(dt_annual$year,na.rm=FALSE), max = max(dt_annual$year,na.rm=FALSE),
-                    value = c(2000,2012),sep = "")
+                    value = c(2000,2012),sep = "")),
         # conditionalPanel(
         #   'input$id == "graph"',
         #   checkboxGroupInput("parameters_toshow", "Phosphorus:",
@@ -149,13 +153,17 @@ ui <- dashboardPage(
         #                      colnames(out[,c(38,37,6,3,5,30,7,26,28)])),
         #   checkboxGroupInput("parameters_toshow", "Phytoplankton",
         #                      colnames(out[,c(24,23,20,19,16,15,18,17,22,21)])))#, selected = colnames(out)))
+        menuItem(
+          "Historic data", 
+          tabName = "history", 
+          icon = icon("book")
       )
     )
   ),
   dashboardBody(
     tabItems(
       tabItem(
-        tabName = "about",
+        tabName = "home",
         #Render an output text
         htmlOutput("mytext1")
       ),
@@ -241,21 +249,37 @@ ui <- dashboardPage(
           label = "Stations to plot", status = "default", width = 80, circle = FALSE,
           div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow2", "Check any boxes:",
                              sort(unique(dt_annual$StationID)), selected = sort(unique(dt_annual$StationID)), inline = FALSE)))
+      ),
+      tabItem(
+        tabName = "history",
+        #Render an output text
+        htmlOutput("history_info")
       )
     )
   )
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   # plot
   output$mytext1 <- renderUI({ 
-    header <- "<h1>Lake Champlain</h1> <br/>"
+    header <- "<h2>Lake Champlain</h2>"
     myparagraph1 <- "Spanning a length of 190 km from Whitehall, NY to its outlet at the Richelieu River in Québec, Canada, Lake Champlain covers 113,000 hectares and is estimated to hold roughly 25 trillion liters. Average lake depth is 19.5 meters (64.5 feet), with the greatest lake depth of 122 meters (400 feet). A majority of the water that enters Lake Champlain runs through its basin, which covers over 21,000 square kilometers. Over half of the basin is in Vermont, about a third in New York, and less than a tenth in the Province of Québec. The water retention time varies by lake segment, ranging between two months in the South Lake to about 3 years in the Main Lake. <br/> <br/>"
+    header2 <- "<h3> Lake Champlain Long-Term Water Quality and Biological Monitoring Program (LTMP) </h3>"
     myparagraph2 <- "Data have been collected through the Lake Champlain Long-Term Water Quality and Biological Monitoring Program since 1992, with one of the original purposes to provide hydrodynamic, eutrophication, and food web models for the lake, although their purpose changed in 1995 (Vermont Department of Environmental Conservation, & New York State Department of Environmental Conservation, 2017). Data were collected by the Vermont Department of Environmental Conservation and the New York State Department of Environmental Conservation, with the support of the Lake Champlain Basin Program. Fifteen lake and twenty-two tributary stations have been sampled throughout the years, although some biological and chemical measurements were only collected during more recent years along with the acquisition of newer equipment. Data are stored in a database and available on request for research, management, consulting, and learning purposes. <br/> <br/>"
     linkToSite <- "To visit the Lake Champlain Basin Program's website, click <a href = 'http://www.lcbp.org/'>here</a>. <br/> <br/>"
     linkToData <- "To retrieve the data on Lake Champlain used for this project, click <a href = 'https://dec.vermont.gov/watershed/lakes-ponds/monitor/lake-champlain'>here</a>."
-    HTML(paste(header, myparagraph1, myparagraph2, linkToSite, linkToData))
+    HTML(paste(header, myparagraph1, header2, myparagraph2, linkToSite, linkToData))
+  })
+  
+  output$history_info <- renderUI({
+    header_history <- "<h3> Historic data of Lake Champlain </h3> <br/>"
+    header_body <- "Here, you'll find historic data collected on Lake Champlain by various researchers. To be finished soon..."
+    HTML(paste(header_history, header_body))
+  })
+  
+  observeEvent(input$home, {
+    updateTabItems(session, "main_sidebar", "home")
   })
   
   # Parameters table 
@@ -366,9 +390,9 @@ server <- function(input, output) {
   
   # Stats
   output$Stats1 <- renderUI({ 
-    Header       <- "<h1>Stat tools</h1> <br/>"
-    Header1      <- "<h2>Correlation</h2> <br/>"
-    Header11     <- "<h3>Theory</h3> <br/>"
+    Header       <- "<h1>Stat tools</h1>"
+    Header1      <- "<h2><u>Correlation</u></h2>"
+    Header11     <- "<h3>Theory</h3>"
     Theory1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
                            </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
                            </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
@@ -387,12 +411,12 @@ server <- function(input, output) {
   })
   
   output$Stats2 <- renderUI({
-    Header2      <- "<h2>Basic stats</h2> <br/>"
-    Header21     <- "<h3>Theory</h3> <br/>"
+    Header2      <- "<h2><u>Basic stats</u></h2>"
+    Header21     <- "<h3>Theory</h3>"
     Theory2      <- paste0("</br>This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
                          </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
                          </br>")
-    Header22     <- "<h3>Try it for yourself!</h3> <br/>"
+    Header22     <- "<h3>Try it for yourself!</h3>"
     mmean        <- NULL
     if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(dt_annual[dt_annual$StationID %in% as.numeric(input$stations_toshow2) & dt_annual$VisitDate>input$range[1] & dt_annual$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(dt_annual[,input$parameters_toshow2[i]]))," observations. </br>")
     mstations <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
