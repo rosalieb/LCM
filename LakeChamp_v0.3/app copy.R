@@ -22,12 +22,14 @@ library(leaflet)
 library(htmlTable)
 library(shinyWidgets)
 
+# Introducing the dataframe dt_annual, which contains annual averages of the data we're working with.
 dt_annual <- total_year
 dt_annual$year <- as.numeric(substring(dt_annual[,1],1,4))
 str(dt_annual$VisitDate)
 dt_annual <- dt_annual[order(dt_annual$year,decreasing = F),]
 dt_annual <- round(dt_annual, digits = 2)
 
+# Introducing the dataframe dt_day, which contains the original data collected weekly. 
 dt_day <- total
 dt_day$year <- as.numeric(substring(dt_day[,1],1,4))
 str(dt_day$VisitDate)
@@ -35,6 +37,7 @@ dt_day <- dt_day[order(dt_day$year,decreasing = F),]
 dt_day$VisitDate <- as.numeric(dt_day$VisitDate)
 dt_day <- round(dt_day, digits = 2)
 
+# Cleaning up the datasets some here for later on. 
 dt_annual$StationID[dt_annual$Station == "2"] <- "02"
 dt_annual$StationID[dt_annual$Station == "4"] <- "04"
 dt_annual$StationID[dt_annual$Station == "7"] <- "07"
@@ -47,15 +50,18 @@ dt_day$StationID[dt_day$Station == "7"] <- "07"
 dt_day$StationID[dt_day$Station == "9"] <- "09"
 as.numeric(dt_day$StationID)
 
+# Creating a subset of the data so we are only focusing on particular stations in our analyses. 
 stations_metadata <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
 lake_stations_subset <- stations_metadata[stations_metadata$StationID %in% dt_annual$StationID,]
 trib_stations_subset <- stations_metadata[stations_metadata$StationID %in% LCMcoord$TStation,]
 stations_metadata_subset <- rbind(lake_stations_subset, trib_stations_subset)
 
+# Creating the X icon for the map here because there isn't a good X glyphicon.
 xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
 
+# Reading in the parameter datafile to be placed in the "Parameter descriptions" tab. 
 parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.csv"), stringsAsFactors = FALSE, encoding = "UTF-8")
 
 # tweaks, a list object to set up multicols for checkboxGroupInput
@@ -72,13 +78,15 @@ tweaks <-
                                  ")) 
   ))
 
+# Creating an object in hopes that it will be useful for being able to switch between the daily and annual datasets...
 annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 150px;", radioButtons(
   inputId = "data_toggle", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
 ))
 
-whichdata <- data.frame()
-whichdata <- ifelse(annual_or_daily == 1, dt_annual, dt_day)
-whichdata <- as.data.frame(whichdata)
+# Again, some more code I thought would be useful. It's currently commented out because it's not working quite yet. 
+# whichdata <- data.frame()
+# whichdata <- ifelse(annual_or_daily == 1, dt_annual, dt_day)
+# whichdata <- as.data.frame(whichdata)
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -250,24 +258,29 @@ server <- function(input, output) {
     HTML(paste(header, myparagraph1, myparagraph2, linkToSite, linkToData))
   })
   
+  # Parameters table 
   output$parameters_table = DT::renderDataTable({
     DT::datatable(parameters_info, options = list(lengthMenu = c(50, 100)))
   })
 
+  # Just giving some instructions for the data tab
   output$Instructions_plot_1 <- renderUI({ 
     Instruction1 <- paste0("1. Select which dataset you'd like to view data for (annual averages or daily data). <br/> 2. Select below which parameters to plot (you need to select at least one). <br/> 3. Choose the period for which you want to visualize the data on the left sidebar using the slider option. Currently, data are displayed for the ", input$range[1],"-",input$range[2]," period. <br/> 4. Lastly, select the stations you want to see the data for using the dropdown menu below.<br/><br/>")
     HTML(paste(Instruction1))
   })
   
+  # This may not be necessary anymore once we incorporate the daily dataset.
   output$info_plot_3 <- renderUI({ 
     info3 <- paste0("Values for each parameter are averages for the date range selected with the slider. You can select which stations to view with the selection boxes at the top of this page.")
     HTML(paste(info3))
   })
   
+  # Info for chemical and biological parameter table
   output$parameter_table_help <- renderUI({ 
     p_table_help <- paste0("Here, you'll find more information on the chemical and biological parameters collected through the Lake Champlain Long-Term Monitoring Project. To organize and quickly find parameters, they are separated into categories. <br/><br/>")
     HTML(paste(p_table_help))
   })
+  
   
   output$mytable1help <- renderUI({ 
     table1help <- paste0("<h3>Annual averages data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
