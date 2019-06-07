@@ -299,11 +299,6 @@ panel.background = element_blank(), axis.line = element_line(colour = "black")) 
 bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
 lcgroupmap=c("lake",rep("island", 84562))
 bathy2 <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
-plot(bathy2,
-     main = "Bathymetric map of Lake Champlain",
-     col = grey(1:100/100),
-     axes = FALSE,
-     box = FALSE)
 
 plot(hillshade_wgs84)
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -390,13 +385,89 @@ p <- levelplot(bathy2,
           ),
           scales=list(draw=TRUE),  # turn to F to suppress axis labels
           col.regions=colr,         # colour ramp
-          at=seq(-130, 0, len=101)) # colour ramp breaks
+          at=seq(-130, -1, len=130))  # colour ramp breaks
 
+# p$legend$top
+
+p 
+
+#pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LG_bathy.pdf"),width = 4, height = 9)
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LG_bathy.pdf"),width = 9, height = 7)
 p
+dev.off()
 
-# pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LC_bathy.pdf"),width = 4, height = 9)
-# p
+# pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LC_bathy_BW.pdf"),width = 4, height = 9)
+# plot(bathy2,
+#      main = "Bathymetric map of Lake Champlain",
+#      col = grey(1:100/100),
+#      axes = FALSE,
+#      box = FALSE)
 # dev.off()
+
+
+histogram(bathy2, main='Lake Champlain depth histogram', xlab='depth (m)')
+
+```
+
+
+```{r map for Lake Geneva, eval=FALSE, include=FALSE}
+lem <- raster("/Users/Rosalie/Desktop/Travail/QGIS/LakeGeneva/bathy-tin-decoupe.tif")
+lem <- projectRaster(lem, crs = crs(world))
+
+ontario <- raster("/Users/Rosalie/Desktop/Travail/QGIS/lake_ontario.tif")
+ontario <- projectRaster(ontario, crs = crs(world))
+
+colr <- colorRampPalette(brewer.pal(11, 'RdYlBu'))
+
+plem <- levelplot(lem,  margin=TRUE,colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-320,0,20))      # legend ticks and labels
+            ),    
+          par.settings=list( axis.line=list(col='black') ),
+          scales=list(draw=TRUE), col.regions=colr, at=seq(-325, -1, len=101))
+
+plem 
+
+pont <- levelplot(ontario,  margin=TRUE,colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-250,0,20))      # legend ticks and labels
+            ),    
+          par.settings=list( axis.line=list(col='black') ),
+          scales=list(draw=TRUE), col.regions=colr, at=seq(-250, -1, len=101))
+pont 
+
+pont2 <- levelplot(ontario,  margin=TRUE,colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-250,450,20))      # legend ticks and labels
+            ),    
+          par.settings=list( axis.line=list(col='black') ),
+          scales=list(draw=TRUE), col.regions=colr, at=seq(-250, 450, len=101))
+
+pont2
+
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LG_bathy.pdf"),width = 9, height = 7)
+plem
+dev.off()
+
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LO_bathy.pdf"),width = 9, height = 7)
+pont
+dev.off()
+
+
+#hist plot for LG
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LG_hist.pdf"),width = 5, height = 4)
+histogram(lem, main='a. Lake Geneva depth histogram', xlab='depth (m)', xlim=c(-325,-0.1),ylim=c(0,1))
+dev.off()
+
+#hist plot for LC
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LC_hist.pdf"),width = 5, height = 4)
+histogram(bathy2, main='b. Lake Champlain depth histogram', xlab='depth (m)')
+dev.off()
+
+#hist plot for LC
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LO_hist.pdf"),width = 5, height = 4)
+histogram(ontario, main='c. Lake Ontario depth histogram', xlab='depth (m)',xlim=c(-250,0),ylim=c(0,0.5), breaks=300)
+dev.off()
 
 ```
 

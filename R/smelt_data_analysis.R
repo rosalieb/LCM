@@ -9,7 +9,7 @@ smelt[(smelt$Weight / smelt$Length)<0.4,]
 
 plot(smelt$Weight, smelt$Length, pch=20)
 
-ggplot(aes(y=Length, x=Weight), data=smelt )+
+ggplot(aes(x=Length, y=Weight), data=smelt )+
   geom_point()+
   #geom_line() +
   geom_smooth(method="gam", formula = y ~ s(x))
