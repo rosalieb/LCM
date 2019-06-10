@@ -1,0 +1,268 @@
+---
+title: "Rainbow Smelt in Lake Champlain"
+author: "Rosalie Bruel and Alex Naccarato with data from Ellen Marsden"
+date: "6/10/2019"
+output: html_document
+---
+
+I'm calling the libraries that will be useful for this analysis as well as cleaning up and getting familiar with the format of the data. The data was provided by Ellen Marsden. It contains 25,394 observations of smelt including important variables such as their length, weight, year class, condition, the year, and the basin it was caught in. 
+
+```{r setup, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(FSA)
+library(FSAdata)
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
+smelt <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltBio1984-2015-2-24-16.csv"))
+smelt$Station <- gsub("-"," ",smelt$Station)
+head(smelt)
+```
+
+## Length-weight relationship of rainbow smelt
+
+This is the length-weight relationship of rainbow smelt in Lake Champlain. It's consistent with plots of length-weight relationships of other fish. There are a few outliers - fish that were very overweight compared to the other smelt of similar lengths. The second plot in the output includes a trendline created from the generalized additive models method. The third plot includes a polynomial trend line.
+
+```{r length weight relationship, results = FALSE, warning = FALSE}
+mean(smelt$Weight / smelt$Length, na.rm = T)
+smelt[(smelt$Weight / smelt$Length)<0.4,]
+
+plot(y = smelt$Weight, x = smelt$Length, pch=20)
+
+ggplot(aes(x=Length, y=Weight), data=smelt )+
+  geom_point()+
+  #geom_line() +
+  geom_smooth(method="gam", formula = y ~ s(x))
+
+ggplot(aes(x=Length, y=Weight), data=smelt )+
+  geom_point() +
+  stat_smooth(method = 'lm', formula = y ~ poly(x,2), se= FALSE)
+```
+
+## Weight relationship of rainbow smelt by lake station
+
+Malletts Bay includes the most outliers of any station. The smelt in the Main Lake have a particularly odd linear relationship between their length and weight from the appearance of the graph. Barber Point and the Northeast Arm have some of the largest smelt of all stations. 
+
+```{r length weight by station, warning = FALSE}
+ggplot(aes(y=Weight, x=Length), data=smelt )+
+  geom_point()+
+  #geom_line() +
+  geom_smooth(method="gam", formula = y ~ s(x)) +
+  facet_wrap(~Station)
+```
+
+# Condition of rainbow smelt over time by lake station 
+
+It appears that the condition of rainbow smelt has stayed realtively constant over time in Lake Champlain. The trendlines show an average condition of roughly 0.5 to 0.7 over time.
+
+```{r condition by station, warning = FALSE}
+ggplot(aes(y=condition, x=Year), data=smelt )+
+  ylim(0,6)+
+  geom_point()+
+  #geom_line() +
+  geom_smooth(method="gam", formula = y ~ s(x)) +
+  facet_wrap(~Station)
+```
+
+## Abundance of species in Burlington Bay (1999-2000)
+
+```{r fbb, results = FALSE, warning = FALSE}
+fbb <- read.delim(paste0(getpath4data(),"/data_from_Ellen/Fish_Burlington_Bay_1999_2000.txt"))
+class(fbb$rel_ab_Burl_Bay_1999_2000)
+fbb$abundance=gsub("<","",fbb$rel_ab_Burl_Bay_1999_2000)
+fbb$abundance <- as.numeric(paste(fbb$abundance))
+fbb$abundance
+dim(fbb)
+
+library(rfishbase)
+dietfbb <- diet(species_list = fbb$species)
+dim(dietfbb)
+fbb$species[!fbb$species %in% unique(dietfbb$Species)] # all species got diet assigned
+fbb$species[fbb$species %in% unique(dietfbb$Species)]
+fbb$Troph<-rep(NA,nrow(fbb))
+fbb$seTroph <- fbb$Troph
+for (i in 1:length(unique(dietfbb$Species))) {
+  fbb$Troph[i] <- mean(dietfbb$Troph[dietfbb$Species==unique(dietfbb$Species)[i]],na.rm=T)
+  fbb$seTroph[i] <- mean(dietfbb$seTroph[dietfbb$Species==unique(dietfbb$Species)[i]],na.rm=T)
+}
+```
+
+## Rainbow smelt per year class in Lake Champlain
+
+The age distribution of rainbow smelt caught is skewed right. The majority of fish are 1 or 2 years old. 
+
+```{r catch per year, warning = FALSE, message = FALSE}
+summ_smelt_ageclass <- as.data.frame(summary(as.factor(smelt$Age)))
+summ_smelt_ageclass <- cbind(rownames(summ_smelt_ageclass), summ_smelt_ageclass)
+rownames(summ_smelt_ageclass) <- c()
+colnames(summ_smelt_ageclass) <- c("year_class", "num_fish")
+summ_smelt_ageclass
+
+ggplot(data = summ_smelt_ageclass[3:12,], aes(x = year_class, y = num_fish)) + 
+  geom_bar(stat = "summary") + 
+  labs(x = "Year Class", y = "Number of Fish")
+```
+
+## Sampling effort of rainbow smelt in Lake Champlain 
+
+For 1986, 1988, and 1989, there were no data. Therefore, the number of stations and number of fish sampled for those years are equal to 0. 2002, 2003, and 2012 had particularly large sample sizes of smelt in comparison to the other years. 
+
+```{r sample effort, warning = FALSE, message = FALSE}
+summ_smelt_effort1 <- as.data.frame(summary(as.factor(smelt$Year)))
+summ_smelt_effort1 <- cbind(rownames(summ_smelt_effort1), summ_smelt_effort1)
+rownames(summ_smelt_effort1) <- c()
+colnames(summ_smelt_effort1) <- c("Year", "num_fish")
+
+ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
+  geom_bar(stat = "summary") + 
+  labs(x = "Year", y = "Number of Fish Sampled") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+summ_smelt_effort2 <- smelt %>% 
+  group_by(Year) %>% 
+  summarise(list_stations = list(unique(Station)), num_stations = length(list_stations))
+
+ggplot(data = summ_smelt_effort2, mapping = aes(x = as.factor(Year), y = num_stations)) +
+  geom_bar(stat = "summary") +
+  labs(x = "Year", y = "Number of Stations Sampled") + 
+  scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Can't currently figure out why this isn't working
+# ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
+#   geom_bar(stat = "summary") + 
+#   labs(x = "Year", y = "Number of Fish Sampled") + 
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   facet_wrap(~smelt$Station)
+```
+
+## Exploring growth parameters
+
+### Weight-length relationship
+
+Using Rosalie's code and Derek Ogle's tutorial.
+
+```{r, message = FALSE, warning = FALSE}
+par(mfrow=c(1,2))
+plot(smelt$Weight ~ smelt$Length ,xlab="Total Length (mm)", ylab = "Weight (g)", main = "", pch=20)
+
+smelt$logW <- log(smelt$Weight)
+smelt$logL <- log(smelt$Length)
+
+lm1 <- lm(logW~logL,data = smelt)
+fitPlot(lm1,xlab="Log Total Length (mm)", ylab = "Log Weight (g)", main="")
+
+```
+
+The relationship is not linear without log-transforming the data. Here, we have the coefficients of the log-transformed data. 
+
+```{r, message = FALSE, warning = FALSE}
+summary(lm1)
+```
+
+### Test whether rainbow smelt exhibit isometric or allometric growth
+
+A test of whether the fish in a population exhibit isometric growth or not can be obtained by noting that b is the estimated slope from fitting the transformed length-weight model. The slope is generically labeled with β such that the test for allometry can be translated into the following statistical hypotheses:
+* H0: β=3 ⇒ H0 :"Isometricgrowth"
+* HA: β≠3 ⇒ HA :"Allometricgrowth"
+(All taken from Derek Ogle tutorial. Go back there for more details).
+
+A test, and confidence interval for b, of whether rainbow smelt from Lake Champlain exhibited allometric growth or not is constructed with:
+
+```{r, message = FALSE, warning = FALSE}
+hoCoef(lm1,2,3)
+confint(lm1)
+```
+
+These results show that LT exhibit allometric growth (p = 2.33e-99) with an exponent parameter (b) between 2.86 and 2.89, with 95% confidence.
+
+### Prediction on original scale
+Again, from Derek Ogle tutorial: "Predictions of the mean value of the response variable given a value of the explanatory variable can be made with predict(). In the length-weight regression, the value predicted is the mean log of weight. Most often, of course, the researcher is interested in predicting the mean weight on the original scale. An intuitive and common notion is that the log result can simply be back-transformed to the original scale by exponentiation. However, back-transforming the mean value on the log scale in this manner underestimates the mean value on the original scale. This observation stems from the fact that the back-transformed mean value from the log scale is equal to the geometric mean of the values on the original scale. The geometric mean is always less than the arithmetic mean and, thus, the back-transformed mean always underestimates the arithmetic mean from the original scale."
+
+We want to extract the sigma, and then get the correction factor:
+
+```{r, message = FALSE, warning = FALSE}
+syx <- summary(lm1)$sigma
+(cf <- exp((syx^2)/2))
+```
+
+(1) Predict log weight of a rainbow smelt of size 200 mm
+(2) Biased prediction on original scale
+(3) Corrected prediction on original scale
+
+```{r, message = FALSE, warning = FALSE}
+(pred.log <- predict(lm1,data.frame(logL=log(200)),interval="c")) ##(1)
+(bias.pred.orig <- exp(pred.log)) ##(2)
+(pred.orig <- cf*bias.pred.orig) ##(3)
+```
+
+### Comparison of weight-length relationship {.tabset}
+
+#### Across years
+
+Include year as a factor.  
+
+```{r, message = FALSE, warning = FALSE}
+smelt$fyear <- factor(smelt$Year)
+lm2 <- lm(logW ~ logL * fyear, data = smelt)
+```
+
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such: 
+
+```{r, message = FALSE, warning = FALSE}
+anova(lm2)
+```
+
+These results indicate that the interaction terms is significant (p = 2.2e-16). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three years (p = 2.2e-16).
+
+Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+```{r, message = FALSE, warning = FALSE}
+confint(lm2)
+par(mfrow=c(1,1))
+fitPlot(lm2,xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",main = "", col = adjustcolor(c("red","blue","grey"), alpha.f = .5))
+```
+
+
+#### Across stations
+
+Include sites as a factor.  
+```{r, message = FALSE, warning = FALSE}
+smelt$fstations <- factor(smelt$Station)
+lm3 <- lm(logW~logL*fstations, data = smelt)
+``` 
+
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such
+```{r, message = FALSE, warning = FALSE}
+anova(lm3)
+```
+
+These results indicate that the interaction terms is significant (p = 
+0.008697). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three sites (p = 1.193e-13). 
+
+Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+```{r, message = FALSE, warning = FALSE}
+confint(lm3)
+par(mfrow=c(1,1))
+fitPlot(lm3, xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",main = "", col = adjustcolor(c("red","blue","grey"), alpha.f = .5))
+```
+
+## Conclusion: a and b parameters
+In <a href= > Schneider et al 2010 report for Michigan Department of Natural Resources</a>, growth parameter are reported for rainbow smelt:  
+  *  a= 
+  *  b= 
+_Warning:_ These parameters are not on original scale.  
+We found (see results for lm1):  
+  *  a=  
+  *  b= 
+So not too far off.  
+
+To convert them to the initial equation W = aL<sup>b</sup>:  
+```{r, message = FALSE, warning = FALSE}
+(a= exp(lm1$coefficients[1]))
+(b= lm1$coefficients[2])
+```
