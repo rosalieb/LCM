@@ -141,6 +141,11 @@ ggplot(data = summ_smelt_effort2, mapping = aes(x = as.factor(Year), y = num_sta
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+
+station_which_sampled <- data.frame(matrix(nrow = 29, ncol = 11))
+colnames(station_which_sampled) <- unique(smelt$Station)
+rownames(station_which_sampled) <- unique(sort(smelt$Year))
+
 # Can't currently figure out why this isn't working
 # ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
 #   geom_bar(stat = "summary") + 
