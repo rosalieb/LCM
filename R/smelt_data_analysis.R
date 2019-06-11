@@ -14,7 +14,7 @@ ggplot(aes(x=Length, y=Weight), data=smelt )+
   #geom_line() +
   geom_smooth(method="gam", formula = y ~ s(x))
 
-ggplot(aes(y=Length, x=Weight), data=smelt )+
+ggplot(aes(y=Weight, x=Length), data=smelt )+
   geom_point()+
   #geom_line() +
   geom_smooth(method="gam", formula = y ~ s(x)) +
@@ -36,7 +36,6 @@ fbb$abundance <- as.numeric(paste(fbb$abundance))
 fbb$abundance
 dim(fbb)
 
-fbb
 library(rfishbase)
 dietfbb <- diet(species_list = fbb$species)
 dim(dietfbb)
@@ -48,5 +47,3 @@ for (i in 1:length(unique(dietfbb$Species))) {
   fbb$Troph[i] <- mean(dietfbb$Troph[dietfbb$Species==unique(dietfbb$Species)[i]],na.rm=T)
   fbb$seTroph[i] <- mean(dietfbb$seTroph[dietfbb$Species==unique(dietfbb$Species)[i]],na.rm=T)
 }
-
-
