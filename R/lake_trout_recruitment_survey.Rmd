@@ -136,7 +136,7 @@ syx <- summary(lm1)$sigma
 ( cf <- exp((syx^2)/2) )
 ```
 
-(1) Predict log weigth of a LT of size 200 mm
+(1) Predict log weight of a LT of size 200 mm
 (2) Biased prediction on original scale
 (3) Corrected prediction on original scale
 ```{r}

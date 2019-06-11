@@ -191,12 +191,12 @@ syx <- summary(lm1)$sigma
 (cf <- exp((syx^2)/2))
 ```
 
-(1) Predict log weight of a rainbow smelt of size 200 mm
+(1) Predict log weight of a rainbow smelt of size 130 mm
 (2) Biased prediction on original scale
 (3) Corrected prediction on original scale
 
 ```{r, message = FALSE, warning = FALSE}
-(pred.log <- predict(lm1,data.frame(logL=log(200)),interval="c")) ##(1)
+(pred.log <- predict(lm1,data.frame(logL=log(130)),interval="c")) ##(1)
 (bias.pred.orig <- exp(pred.log)) ##(2)
 (pred.orig <- cf*bias.pred.orig) ##(3)
 ```
@@ -209,7 +209,7 @@ Include year as a factor.
 
 ```{r, message = FALSE, warning = FALSE}
 smelt$fyear <- factor(smelt$Year)
-lm2 <- lm(logW ~ logL * fyear, data = smelt)
+lm2 <- lm(logW~logL*fyear, data = smelt)
 ```
 
 The analysis of variable table is constructed by submitting the saved lm object to anova() as such: 
@@ -218,9 +218,10 @@ The analysis of variable table is constructed by submitting the saved lm object 
 anova(lm2)
 ```
 
-These results indicate that the interaction terms is significant (p = 2.2e-16). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three years (p = 2.2e-16).
+These results indicate that the interaction terms are significant (p = 2.2e-16). There is evidence to conclude that there is a difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three years (p = 2.2e-16).
 
 Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+
 ```{r, message = FALSE, warning = FALSE}
 confint(lm2)
 par(mfrow=c(1,1))
@@ -230,19 +231,20 @@ fitPlot(lm2,xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",mai
 
 #### Across stations
 
-Include sites as a factor.  
+Include stations as a factor.  
+
 ```{r, message = FALSE, warning = FALSE}
 smelt$fstations <- factor(smelt$Station)
 lm3 <- lm(logW~logL*fstations, data = smelt)
 ``` 
 
-The analysis of variable table is constructed by submitting the saved lm object to anova() as such
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such:
+
 ```{r, message = FALSE, warning = FALSE}
 anova(lm3)
 ```
 
-These results indicate that the interaction terms is significant (p = 
-0.008697). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three sites (p = 1.193e-13). 
+These results indicate that the interaction terms is significant (p = 2.2e-16). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three sites (p = 2.2e-16). 
 
 Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
 ```{r, message = FALSE, warning = FALSE}
@@ -252,17 +254,18 @@ fitPlot(lm3, xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",ma
 ```
 
 ## Conclusion: a and b parameters
-In <a href= > Schneider et al 2010 report for Michigan Department of Natural Resources</a>, growth parameter are reported for rainbow smelt:  
-  *  a= 
-  *  b= 
-_Warning:_ These parameters are not on original scale.  
-We found (see results for lm1):  
-  *  a=  
-  *  b= 
-So not too far off.  
+In <a href=http://www.dnr.state.mi.us/publications/pdfs/ifr/manual/smii%20chapter17.pdf> Schneider et al 2010 report for Michigan Department of Natural Resources</a>, growth parameter are reported for rainbow smelt:    
+  *  a= -5.12117 <br/>
+  *  b=  2.96408 <br/>
+We found (see results for lm1):  <br/>
+  *  a= -5.0088<br/>
+  *  b=  2.874738<br/>
+There are some discrepancies between the two.  <br/>
 
 To convert them to the initial equation W = aL<sup>b</sup>:  
 ```{r, message = FALSE, warning = FALSE}
 (a= exp(lm1$coefficients[1]))
 (b= lm1$coefficients[2])
 ```
+
+Therefore, the intial equation is W = 0.000009821 x L<sup>2.874738</sup>
