@@ -288,15 +288,13 @@ Note too that barplots are not the most relevant plots to show a discrete value.
 
 
 ```{r condition.by.origin, warning=FALSE}
-<<<<<<< HEAD
 # This is the code for the bar chart of the difference in weight between stocked and wild lake trout. 
 condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight/(Total.Length^3), fill = stock.wild)) +
-  geom_bar(stat = "summary", fun.y = "mean") +
-=======
+  geom_bar(stat = "summary", fun.y = "mean") 
+
 # This is the code for tha bar chart of the difference in weight between stocked and wild lake trout. 
 condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight*10^5/(Total.Length^3), fill = stock.wild)) +
   geom_boxplot() +
->>>>>>> ae3bacf24ac1eefb98b4c5efd07caf11947443a4
   labs(y = "Average Weight (g)", fill = "") +
   theme(axis.title.x = element_blank()) 
 
