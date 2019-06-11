@@ -2,10 +2,17 @@
 title: "Rainbow Smelt in Lake Champlain"
 author: "Rosalie Bruel and Alex Naccarato with data from Ellen Marsden"
 date: "6/10/2019"
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
 ---
 
-I'm calling the libraries that will be useful for this analysis as well as cleaning up and getting familiar with the format of the data. The data was provided by Ellen Marsden. It contains 25,394 observations of smelt including important variables such as their length, weight, year class, condition, the year, and the basin it was caught in. 
+I'm calling the libraries that will be useful for this analysis as well as cleaning up and getting familiar with the format of the data. The data was provided by Ellen Marsden. It contains 24,982 observations of smelt including important variables such as their length, weight, year class, condition, the year, and the basin it was caught in. 
 
 ```{r setup, message = FALSE}
 library(ggplot2)
@@ -20,11 +27,12 @@ getpath4data <- function() {
 }
 
 smelt <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltBio1984-2015-2-24-16.csv"))
+smelt <- smelt[smelt$Species == "Rainbow Smelt",]
 smelt$Station <- gsub("-"," ",smelt$Station)
 head(smelt)
 ```
 
-## Length-weight relationship of rainbow smelt
+# Length-weight relationship of rainbow smelt
 
 This is the length-weight relationship of rainbow smelt in Lake Champlain. It's consistent with plots of length-weight relationships of other fish. There are a few outliers - fish that were very overweight compared to the other smelt of similar lengths. The second plot in the output includes a trendline created from the generalized additive models method. The third plot includes a polynomial trend line.
 
@@ -56,7 +64,7 @@ ggplot(aes(y=Weight, x=Length), data=smelt )+
   facet_wrap(~Station)
 ```
 
-# Condition of rainbow smelt over time by lake station 
+## Condition of rainbow smelt over time by lake station 
 
 It appears that the condition of rainbow smelt has stayed realtively constant over time in Lake Champlain. The trendlines show an average condition of roughly 0.5 to 0.7 over time.
 
@@ -179,7 +187,7 @@ hoCoef(lm1,2,3)
 confint(lm1)
 ```
 
-These results show that LT exhibit allometric growth (p = 2.33e-99) with an exponent parameter (b) between 2.86 and 2.89, with 95% confidence.
+These results show that LT exhibit allometric growth (p = 1.3e-93) with an exponent parameter (b) between 2.87 and 2.89, with 95% confidence.
 
 ### Prediction on original scale
 Again, from Derek Ogle tutorial: "Predictions of the mean value of the response variable given a value of the explanatory variable can be made with predict(). In the length-weight regression, the value predicted is the mean log of weight. Most often, of course, the researcher is interested in predicting the mean weight on the original scale. An intuitive and common notion is that the log result can simply be back-transformed to the original scale by exponentiation. However, back-transforming the mean value on the log scale in this manner underestimates the mean value on the original scale. This observation stems from the fact that the back-transformed mean value from the log scale is equal to the geometric mean of the values on the original scale. The geometric mean is always less than the arithmetic mean and, thus, the back-transformed mean always underestimates the arithmetic mean from the original scale."
@@ -255,17 +263,131 @@ fitPlot(lm3, xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",ma
 
 ## Conclusion: a and b parameters
 In <a href=http://www.dnr.state.mi.us/publications/pdfs/ifr/manual/smii%20chapter17.pdf> Schneider et al 2010 report for Michigan Department of Natural Resources</a>, growth parameter are reported for rainbow smelt:    
-  *  a= -5.12117 <br/>
-  *  b=  2.96408 <br/>
+  *  a = -5.12117 <br/>
+  *  b =  2.96408 <br/>
 We found (see results for lm1):  <br/>
-  *  a= -5.0088<br/>
-  *  b=  2.874738<br/>
-There are some discrepancies between the two.  <br/>
+  *  a = -5.05001<br/>
+  *  b =  2.88230<br/>
+There are some discrepancies between the two, but they're fairly close.  <br/>
 
 To convert them to the initial equation W = aL<sup>b</sup>:  
 ```{r, message = FALSE, warning = FALSE}
-(a= exp(lm1$coefficients[1]))
-(b= lm1$coefficients[2])
+(a = exp(lm1$coefficients[1]))
+(b = lm1$coefficients[2])
 ```
 
-Therefore, the intial equation is W = 0.000009821 x L<sup>2.874738</sup>
+Therefore, the intial equation is W = 0.000009405 x L<sup>2.88230</sup>
+
+***
+
+# Weight-length relationships for specific groups of rainbow smelt
+
+## Age-0 (for Lake Champlain fish.xlsx)
+
+The calculations for a and b for age-0 and age-1 rainbow smelt are for the purpose of transcribing rainbow smelt density to biomass values in Lake Champlain fish.xlsx in our Dropbox!
+
+n = 89
+
+Because most rainbow smelt of age-0 or with a year class of "YOY" don't have a weight, we will calculate an average weight for them based on the average length of rainbow smelt of age-0 (n = 89). We will use the weight-length equation calculated earlier for all rainbow smelt in Lake Champlain. Again, the equation from earlier was: <br/><br/> 
+W = 0.000009405 x L<sup>2.88230</sup> 
+<br/><br/>
+Therefore, if we use the average length of 41 mm for the 89 fish with a classification of "YOY", our equation is: <br/><br/> 
+W = 0.000009405 x 41<sup>2.88230</sup> 
+
+```{r}
+mean(smelt$Length[smelt$YearClass == "YOY"], na.rm = TRUE)
+length(smelt$Length[smelt$YearClass == "YOY"])
+(weight_age0 <- 0.000009405 * (41^2.8830))
+```
+
+The average weight of age-0 smelt in Lake Champlain is around 0.42 grams. 
+
+## Age-1 (for Lake Champlain fish.xlsx)
+
+n = 9,754
+
+Using data from 9,754 rainbow smelt of age-1, we can find an average weight.
+
+```{r}
+mean(smelt$Weight[smelt$Age == 1], na.rm = TRUE)
+mean(smelt$Length[smelt$Age == 1], na.rm = TRUE)
+length(smelt$Weight[smelt$Age == 1])
+```
+
+The average weight of age-0 rainbow smelt in Lake Champlain is around 8.59 grams. Their average length is 114 mm.
+
+## <4 years old
+
+n = 23,749
+
+```{r}
+lm_4years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) >= 4,])
+fitPlot(lm_4years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_4years)
+```
+
+a = -4.963429 <br/>
+b =  2.853242 <br/>
+
+W = 0.000011 x L<sup>2.853242</sup>
+
+## <5 years old
+
+n = 13,995
+
+```{r}
+lm_5years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) >= 5,])
+fitPlot(lm_5years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_5years)
+```
+
+a = -5.100734 <br/>
+b =  2.915718 <br/>
+
+W = 0.0000079 x L<sup>2.915718</sup>
+
+## <6 years old
+
+n = 5,570
+
+```{r}
+lm_6years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) >= 6,])
+fitPlot(lm_6years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_6years)
+```
+
+a = -5.14460 <br/>
+b =  2.93305 <br/>
+
+W = 0.0000072 x L<sup>2.93305</sup>
+
+## At or below 200 mm
+
+n = 24816
+
+```{r}
+lm_below200mm <- lm(logW~logL,data = smelt[as.numeric(smelt$Length) <= 200,])
+fitPlot(lm_below200mm, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_below200mm)
+```
+
+a = -5.02208 <br/>
+b =  2.88082 <br/>
+
+W = 0.0000095 x L<sup>2.880817</sup>
+
+## Above 200 mm
+
+n = 180
+
+```{r}
+lm_above200mm <- lm(logW~logL,data = smelt[as.numeric(smelt$Length) > 200,])
+fitPlot(lm_above200mm, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_above200mm)
+```
+
+a = -5.3648 <br/>
+b =  3.0303 <br/>
+
+W = 0.0000043 x L<sup>3.0303</sup>
+
