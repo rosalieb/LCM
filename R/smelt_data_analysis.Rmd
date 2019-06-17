@@ -19,6 +19,8 @@ library(ggplot2)
 library(dplyr)
 library(FSA)
 library(FSAdata)
+library(knitr)
+library(leaflet)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -30,6 +32,12 @@ smelt <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltB
 smelt <- smelt[smelt$Species == "Rainbow Smelt",]
 smelt$Station <- gsub("-"," ",smelt$Station)
 head(smelt)
+
+smelt_coord <- read.csv(file = paste0(getpath4data(), "smelt_coord.csv"))
+
+xIcon <- makeIcon(
+  iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
+  iconWidth = 20, iconHeight = 20)
 ```
 
 # Length-weight relationship of rainbow smelt
@@ -50,6 +58,21 @@ ggplot(aes(x=Length, y=Weight), data=smelt )+
 ggplot(aes(x=Length, y=Weight), data=smelt )+
   geom_point() +
   stat_smooth(method = 'lm', formula = y ~ poly(x,2), se= FALSE)
+```
+
+## Getting familiar with the stations
+
+Here, you can see rough coordinates of the stations sampled for rainbow smelt throughout the years. For ambiguous locations such as Main Lake, Main Lake North, Main Lake South, etc., we just coordinates roughly in the center of the area. You can click on the icons to see the stations specific coordinates. 
+
+```{r, message = FALSE}
+coord_map <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(icon = xIcon, lng = smelt_coord$Longitude, lat = smelt_coord$Latitude,
+             popup = paste("<b>Station:</b>", smelt_coord$Station, "<br>",
+                           "<b>Latitude:</b>", smelt_coord$Latitude, "<br>",
+                           "<b>Longitude:</b>", smelt_coord$Longitude))
+
+coord_map
 ```
 
 ## Weight relationship of rainbow smelt by lake station
@@ -79,6 +102,7 @@ ggplot(aes(y=condition, x=Year), data=smelt )+
 
 ## Abundance of species in Burlington Bay (1999-2000)
 
+Found in the Rube Lab newsletter from early 2000's(?)
 ```{r fbb, results = FALSE, warning = FALSE}
 fbb <- read.delim(paste0(getpath4data(),"/data_from_Ellen/Fish_Burlington_Bay_1999_2000.txt"))
 class(fbb$rel_ab_Burl_Bay_1999_2000)
@@ -120,7 +144,9 @@ ggplot(data = summ_smelt_ageclass[3:12,], aes(x = year_class, y = num_fish)) +
 
 For 1986, 1988, and 1989, there were no data. Therefore, the number of stations and number of fish sampled for those years are equal to 0. 2002, 2003, and 2012 had particularly large sample sizes of smelt in comparison to the other years. 
 
-```{r sample effort, warning = FALSE, message = FALSE}
+In addition, the table of 0's and 1's indicates whether or not a station was sampled for a particular year. 
+
+```{r sample effort, warning = FALSE, message = FALSE, results = "asis"}
 summ_smelt_effort1 <- as.data.frame(summary(as.factor(smelt$Year)))
 summ_smelt_effort1 <- cbind(rownames(summ_smelt_effort1), summ_smelt_effort1)
 rownames(summ_smelt_effort1) <- c()
@@ -141,15 +167,13 @@ ggplot(data = summ_smelt_effort2, mapping = aes(x = as.factor(Year), y = num_sta
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-
-station_which_sampled <- data.frame(matrix(nrow = 29, ncol = 11))
-colnames(station_which_sampled) <- unique(smelt$Station)
-rownames(station_which_sampled) <- unique(sort(smelt$Year))
-
+# Creating a table of 0's and 1's to determine which stations were sampled during which years.
 station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
-
 station_which_sampled[is.na(station_which_sampled)] <- 0
+station_which_sampled[station_which_sampled > 0] <- 1
+kable(station_which_sampled)
+
 # Can't currently figure out why this isn't working
 # ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
 #   geom_bar(stat = "summary") + 
@@ -399,4 +423,15 @@ a = -5.3648 <br/>
 b =  3.0303 <br/>
 
 W = 0.0000043 x L<sup>3.0303</sup>
+
+## Summary of a and b
+
+```{r}
+age_group <- c("All", "<4 years", "<5 years", "<6 years", "<=200 mm", ">200 mm")
+a <- c(-5.05001, -4.963429, -5.100734, -5.14460, -5.02208, -5.3648)
+b <- c(2.88230, 2.853242, 2.915718, 2.93305, 2.88082, 3.0303)
+
+a_and_b_summary <- data.frame(age_group, a, b)
+kable(a_and_b_summary)
+```
 
