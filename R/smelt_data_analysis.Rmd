@@ -146,6 +146,10 @@ station_which_sampled <- data.frame(matrix(nrow = 29, ncol = 11))
 colnames(station_which_sampled) <- unique(smelt$Station)
 rownames(station_which_sampled) <- unique(sort(smelt$Year))
 
+station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
+  ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
+
+station_which_sampled[is.na(station_which_sampled)] <- 0
 # Can't currently figure out why this isn't working
 # ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
 #   geom_bar(stat = "summary") + 
