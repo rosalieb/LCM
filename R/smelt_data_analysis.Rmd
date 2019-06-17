@@ -21,6 +21,7 @@ library(FSA)
 library(FSAdata)
 library(knitr)
 library(leaflet)
+library(janitor)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -167,19 +168,19 @@ ggplot(data = summ_smelt_effort2, mapping = aes(x = as.factor(Year), y = num_sta
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Creating a table of 0's and 1's to determine which stations were sampled during which years.
 station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
 station_which_sampled[is.na(station_which_sampled)] <- 0
 station_which_sampled[station_which_sampled > 0] <- 1
 kable(station_which_sampled)
 
-# Can't currently figure out why this isn't working
-# ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
-#   geom_bar(stat = "summary") + 
-#   labs(x = "Year", y = "Number of Fish Sampled") + 
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-#   facet_wrap(~smelt$Station)
+station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
+  ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
+station_number_sampled[is.na(station_number_sampled)] <- 0
+kable(station_number_sampled)
+
+station_total_sampled <- station_number_sampled %>% summarise_all(list(sum))
+kable(station_total_sampled)
 ```
 
 ## Exploring growth parameters
@@ -351,48 +352,48 @@ The average weight of age-0 rainbow smelt in Lake Champlain is around 8.59 grams
 
 ## <4 years old
 
-n = 23,749
+n = 10,987
 
 ```{r}
-lm_4years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) >= 4,])
+lm_4years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 4,])
 fitPlot(lm_4years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
 summary(lm_4years)
 ```
 
-a = -4.963429 <br/>
-b =  2.853242 <br/>
+a = -5.19480 <br/>
+b =  2.96750 <br/>
 
-W = 0.000011 x L<sup>2.853242</sup>
+W = 0.0000064 x L<sup>2.96750</sup>
 
 ## <5 years old
 
-n = 13,995
+n = 19,412
 
 ```{r}
-lm_5years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) >= 5,])
+lm_5years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 5,])
 fitPlot(lm_5years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
 summary(lm_5years)
 ```
 
-a = -5.100734 <br/>
-b =  2.915718 <br/>
+a = -5.12426 <br/>
+b =  2.93121 <br/>
 
-W = 0.0000079 x L<sup>2.915718</sup>
+W = 0.0000075 x L<sup>2.93121</sup>
 
 ## <6 years old
 
-n = 5,570
+n = 23.296
 
 ```{r}
-lm_6years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) >= 6,])
+lm_6years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 6,])
 fitPlot(lm_6years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
 summary(lm_6years)
 ```
 
 a = -5.14460 <br/>
-b =  2.93305 <br/>
+b =  2.90205 <br/>
 
-W = 0.0000072 x L<sup>2.93305</sup>
+W = 0.0000086 x L<sup>2.90205</sup>
 
 ## At or below 200 mm
 
@@ -428,8 +429,8 @@ W = 0.0000043 x L<sup>3.0303</sup>
 
 ```{r}
 age_group <- c("All", "<4 years", "<5 years", "<6 years", "<=200 mm", ">200 mm")
-a <- c(-5.05001, -4.963429, -5.100734, -5.14460, -5.02208, -5.3648)
-b <- c(2.88230, 2.853242, 2.915718, 2.93305, 2.88082, 3.0303)
+a <- c(-5.05001, -5.19480, -5.12426, -5.14460, -5.02208, -5.3648)
+b <- c(2.88230, 2.96750, 2.93121, 2.90205, 2.88082, 3.0303)
 
 a_and_b_summary <- data.frame(age_group, a, b)
 kable(a_and_b_summary)
