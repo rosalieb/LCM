@@ -93,7 +93,7 @@ annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 1
 # whichdata <- ifelse(annual_or_daily == 1, dt_annual, dt_day)
 # whichdata <- as.data.frame(whichdata)
 
-#dt_out <- ifelse(data_toggle == 1, dt_annual, dt_day)
+#dt_out <- ifelse(data_toggle_plots == 1, dt_annual, dt_day)
 dt_out <- dt_day
 
 
@@ -145,6 +145,9 @@ ui <- dashboardPage(
         menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
+        prettyRadioButtons(inputId = "data_toggle",
+                           label = "Annual or daily dataset", choices = list("Annual data" = 1, "Daily data" = 2),
+                           inline = T),
         sliderInput("range", "Years selected",
                     min = min(dt_out$year,na.rm=FALSE), max = max(dt_out$year,na.rm=FALSE),
                     value = c(2000,2012),sep = "")),
@@ -208,9 +211,9 @@ ui <- dashboardPage(
           height = "100%",
           #Render an output text
           htmlOutput("Instructions_plot_1"),
-          radioButtons(
-            inputId = "data_toggle", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
-          ),
+          # radioButtons(
+          #   inputId = "data_toggle_plots", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
+          # ),
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
             div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any parameters:",
@@ -246,6 +249,9 @@ ui <- dashboardPage(
       tabItem(
         tabName = "d_table",
         htmlOutput("mytable1help"),
+        # radioButtons(
+        #   inputId = "data_toggle_table", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
+        # ),
         DT::dataTableOutput("mytable1")
       ),
       tabItem(
@@ -281,7 +287,7 @@ server <- function(input, output, session) {
 
   # output$selected_dt_out <- reactive({
   #   selected_dt_out <- load_data()
-  #   selected_dt_out <- dt_all[dt_all$type==input$data_toggle,]
+  #   selected_dt_out <- dt_all[dt_all$type==input$data_toggle_plots,]
   #   selected_dt_out <- selected_dt_out[,-which(colnames(selected_dt_out)=="type")]
   #   selected_dt_out
   # })
@@ -418,7 +424,9 @@ server <- function(input, output, session) {
   
   # table
   output$mytable1 <- DT::renderDataTable({
-    DT::datatable(dt_out[dt_out$year >= as.numeric(input$range[1]) & dt_out$year <= as.numeric(input$range[2]), ],
+    dt_out <- dt_all[which(as.numeric(dt_all$type)==as.numeric(input$data_toggle)),]
+    if (input$data_toggle==1) dt_out$VisitDate <- dt_out$year
+    DT::datatable(dt_out[dt_out$year >= as.numeric(input$range[1]) & dt_out$year <= as.numeric(input$range[2]), -which(colnames(dt_out)=="year")],
                   filter = 'top', options = list(orderClasses = TRUE, scrollX = TRUE))
   })
   
