@@ -208,11 +208,9 @@ ui <- dashboardPage(
           height = "100%",
           #Render an output text
           htmlOutput("Instructions_plot_1"),
-          # radioButtons(
-          #   inputId = "data_toggle", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
-          # ),
-          checkboxGroupInput("data_toggle", "Check any parameters:",
-                             c(1,2)),
+          radioButtons(
+            inputId = "data_toggle", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
+          ),
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
             div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any parameters:",
