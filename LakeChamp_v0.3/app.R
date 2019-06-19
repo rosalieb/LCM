@@ -35,7 +35,7 @@ dt_day <- total
 dt_day$year <- as.numeric(substring(dt_day[,1],1,4))
 str(dt_day$VisitDate)
 dt_day <- dt_day[order(dt_day$year,decreasing = F),]
-#dt_day$VisitDate <- as.numeric(dt_day$VisitDate)
+dt_day$VisitDate <- paste0(as.Date(dt_day$VisitDate))
 #dt_day <- round(dt_day, digits = 2)
 
 # Cleaning up the datasets some here for later on. 
@@ -49,7 +49,7 @@ dt_day$StationID[dt_day$Station == "2"] <- "02"
 dt_day$StationID[dt_day$Station == "4"] <- "04"
 dt_day$StationID[dt_day$Station == "7"] <- "07"
 dt_day$StationID[dt_day$Station == "9"] <- "09"
-#dt_day$StationID <- as.numeric(dt_day$StationID)
+dt_day$StationID <- as.numeric(dt_day$StationID)
 
 # Create an overall dataset that will later be subset
 dt_all <- rbind(cbind(dt_annual,"type"=1),cbind(dt_day,"type"=2))
