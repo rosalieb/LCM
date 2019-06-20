@@ -22,6 +22,10 @@ library(FSAdata)
 library(knitr)
 library(leaflet)
 library(janitor)
+library(rgdal)
+library(raster)
+library(rnaturalearth)
+library(RColorBrewer)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
