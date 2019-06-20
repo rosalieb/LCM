@@ -76,7 +76,7 @@ coord_map <- leaflet() %>%
 coord_map
 ```
 
-## Weight relationship of rainbow smelt by lake station
+## Weight-length relationship of rainbow smelt by lake station
 
 Malletts Bay includes the most outliers of any station. The smelt in the Main Lake have a particularly odd linear relationship between their length and weight from the appearance of the graph. Barber Point and the Northeast Arm have some of the largest smelt of all stations. 
 
