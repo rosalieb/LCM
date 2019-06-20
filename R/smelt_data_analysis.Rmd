@@ -173,6 +173,11 @@ station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
 station_which_sampled[is.na(station_which_sampled)] <- 0
 station_which_sampled[station_which_sampled > 0] <- 1
 kable(station_which_sampled)
+#Put in red the sites that were sampled
+# library(huxtable)
+# ht <- as_hux(station_which_sampled)
+# ht <- set_background_color(ht, where(ht == 1), "pink")
+# ht
 
 station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
@@ -182,6 +187,8 @@ kable(station_number_sampled)
 station_total_sampled <- station_number_sampled %>% summarise_all(list(sum))
 kable(station_total_sampled)
 ```
+
+
 
 ## Exploring growth parameters
 
