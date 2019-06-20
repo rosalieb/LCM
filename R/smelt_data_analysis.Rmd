@@ -46,16 +46,16 @@ xIcon <- makeIcon(
 This is the length-weight relationship of rainbow smelt in Lake Champlain. It's consistent with plots of length-weight relationships of other fish. There are a few outliers - fish that were very overweight compared to the other smelt of similar lengths. The second plot in the output includes a trendline created from the generalized additive models method. The third plot includes a polynomial trend line.
 
 ```{r length weight relationship, results = FALSE, warning = FALSE}
-mean(smelt$Weight / smelt$Length, na.rm = T)
-smelt[(smelt$Weight / smelt$Length)<0.4,]
-
+# Scatterplot of weight-length relationship without a line of best fit
 plot(y = smelt$Weight, x = smelt$Length, pch=20)
 
+# Weight-length relationship of rainbow smelt with the R-generated line of best fit 
 ggplot(aes(x=Length, y=Weight), data=smelt )+
   geom_point()+
   #geom_line() +
   geom_smooth(method="gam", formula = y ~ s(x))
 
+# Weight-length relationship of rainbow smelt with a polynomial line of best fit, rather than R-generated line of best fit
 ggplot(aes(x=Length, y=Weight), data=smelt )+
   geom_point() +
   stat_smooth(method = 'lm', formula = y ~ poly(x,2), se= FALSE)
@@ -66,6 +66,7 @@ ggplot(aes(x=Length, y=Weight), data=smelt )+
 Here, you can see rough coordinates of the stations sampled for rainbow smelt throughout the years. For ambiguous locations such as Main Lake, Main Lake North, Main Lake South, etc., we just coordinates roughly in the center of the area. You can click on the icons to see the stations specific coordinates. 
 
 ```{r, message = FALSE}
+# Creation of the map with each station. Includes name of station, latitude, and longitude
 coord_map <- leaflet() %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
   addMarkers(icon = xIcon, lng = smelt_coord$Longitude, lat = smelt_coord$Latitude,
@@ -81,6 +82,7 @@ coord_map
 Malletts Bay includes the most outliers of any station. The smelt in the Main Lake have a particularly odd linear relationship between their length and weight from the appearance of the graph. Barber Point and the Northeast Arm have some of the largest smelt of all stations. 
 
 ```{r length weight by station, warning = FALSE}
+# Grid of plots which display the weight-length relationship of rainbow smelt over time at each station
 ggplot(aes(y=Weight, x=Length), data=smelt )+
   geom_point()+
   #geom_line() +
@@ -93,6 +95,7 @@ ggplot(aes(y=Weight, x=Length), data=smelt )+
 It appears that the condition of rainbow smelt has stayed realtively constant over time in Lake Champlain. The trendlines show an average condition of roughly 0.5 to 0.7 over time.
 
 ```{r condition by station, warning = FALSE}
+# Grid of plots which display the condition of rainbow smelt over time at each station
 ggplot(aes(y=condition, x=Year), data=smelt )+
   ylim(0,6)+
   geom_point()+
@@ -103,7 +106,7 @@ ggplot(aes(y=condition, x=Year), data=smelt )+
 
 ## Abundance of species in Burlington Bay (1999-2000)
 
-Found in the Rube Lab newsletter from early 2000's(?)
+Found in the Rube Lab newsletter from early 2000's
 ```{r fbb, results = FALSE, warning = FALSE}
 fbb <- read.delim(paste0(getpath4data(),"/data_from_Ellen/Fish_Burlington_Bay_1999_2000.txt"))
 class(fbb$rel_ab_Burl_Bay_1999_2000)
@@ -130,12 +133,14 @@ for (i in 1:length(unique(dietfbb$Species))) {
 The age distribution of rainbow smelt caught is skewed right. The majority of fish are 1 or 2 years old. 
 
 ```{r catch per year, warning = FALSE, message = FALSE}
+# Data frame which includes the number of fish obtained per year class
 summ_smelt_ageclass <- as.data.frame(summary(as.factor(smelt$Age)))
 summ_smelt_ageclass <- cbind(rownames(summ_smelt_ageclass), summ_smelt_ageclass)
 rownames(summ_smelt_ageclass) <- c()
 colnames(summ_smelt_ageclass) <- c("year_class", "num_fish")
 summ_smelt_ageclass
 
+# Bar plot which displays the number of fish obtained per year class
 ggplot(data = summ_smelt_ageclass[3:12,], aes(x = year_class, y = num_fish)) + 
   geom_bar(stat = "summary") + 
   labs(x = "Year Class", y = "Number of Fish")
@@ -148,42 +153,53 @@ For 1986, 1988, and 1989, there were no data. Therefore, the number of stations 
 In addition, the table of 0's and 1's indicates whether or not a station was sampled for a particular year. 
 
 ```{r sample effort, warning = FALSE, message = FALSE, results = "asis"}
+# Data frame which includes the number of fish sampled per year
 summ_smelt_effort1 <- as.data.frame(summary(as.factor(smelt$Year)))
 summ_smelt_effort1 <- cbind(rownames(summ_smelt_effort1), summ_smelt_effort1)
 rownames(summ_smelt_effort1) <- c()
 colnames(summ_smelt_effort1) <- c("Year", "num_fish")
 
+# Bar plot which displays the number of fish sampled per year
 ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
   geom_bar(stat = "summary") + 
   labs(x = "Year", y = "Number of Fish Sampled") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+# Data frame which includes the years, list of the stations sampled during that year, and number of stations sampled that year
 summ_smelt_effort2 <- smelt %>% 
   group_by(Year) %>% 
   summarise(list_stations = list(unique(Station)), num_stations = length(list_stations))
 
+# Bar plot showing the number of stations sampled per year
 ggplot(data = summ_smelt_effort2, mapping = aes(x = as.factor(Year), y = num_stations)) +
   geom_bar(stat = "summary") +
   labs(x = "Year", y = "Number of Stations Sampled") + 
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+# Table which displays which stations were sampled when
 station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
 station_which_sampled[is.na(station_which_sampled)] <- 0
 station_which_sampled[station_which_sampled > 0] <- 1
-kable(station_which_sampled)
-#Put in red the sites that were sampled
-# library(huxtable)
-# ht <- as_hux(station_which_sampled)
-# ht <- set_background_color(ht, where(ht == 1), "pink")
-# ht
 
+# Put in red the sites that were sampled to make it easier to see which sites were sampled when
+library(huxtable)
+ht <- as_hux(station_which_sampled)
+ht <- set_background_color(ht, where(ht == 1), "pink")
+ht <- huxtable::add_colnames(ht, colnames = colnames(station_which_sampled))
+ht <- huxtable::add_rownames(ht, rownames = rownames(station_which_sampled))
+col_width(ht) <- 0.5
+wrap(ht) <- TRUE
+ht
+
+# Table which displays the number of fish sampled each year at each station 
 station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
 station_number_sampled[is.na(station_number_sampled)] <- 0
 kable(station_number_sampled)
 
+# Table which displays the total number of fish sampled at each station across all years
 station_total_sampled <- station_number_sampled %>% summarise_all(list(sum))
 kable(station_total_sampled)
 ```
@@ -197,6 +213,7 @@ kable(station_total_sampled)
 Using Rosalie's code and Derek Ogle's tutorial.
 
 ```{r, message = FALSE, warning = FALSE}
+# Two plots here--the first is the weight-length relationship of rainbow smelt without a log-transformation. The second plot is a log-transformed plot of this relationship with a line of best fit
 par(mfrow=c(1,2))
 plot(smelt$Weight ~ smelt$Length ,xlab="Total Length (mm)", ylab = "Weight (g)", main = "", pch=20)
 
@@ -389,7 +406,7 @@ W = 0.0000075 x L<sup>2.93121</sup>
 
 ## <6 years old
 
-n = 23.296
+n = 23,296
 
 ```{r}
 lm_6years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 6,])
@@ -404,7 +421,7 @@ W = 0.0000086 x L<sup>2.90205</sup>
 
 ## At or below 200 mm
 
-n = 24816
+n = 24,816
 
 ```{r}
 lm_below200mm <- lm(logW~logL,data = smelt[as.numeric(smelt$Length) <= 200,])
@@ -435,6 +452,7 @@ W = 0.0000043 x L<sup>3.0303</sup>
 ## Summary of a and b
 
 ```{r}
+# Table which includes the age/size group and their respective a and b parameters
 age_group <- c("All", "<4 years", "<5 years", "<6 years", "<=200 mm", ">200 mm")
 a <- c(-5.05001, -5.19480, -5.12426, -5.14460, -5.02208, -5.3648)
 b <- c(2.88230, 2.96750, 2.93121, 2.90205, 2.88082, 3.0303)
