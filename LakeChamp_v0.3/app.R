@@ -249,7 +249,7 @@ ui <- dashboardPage(
         tabName = "d_stats",
         htmlOutput("Stats1"),
         dropdownButton(
-          label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
+          label = "Parameters to plot", status = "default", width = 80, circle = FALSE, 
           div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow2", "Check any boxes:",
                                                                               colnames(dt_out)))),
         htmlOutput("Stats2"),

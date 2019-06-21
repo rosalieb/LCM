@@ -18,7 +18,7 @@ bathy2.raster.aggregate <- aggregate(bathy2, fact=5)
 # #fced4b = yellow
 # #f23c24 = red
 
-pal <- colorNumeric(c("#000b70", "#159112", "#fced4b", "#f23c24"), values(bathy2.raster.aggregate),
+pal <- colorNumeric(c("#000b70", "#67c7f7", "#159112", "#fced4b", "#f23c24"), values(bathy2.raster.aggregate),
                     na.color = "transparent")
 
 leaflet() %>% addTiles() %>% 
