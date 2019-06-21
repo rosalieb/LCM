@@ -43,17 +43,14 @@ dt_annual$StationID[dt_annual$Station == "2"] <- "02"
 dt_annual$StationID[dt_annual$Station == "4"] <- "04"
 dt_annual$StationID[dt_annual$Station == "7"] <- "07"
 dt_annual$StationID[dt_annual$Station == "9"] <- "09"
-dt_annual$StationID <- as.numeric(dt_annual$StationID)
 
 dt_day$StationID[dt_day$Station == "2"] <- "02"
 dt_day$StationID[dt_day$Station == "4"] <- "04"
 dt_day$StationID[dt_day$Station == "7"] <- "07"
 dt_day$StationID[dt_day$Station == "9"] <- "09"
-dt_day$StationID <- as.numeric(dt_day$StationID)
 
 # Create an overall dataset that will later be subset
 dt_all <- rbind(cbind(dt_annual,"type"=1),cbind(dt_day,"type"=2))
-
 
 # Creating a subset of the data so we are only focusing on particular stations in our analyses. 
 stations_metadata <- read.delim(paste0(getpath4data(),"/LCM_bio_PeteStangel/Plankton data stations.txt"))
@@ -88,14 +85,8 @@ annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 1
   inputId = "data_toggle", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
 ))
 
-# Again, some more code I thought would be useful. It's currently commented out because it's not working quite yet. 
-# whichdata <- data.frame()
-# whichdata <- ifelse(annual_or_daily == 1, dt_annual, dt_day)
-# whichdata <- as.data.frame(whichdata)
-
 #dt_out <- ifelse(data_toggle_plots == 1, dt_annual, dt_day)
 dt_out <- dt_day
-
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -352,6 +343,7 @@ server <- function(input, output, session) {
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
+      addRasterImage(raster.LC.leaflet, colors = pal, opacity = 0.8) %>% 
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
