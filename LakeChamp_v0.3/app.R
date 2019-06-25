@@ -247,17 +247,19 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_stats",
-        htmlOutput("Stats1"),
+        tabsetPanel(type = "tabs", tabPanel("Correlation", htmlOutput("Stats1")),
+                    tabPanel("Basic stats", htmlOutput("Stats2"))),
         dropdownButton(
           label = "Parameters to plot", status = "default", width = 80, circle = FALSE, 
-          div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow2", "Check any boxes:",
+          div(style='display: inline-block; max-height: 40vh; overflow-y: auto; width: 150px;', checkboxGroupInput("parameters_toshow2", "Check any boxes:",
                                                                               colnames(dt_out)))),
-        htmlOutput("Stats2"),
         dropdownButton(
           label = "Stations to plot", status = "default", width = 80, circle = FALSE,
-          div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow2", "Check any boxes:",
+          div(style='display: inline-block; max-height: 40vh; overflow-y: auto; width: 150px;', checkboxGroupInput("stations_toshow2", "Check any boxes:",
                                                                               sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE)))
       ),
+      
+      # div(style="display: inline-block;vertical-align:top; width: 150px;",
       tabItem(
         tabName = "history",
         #Render an output text
@@ -424,9 +426,7 @@ server <- function(input, output, session) {
   
   # Stats
   output$Stats1 <- renderUI({ 
-    Header       <- "<h1>Stat tools</h1>"
     Header1      <- "<h2><u>Correlation</u></h2>"
-    Header11     <- "<h3>Theory</h3>"
     Theory1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
                       </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
                       </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
@@ -439,15 +439,13 @@ server <- function(input, output, session) {
                            </br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
     
-    HTML(paste(Header,
-               Header1,Header11,Theory1, Img1, Header12, Results_Corr))
+    HTML(paste(Header1, Theory1, Img1, Header12, Results_Corr))
     
   })
   
   output$Stats2 <- renderUI({
-    Header2      <- "<h2><u>Basic stats</u></h2>"
-    Header21     <- "<h3>Theory</h3>"
-    Theory2      <- paste0("</br>This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
+    Header2      <- paste0("<h2><u>Basic statistics</u></h2>")
+    Theory2      <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
                            </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
                            </br>")
     Header22     <- "<h3>Try it for yourself!</h3>"
@@ -457,7 +455,7 @@ server <- function(input, output, session) {
     Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the dropdown menu below. </br>
                                   The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
     
-    HTML(paste(Header2,Header21,Theory2, Header22, Results_basic_stats, mmean))
+    HTML(paste(Header2, Theory2, Header22, Results_basic_stats, mmean))
     
   })           
   
