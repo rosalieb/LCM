@@ -26,4 +26,5 @@ leaflet() %>% addTiles() %>%
 
 raster.LC.leaflet <- projectRasterForLeaflet(bathy2.raster.aggregate, method = "ngb")
 
-writeRaster(raster.LC.leaflet, filename = "raster.LC.leaflet", format = "GTiff", overwrite = TRUE)
+writeRaster(raster.LC.leaflet, filename = "LakeChamp_v0.3/data/raster_LC_leaflet", format = "GTiff", overwrite = TRUE)
+writeRaster(bathy2.raster.aggregate, filename = "LakeChamp_v0.3/data/raster_LC", format = "GTiff", overwrite = TRUE)
