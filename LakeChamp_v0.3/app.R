@@ -65,8 +65,8 @@ xIcon <- makeIcon(
   iconWidth = 20, iconHeight = 20)
 
 # Read the raster layer for Lake Champlain bathymetry 
-# raster.LC <- raster("LakeChamp_v0.3/data/raster_LC.tif")
-# raster.LC.leaflet <- projectRasterForLeaflet(raster.LC, method = "ngb")
+# raster_LC <- raster("LakeChamp_v0.3/data/raster_LC.tif")
+# raster_LC_leaflet <- projectRasterForLeaflet(raster_LC, method = "ngb")
 
 # Reading in the parameter datafile to be placed in the "Parameter descriptions" tab. 
 parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.csv"), stringsAsFactors = FALSE, encoding = "UTF-8")
@@ -257,7 +257,7 @@ ui <- dashboardPage(
                                               label = "Parameters to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("parameters_toshow2", "Check any boxes:",
                                                                                                                                                        colnames(dt_out)))),
                                             htmlOutput("Stats1.3"),
-                                            sidebarPanel(sliderInput("size_slider", label = "Image size", min = 300, max = 700, value = 500)), uiOutput("corr_plot")),
+                                            sidebarPanel(sliderInput("size_slider", label = "Image size", min = 200, max = 700, value = 200)), uiOutput("corr_plot")),
                     tabPanel("Basic stats", htmlOutput("Stats2.1"), 
                              div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
                                label = "Stations to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("stations_toshow2", "Check any boxes:",
@@ -351,7 +351,7 @@ server <- function(input, output, session) {
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
-      addRasterImage(raster.LC.leaflet, colors = pal, opacity = 0.8) %>% 
+      addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
@@ -459,7 +459,8 @@ server <- function(input, output, session) {
   output$Stats1.3 <- renderUI({
     Results_Corr  <- paste0("</br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is:", verbatimTextOutput("mcor"),"calculated from </br>",verbatimTextOutput("n")," observations. </br></br>This is calculated across ALL sites, for the <b>", input$range[1],"-",input$range[2],"</b> period.
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br></br>")
-    HTML(paste(Results_Corr))
+    Corr_plot_instruct <- paste0("Below is a correlation plot of all of the parameters plotted against one another. Use the slider to expand or shrink the image.</br></br>")
+    HTML(paste(Results_Corr, Corr_plot_instruct))
   })
   
   output$Stats2.1 <- renderUI({
