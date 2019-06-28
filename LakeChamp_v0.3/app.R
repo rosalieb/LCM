@@ -21,6 +21,7 @@ library(leaflet)
 # names(tags) # list of tags recognized by shiny.
 library(htmlTable)
 library(shinyWidgets)
+library(raster) # to read the raster layer
 
 # Introducing the dataframe dt_annual, which contains annual averages of the data we're working with.
 dt_annual <- total_year
@@ -62,6 +63,10 @@ stations_metadata_subset <- rbind(lake_stations_subset, trib_stations_subset)
 xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
+
+# Read the raster layer for Lake Champlain bathymetry 
+# raster.LC <- raster("LakeChamp_v0.3/data/raster_LC.tif")
+# raster.LC.leaflet <- projectRasterForLeaflet(raster.LC, method = "ngb")
 
 # Reading in the parameter datafile to be placed in the "Parameter descriptions" tab. 
 parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.csv"), stringsAsFactors = FALSE, encoding = "UTF-8")
