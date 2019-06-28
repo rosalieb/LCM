@@ -425,7 +425,10 @@ server <- function(input, output, session) {
   })
   
   # Stats
-  output$Stats1 <- renderUI({ 
+  
+  output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[1]],dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>")
+  output$n       <- renderText(if(length(input$parameters_toshow2)>1) length(!is.na(dt_out[!is.na(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[2]]),input$parameters_toshow2[1]])) else "NA")
+  output$Stats1  <- renderUI({ 
     Header1      <- "<h2><u>Correlation</u></h2>"
     Theory1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
                       </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
@@ -433,10 +436,8 @@ server <- function(input, output, session) {
                       </br>")
     Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
     Header12     <- "<h3>Try it for yourself!</h3> <br/>"
-    mcor         <- if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[1]],dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>"
-    n            <- if(length(input$parameters_toshow2)>1) length(!is.na(dt_out[!is.na(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[2]]),input$parameters_toshow2[1]])) else "NA"
     Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br>
-                           </br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is: ", mcor,", calculated from ",n," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
+                           </br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is:", verbatimTextOutput("mcor"),"calculated from </br>",verbatimTextOutput("n")," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
     
     HTML(paste(Header1, Theory1, Img1, Header12, Results_Corr))
