@@ -252,16 +252,17 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_stats",
-        tabsetPanel(type = "tabs", tabPanel("Correlation", htmlOutput("Stats1")),
-                    tabPanel("Basic stats", htmlOutput("Stats2"))),
-        dropdownButton(
-          label = "Parameters to plot", status = "default", width = 80, circle = FALSE, 
-          div(style='display: inline-block; max-height: 40vh; overflow-y: auto; width: 150px;', checkboxGroupInput("parameters_toshow2", "Check any boxes:",
-                                                                              colnames(dt_out)))),
-        dropdownButton(
-          label = "Stations to plot", status = "default", width = 80, circle = FALSE,
-          div(style='display: inline-block; max-height: 40vh; overflow-y: auto; width: 150px;', checkboxGroupInput("stations_toshow2", "Check any boxes:",
-                                                                              sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE)))
+        tabsetPanel(type = "tabs", tabPanel("Correlation", htmlOutput("Stats1.1"), htmlOutput("Stats1.2"),
+                                            div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
+                                              label = "Parameters to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("parameters_toshow2", "Check any boxes:",
+                                                                                                                                                       colnames(dt_out)))),
+                                            htmlOutput("Stats1.3"),
+                                            sidebarPanel(sliderInput("size_slider", label = "Image size", min = 300, max = 700, value = 500)), uiOutput("corr_plot")),
+                    tabPanel("Basic stats", htmlOutput("Stats2.1"), 
+                             div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
+                               label = "Stations to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("stations_toshow2", "Check any boxes:",
+                                                                                                                              sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE))),
+                             htmlOutput("Stats2.2")))
       ),
       
       # div(style="display: inline-block;vertical-align:top; width: 150px;",
@@ -431,38 +432,52 @@ server <- function(input, output, session) {
   
   # Stats
   
-  output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[1]],dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>")
-  output$n       <- renderText(if(length(input$parameters_toshow2)>1) length(!is.na(dt_out[!is.na(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2],input$parameters_toshow2[2]]),input$parameters_toshow2[1]])) else "NA")
-  output$Stats1  <- renderUI({ 
+ output$Stats1.1  <- renderUI({ 
     Header1      <- "<h2><u>Correlation</u></h2>"
     Theory1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
                       </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
                       </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
                       </br>")
-    Img1         <- img(src='20190521_corrplot.pdf', align = "right", width=700)
-    Header12     <- "<h3>Try it for yourself!</h3> <br/>"
-    Results_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br>
-                           </br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is:", verbatimTextOutput("mcor"),"calculated from </br>",verbatimTextOutput("n")," observations. </br></br>This is calculated across ALL sites, for the <b>",input$range[1],"-",input$range[2],"</b> period. 
-                           If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br>")
     
-    HTML(paste(Header1, Theory1, Img1, Header12, Results_Corr))
-    
+    HTML(paste(Header1, Theory1))
+  })
+ 
+  output$corr_plot <- renderUI({
+    Img1         <- img(src='20190521_corrplot.pdf', width = as.integer(input$size_slider))
+    HTML(paste(Img1))
   })
   
-  output$Stats2 <- renderUI({
+  output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[1]], dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>")
+  output$n       <- renderText(if(length(input$parameters_toshow2)>1) length(!is.na(dt_out[!is.na(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2], input$parameters_toshow2[2]]), input$parameters_toshow2[1]])) else "NA")
+  
+  output$Stats1.2 <- renderUI({
+    Header12     <- "<h3>Try it for yourself!</h3>"
+    Instruct_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br></br>")
+    HTML(paste(Header12, Instruct_Corr))
+  })
+  
+  output$Stats1.3 <- renderUI({
+    Results_Corr  <- paste0("</br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is:", verbatimTextOutput("mcor"),"calculated from </br>",verbatimTextOutput("n")," observations. </br></br>This is calculated across ALL sites, for the <b>", input$range[1],"-",input$range[2],"</b> period.
+                           If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br></br>")
+    HTML(paste(Results_Corr))
+  })
+  
+  output$Stats2.1 <- renderUI({
     Header2      <- paste0("<h2><u>Basic statistics</u></h2>")
     Theory2      <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
                            </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
                            </br>")
     Header22     <- "<h3>Try it for yourself!</h3>"
+    Instruct_basic_stats <- paste0("<b>Instructions:</b> select parameters from the dropdown menu below. </br></br>")
+    HTML(paste(Header2, Theory2, Header22, Instruct_basic_stats))
+  })
+  
+  output$Stats2.2 <- renderUI({
+    mstations    <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
+    Results_basic_stats  <- paste0("</br>The stats are calculated for stations ", mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
     mmean        <- NULL
     if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$VisitDate>input$range[1] & dt_out$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(dt_out[,input$parameters_toshow2[i]]))," observations. </br>")
-    mstations <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
-    Results_basic_stats <- paste0("<b>Instructions:</b> select parameters from the dropdown menu below. </br>
-                                  The stats are calculated for stations ",mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
-    
-    HTML(paste(Header2, Theory2, Header22, Results_basic_stats, mmean))
-    
+    HTML(paste(Results_basic_stats, mmean))
   })           
   
 }
