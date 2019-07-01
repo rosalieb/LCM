@@ -310,6 +310,11 @@ bathy <- spTransform(bathy,crs(world))
 crs(bathy)
 bathy2 <- projectRaster(bathy2, crs = crs(world))
 
+res(bathy2)
+#aggregate by factor = 3 to increase plotting speed
+bathy2 <- aggregate(bathy2, fact=3)
+
+
 LTeff$start.lat.dd <- as.numeric(paste(LTeff$start.lat.dd))
 LTeff$start.lon.dd <- as.numeric(paste(LTeff$start.lon.dd))
 LTeff$end.lat.dd <- as.numeric(paste(LTeff$end.lat.dd))
@@ -577,7 +582,7 @@ p4 <- ggplot() + geom_segment(aes(x = xmin_coord, y = ymin_coord, xend = xmax_co
   ggtitle(paste0(choose_day," trawls")) +
   xlab("Longitude") + ylab("Latitude") + coord_equal(ratio=1) + xlim(myxmin_coord+0.008,myxmax_coord-0.008) + ylim(myymin_coord+0.008, myymax_coord-0.008)
 
-p5 <- grid.arrange(p3, p4, ncol=2, widths=c(2,4))
+p5 <- grid.arrange(p3, p4, ncol=2, widths=c(2,4), heights=6)
 p5
 
 #ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_day_trip_",choose_day,".pdf"), p5)
@@ -689,7 +694,7 @@ p <- ggplot(tg, aes(x=tl_mm, fill=fyear)) +
 
 ```
 
-The variation in length is linked to the capture day of the year. Year is also a significant explanatory variable. However, there is a lot of noise (very low R<sup>2</sup>).  
+The variation in length is linked to the capture day of the year, but probably because some species with really different size were caught only then. Year is also a significant explanatory variable. However, there is a lot of noise (very low R<sup>2</sup>).  
 ```{r explain variation in max total length, echo=FALSE}
 lm4a <- lm(tl_mm ~ yday, data=tg)
 lm4b <- lm(tl_mm ~ yday*fyear, data=tg)
@@ -702,17 +707,37 @@ AIC(lm4a,lm4b,lm4c,lm4d)[order(AIC(lm4a,lm4b,lm4c,lm4d)$AIC),]
 All AIC are high. Species explain the most, which doesn't come as a surprise: not all species grow as big as the others. 
 We're looking at the results of the first model that doesn't include the species (we do not necesseraly want to see how some species are bigger than other here, the idea is to know whether the sampling day in the season or the year have targetted different catch.
 There are no strong trend, if larger species were collected on some days, it may have to do with whe zone of the lake that was surveyed instead of actual in-year variation.
+The only species with a real trend is sea lamprey. Average size increases by about 200 mm over the season.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 summary(lm4b)
 
-ggplot(tg, aes(x=yday,y=tl_mm,color=fyear)) + geom_point() + stat_smooth()
+ggplot(tg[tg$species=="lake trout"|tg$species=="alewife"|tg$species=="lake whitefish"|tg$species=="rainbow smelt"|tg$species=="sea lamprey"|tg$species=="burbot",], aes(x=yday,y=tl_mm,color=fyear)) + geom_point() + stat_smooth() + facet_wrap(~species)
 
 ```
 
+# Extract mortality for LT from only wild data
+
+```{r include=FALSE}
+# create a dataframe with lake trout wild
+ltw <- tg[tg$species == "lake trout",]
+ltw <- ltw[ltw$fin_clip == "na" | ltw$fin_clip == "nc" ,]
+nrow(ltw)
+
+par(mfrow=c(3,1))
+hist(ltw$tl_mm[ltw$year==2016], col=adjustcolor("yellow", alpha.f = .4), xlim=c(0,max(ltw$tl_mm, na.rm = T)), xlab="length (mm)", main="2016")
+hist(ltw$tl_mm[ltw$year==2017], col=adjustcolor("grey", alpha.f = .4), xlim=c(0,max(ltw$tl_mm, na.rm = T)), xlab="length (mm)", main="2017")
+hist(ltw$tl_mm[ltw$year==2018], col=adjustcolor("pink", alpha.f = .4), xlim=c(0,max(ltw$tl_mm, na.rm = T)), xlab="length (mm)", main="2018")
+par(mfrow=c(1,1))
+
+
+
+```
+
+
 # Lake Trout diet analysis
 
-Helping Alex with some code, but he'll do the bulk of it.
+Helping Alex with some code, but he'll do the bulk of it (see other .Rmd on diet analysis).  
 An example with the size, but he will do the same to look at stomach content. Here, we learn that 40% of our sample of fish smaller than 100mm were sampled in 2016. (but he will repeat it to learn whether size class impact stomach emptyness)
 
 ```{r echo=FALSE}
