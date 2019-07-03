@@ -447,8 +447,8 @@ server <- function(input, output, session) {
     HTML(paste(Img1))
   })
   
-  output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[1]], dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[2]], use = "na.or.complete"),4) else "<i> Select another variable </i>")
-  output$n       <- renderText(if(length(input$parameters_toshow2)>1) length(!is.na(dt_out[!is.na(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2], input$parameters_toshow2[2]]), input$parameters_toshow2[1]])) else "NA")
+  output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[1]], dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[2]], use = "na.or.complete"),4) else HTML("<i> Select another variable </i>"))
+  output$n       <- renderText(if(length(input$parameters_toshow2)>1) length(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(input$parameters_toshow2[1]) & !is.na(input$parameters_toshow2[2]), input$parameters_toshow2[2]]) else "NA")
   
   output$Stats1.2 <- renderUI({
     Header12     <- "<h3>Try it for yourself!</h3>"
@@ -475,7 +475,7 @@ server <- function(input, output, session) {
   
   output$Stats2.2 <- renderUI({
     mstations    <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
-    Results_basic_stats  <- paste0("</br>The stats are calculated for stations ", mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
+    Results_basic_stats <- paste0("</br>The stats are calculated for stations ", mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
     mmean        <- NULL
     if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$VisitDate>input$range[1] & dt_out$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",length(!is.na(dt_out[,input$parameters_toshow2[i]]))," observations. </br>")
     HTML(paste(Results_basic_stats, mmean))
