@@ -113,6 +113,23 @@ summary(lm1)
 ```
 
 
+Try the quantile regression to fit the non-tranformed data
+```{r quantile regression}
+library(quantreg)
+LTcond$weight ~ LTcond$frozen.tl
+m1 <- rq(weight~poly(frozen.tl,2), data=LTcond,tau=0.9)
+m2 <- rq(weight~poly(frozen.tl,3), data=LTcond,tau=0.9)
+m3 <- rq(weight~poly(frozen.tl,4), data=LTcond,tau=0.9)
+AIC(m1)
+AIC(m2)
+AIC(m3)
+# geom_quantile uses rq()
+ggplot(LTcond, aes(frozen.tl,weight))+ geom_point()+
+    geom_quantile(formula=y~poly(x,3),quantiles=0.9)
+
+```
+
+
 ### Test whether LT exhibit isometric or allometric growth
 
 A test of whether the fish in a population exhibit isometric growth or not can be obtained by noting that b is the estimated slope from fitting the transformed length-weight model. The slope is generically labeled with β such that the test for allometry can be translated into the following statistical hypotheses:
