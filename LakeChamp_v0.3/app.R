@@ -448,7 +448,7 @@ server <- function(input, output, session) {
   })
   
   output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[1]], dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[2]], use = "na.or.complete"),4) else HTML("<i> Select another variable </i>"))
-  output$n       <- renderText(if(length(input$parameters_toshow2)>1) length(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(input$parameters_toshow2[1]) & !is.na(input$parameters_toshow2[2]), input$parameters_toshow2[2]]) else "NA")
+  output$n       <- renderText(if(length(input$parameters_toshow2)>1) nrow(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(dt_out[,input$parameters_toshow2[1]]) & !is.na(dt_out[,input$parameters_toshow2[2]]), ]) else "NA")
   
   output$Stats1.2 <- renderUI({
     Header12     <- "<h3>Try it for yourself!</h3>"
