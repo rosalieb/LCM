@@ -22,6 +22,7 @@ library(leaflet)
 library(htmlTable)
 library(shinyWidgets)
 library(raster) # to read the raster layer
+library(timevis)
 
 # Introducing the dataframe dt_annual, which contains annual averages of the data we're working with.
 dt_annual <- total_year
@@ -93,6 +94,20 @@ annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 1
 #dt_out <- ifelse(data_toggle_plots == 1, dt_annual, dt_day)
 dt_out <- dt_day
 
+timeline_data <- data.frame(
+  content = c("65 million rainbow smelt stocked in Lake Champlain", "Lake trout populations disappeared", "Lake whitefish fishery closes after annual harvests of 60k fish", "Alewife first appear in LC basin in Green Pond, NY",
+              "Summer water clarity in Main Lake increases by over a meter", "August surface temperatures increase by 1.6-3.8 C", "Salmonid stocking program begins", "Comprehensive fish inventory of Lake Champlain conducted", 
+              "Canadian commercial fishery for walleye closes", "Lake Champplain Fish and Wildlife Management Cooperative organized", "Harvest of lake whitefish in Missisquoi Bay decreases from 13,214 kg to 35 kg",
+              "Sustained stocking program begins for reestablishment of lake trout fishery", "Strategic Plan for the Development of Salmonid Fisheries in Lake Champlain implemented", "Reduction in daily creel limit in Vermont",
+              "Walleye stocking efforts first initiated", "Beginning of the expermental program to control sea lamprey", "Lake Champlain Basin Program created", "8-year forage fish evaluation", "Zebra mussels first discovered in Lake Champlain",
+              "Alewife first appeared in Lake St. Catharine, VT", "Long-term control program for sea lamprey created", "Commercial fishery for american eel repealed", "Use of bait fish in Vermont restricted to 16 native species",
+              "Alewife found in Missisquoi Bay", "Alewife first collected", "Commercial fishery for lake whitefish in Quebec ends", "Lake-wide hydroacoustic survey added", "Zebra mussel veliger monitoring for Main Lake, Cumberland Bay, and Isle La Motte ends",
+              "Alewife become abundant in catches", "Major die-off of YOY alewife in Inland Sea and South Lake in late winter months"),
+  start = c("1900", "1900", "1912", "1960", "1964", "1964", "1970", "1971", "1971", "1972", "1972", "1973", "1977", "1978", "1986", "1990", "1990", "1990", "1993", "1997", "2002",
+            "2002", "2002", "2002", "2003", "2004", "2005", "2005", "2007", "2008"),
+  end = c(NA, NA, NA, NA, "2019", "2019", NA, "1977", NA, NA, "2004", NA, NA, NA, NA, NA, NA, "1998", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA)
+)
+
 # Define UI for slider demo app ----
 ui <- dashboardPage(
   #define color
@@ -162,7 +177,7 @@ ui <- dashboardPage(
       #   checkboxGroupInput("parameters_toshow", "Phytoplankton",
       #                      colnames(out[,c(24,23,20,19,16,15,18,17,22,21)])))#, selected = colnames(out)))
       menuItem(
-        "Historic data", 
+        "Historic data/information", 
         tabName = "history", 
         icon = icon("book")
       )
@@ -260,6 +275,9 @@ ui <- dashboardPage(
                                             sidebarPanel(sliderInput("size_slider", label = "Image size", min = 200, max = 700, value = 200)), uiOutput("corr_plot")),
                     tabPanel("Basic stats", htmlOutput("Stats2.1"), 
                              div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
+                               label = "Parameters to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("parameters_toshow3", "Check any boxes:",
+                                                                                                                                colnames(dt_out)))),
+                             div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
                                label = "Stations to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("stations_toshow2", "Check any boxes:",
                                                                                                                               sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE))),
                              htmlOutput("Stats2.2")))
@@ -269,7 +287,8 @@ ui <- dashboardPage(
       tabItem(
         tabName = "history",
         #Render an output text
-        htmlOutput("history_info")
+        htmlOutput("timeline_text"),
+        timevisOutput("timeline")
       )
     )
   )
@@ -299,15 +318,20 @@ server <- function(input, output, session) {
     myparagraph1 <- "Spanning a length of 190 km from Whitehall, NY to its outlet at the Richelieu River in Québec, Canada, Lake Champlain covers 113,000 hectares and is estimated to hold roughly 25 trillion liters. Average lake depth is 19.5 meters (64.5 feet), with the greatest lake depth of 122 meters (400 feet). A majority of the water that enters Lake Champlain runs through its basin, which covers over 21,000 square kilometers. Over half of the basin is in Vermont, about a third in New York, and less than a tenth in the Province of Québec. The water retention time varies by lake segment, ranging between two months in the South Lake to about 3 years in the Main Lake. <br/> <br/>"
     header2 <- "<h3> Lake Champlain Long-Term Water Quality and Biological Monitoring Program (LTMP) </h3>"
     myparagraph2 <- "Data have been collected through the Lake Champlain Long-Term Water Quality and Biological Monitoring Program since 1992, with one of the original purposes to provide hydrodynamic, eutrophication, and food web models for the lake, although their purpose changed in 1995 (Vermont Department of Environmental Conservation, & New York State Department of Environmental Conservation, 2017). Data were collected by the Vermont Department of Environmental Conservation and the New York State Department of Environmental Conservation, with the support of the Lake Champlain Basin Program. Fifteen lake and twenty-two tributary stations have been sampled throughout the years, although some biological and chemical measurements were only collected during more recent years along with the acquisition of newer equipment. Data are stored in a database and available on request for research, management, consulting, and learning purposes. <br/> <br/>"
-    linkToSite <- "To visit the Lake Champlain Basin Program's website, click <a href = 'http://www.lcbp.org/'>here</a>. <br/> <br/>"
-    linkToData <- "To retrieve the data on Lake Champlain used for this project, click <a href = 'https://dec.vermont.gov/watershed/lakes-ponds/monitor/lake-champlain'>here</a>."
-    HTML(paste(header, myparagraph1, header2, myparagraph2, linkToSite, linkToData))
+    linkToSite <- "To visit the Lake Champlain Basin Program's website, click <a href = 'http://www.lcbp.org/'>here</a>. <br/>"
+    linkToData <- "To retrieve the data on Lake Champlain used for this project, click <a href = 'https://dec.vermont.gov/watershed/lakes-ponds/monitor/lake-champlain'>here</a>.</br></br>"
+    final_note <- "<u><b>Please note that this app is a permanent work-in-progress.</u></b>"
+    HTML(paste(header, myparagraph1, header2, myparagraph2, linkToSite, linkToData, final_note))
   })
   
-  output$history_info <- renderUI({
-    header_history <- "<h3> Historic data of Lake Champlain </h3> <br/>"
-    header_body <- "Here, you'll find historic data collected on Lake Champlain by various researchers. To be finished soon..."
-    HTML(paste(header_history, header_body))
+  output$timeline <- renderTimevis({
+    timevis(timeline_data, options = list(height = "400px", zoomFactor = 0.25))
+  })
+  
+  output$timeline_text <- renderUI({
+    timeline_title <- paste0("<h3>Important recent events occuring in and around Lake Champlain</h3>")
+    timeline_instructions <- paste0("You can expand the app window, zoom in and out, and drag the timeline to get a better view of important events that involve the health of Lake Champlain. <b>Please note that this timeline, like the rest of the app, is a permanent work-in-progress and may not include all relevant information.</b></br></br>")
+    HTML(paste(timeline_title, timeline_instructions))
   })
   
   observeEvent(input$home, {
@@ -339,7 +363,7 @@ server <- function(input, output, session) {
   
   
   output$mytable1help <- renderUI({ 
-    table1help <- paste0("<h3>Annual averages data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
+    table1help <- paste0("<h3>", ifelse(input$data_toggle == 1, "Annual", "Daily"), " averages data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
     HTML(paste(table1help))
   })
   
@@ -351,7 +375,7 @@ server <- function(input, output, session) {
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
-      addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
+      # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
@@ -466,18 +490,18 @@ server <- function(input, output, session) {
   output$Stats2.1 <- renderUI({
     Header2      <- paste0("<h2><u>Basic statistics</u></h2>")
     Theory2      <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
-                           </br>The statistics are done on the annual averages dataset. Annual averages were computed to ease the visualization. A future version of the app should allow the user to chose what to visualize (raw dataset or annual averages).)
+                           </br>The statistics can be done with the annual or daily averages dataset!)
                            </br>")
     Header22     <- "<h3>Try it for yourself!</h3>"
-    Instruct_basic_stats <- paste0("<b>Instructions:</b> select parameters from the dropdown menu below. </br></br>")
+    Instruct_basic_stats <- paste0("<b>Instructions:</b> select as many parameters and stations as desired from the dropdown menus below. </br></br>")
     HTML(paste(Header2, Theory2, Header22, Instruct_basic_stats))
   })
   
   output$Stats2.2 <- renderUI({
-    mstations    <- paste(as.numeric(input$stations_toshow2),sep="", collapse=", ")
+    mstations    <- paste(as.numeric(input$stations_toshow3),sep="", collapse=", ")
     Results_basic_stats <- paste0("</br>The stats are calculated for stations ", mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
     mmean        <- NULL
-    if(length(input$parameters_toshow2)>0) for (i in 1:length(input$parameters_toshow2)) mmean <- paste(mmean, input$parameters_toshow2[i], "       – mean: ",round(mean(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$VisitDate>input$range[1] & dt_out$VisitDate<input$range[2],input$parameters_toshow2[i]], na.rm=T),2), ", calculated from n= ",nrow(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(dt_out[,input$parameters_toshow2[i]]),])," observations. </br>")
+    if(length(input$parameters_toshow3)>0) for (i in 1:length(input$parameters_toshow3)) mmean <- paste(mmean, input$parameters_toshow3[i], "       – mean: ",round(mean(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$VisitDate>input$range[1] & dt_out$VisitDate<input$range[2],input$parameters_toshow3[i]], na.rm=T),2), ", calculated from n= ",nrow(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(dt_out[,input$parameters_toshow3[i]]),])," observations. </br>")
     HTML(paste(Results_basic_stats, mmean))
   })           
   

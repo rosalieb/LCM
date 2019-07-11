@@ -47,3 +47,4 @@ for (i in 1:length(unique(dietfbb$Species))) {
   fbb$Troph[i] <- mean(dietfbb$Troph[dietfbb$Species==unique(dietfbb$Species)[i]],na.rm=T)
   fbb$seTroph[i] <- mean(dietfbb$seTroph[dietfbb$Species==unique(dietfbb$Species)[i]],na.rm=T)
 }
+
