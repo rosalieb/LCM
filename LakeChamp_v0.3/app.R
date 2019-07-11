@@ -156,6 +156,7 @@ ui <- dashboardPage(
         menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
+        menuSubItem("Density map", tabName = "d_dens_map", icon = icon("map-marker")),
         prettyRadioButtons(inputId = "data_toggle",
                            label = "Annual or daily dataset", choices = list("Annual data" = 1, "Daily data" = 2),
                            inline = T),
@@ -282,6 +283,10 @@ ui <- dashboardPage(
                                                                                                                               sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE))),
                              htmlOutput("Stats2.2")))
       ),
+      tabItem(
+        tabName = "d_dens_map",
+        leafletOutput("mymap2", height = 900, width = 660)
+      ),
       
       # div(style="display: inline-block;vertical-align:top; width: 150px;",
       tabItem(
@@ -325,7 +330,7 @@ server <- function(input, output, session) {
   })
   
   output$timeline <- renderTimevis({
-    timevis(timeline_data, options = list(height = "400px", zoomFactor = 0.25))
+    timevis(timeline_data, options = list(height = "400px"))
   })
   
   output$timeline_text <- renderUI({
@@ -374,8 +379,8 @@ server <- function(input, output, session) {
   
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
-      addTiles() %>%  # Add default OpenStreetMap map tiles
-      # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
+      addTiles() %>% # Add default OpenStreetMap map tiles
+      addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
@@ -385,6 +390,18 @@ server <- function(input, output, session) {
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]),
                  popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Trib"], 
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]))
+  })
+  
+  output$mymap2 <- renderLeaflet({
+    leaflet(stations_metadata_subset) %>% 
+      addTiles() %>% addProviderTiles("Esri.WorldPhysical") %>%  # Add default OpenStreetMap map tiles
+      # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
+      addCircles(color = "orange", fillOpacity = 0.15, stroke = TRUE, radius = ~dt_out$Chloride*100,
+                       data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
+                       lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
+                       popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
+                                      "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
+                                      "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters"))
   })
   # <b>Instructions:</b>
   
@@ -457,8 +474,8 @@ server <- function(input, output, session) {
   # Stats
   
  output$Stats1.1  <- renderUI({ 
-    Header1      <- "<h2><u>Correlation</u></h2>"
-    Theory1 <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
+    Header1       <- "<h2><u>Correlation</u></h2>"
+    Theory1       <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
                       </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
                       </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
                       </br>")
@@ -467,7 +484,7 @@ server <- function(input, output, session) {
   })
  
   output$corr_plot <- renderUI({
-    Img1         <- img(src='20190521_corrplot.pdf', width = as.integer(input$size_slider))
+    Img1           <- img(src='20190521_corrplot.pdf', width = as.integer(input$size_slider))
     HTML(paste(Img1))
   })
   
@@ -475,7 +492,7 @@ server <- function(input, output, session) {
   output$n       <- renderText(if(length(input$parameters_toshow2)>1) nrow(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(dt_out[,input$parameters_toshow2[1]]) & !is.na(dt_out[,input$parameters_toshow2[2]]), ]) else "NA")
   
   output$Stats1.2 <- renderUI({
-    Header12     <- "<h3>Try it for yourself!</h3>"
+    Header12      <- "<h3>Try it for yourself!</h3>"
     Instruct_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br></br>")
     HTML(paste(Header12, Instruct_Corr))
   })
@@ -488,19 +505,19 @@ server <- function(input, output, session) {
   })
   
   output$Stats2.1 <- renderUI({
-    Header2      <- paste0("<h2><u>Basic statistics</u></h2>")
-    Theory2      <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
+    Header2       <- paste0("<h2><u>Basic statistics</u></h2>")
+    Theory2       <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
                            </br>The statistics can be done with the annual or daily averages dataset!)
                            </br>")
-    Header22     <- "<h3>Try it for yourself!</h3>"
+    Header22      <- "<h3>Try it for yourself!</h3>"
     Instruct_basic_stats <- paste0("<b>Instructions:</b> select as many parameters and stations as desired from the dropdown menus below. </br></br>")
     HTML(paste(Header2, Theory2, Header22, Instruct_basic_stats))
   })
   
   output$Stats2.2 <- renderUI({
-    mstations    <- paste(as.numeric(input$stations_toshow3),sep="", collapse=", ")
+    mstations     <- paste(as.numeric(input$stations_toshow3),sep="", collapse=", ")
     Results_basic_stats <- paste0("</br>The stats are calculated for stations ", mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
-    mmean        <- NULL
+    mmean         <- NULL
     if(length(input$parameters_toshow3)>0) for (i in 1:length(input$parameters_toshow3)) mmean <- paste(mmean, input$parameters_toshow3[i], "       – mean: ",round(mean(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$VisitDate>input$range[1] & dt_out$VisitDate<input$range[2],input$parameters_toshow3[i]], na.rm=T),2), ", calculated from n= ",nrow(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow2) & dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(dt_out[,input$parameters_toshow3[i]]),])," observations. </br>")
     HTML(paste(Results_basic_stats, mmean))
   })           
