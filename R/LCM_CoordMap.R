@@ -8,6 +8,8 @@ xIcon <- makeIcon(
   iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
   iconWidth = 20, iconHeight = 20)
 
+LCMcoord<- read.csv(paste0(getpath4data(),"LCMcoord.csv"))
+
 # LCMcoord = rbind(LCMcoord,
                 # c("Burlington", as.numeric(-73.212074), as.numeric(44.475883)))
 # str(LCMcoord)
