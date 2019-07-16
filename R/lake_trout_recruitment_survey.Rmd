@@ -486,7 +486,7 @@ pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LC_hist.pdf"),width = 5, heigh
 histogram(bathy2, main='b. Lake Champlain depth histogram', xlab='depth (m)')
 dev.off()
 
-#hist plot for LC
+#hist plot for LO
 pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LO_hist.pdf"),width = 5, height = 4)
 histogram(ontario, main='c. Lake Ontario depth histogram', xlab='depth (m)',xlim=c(-250,0),ylim=c(0,0.5), breaks=300)
 dev.off()
