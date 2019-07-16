@@ -295,7 +295,7 @@ condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,]
 # This is the code for tha bar chart of the difference in weight between stocked and wild lake trout. 
 condition.stock.wild <- LTdiet[LTdiet$Total.Length>150&LTdiet$Total.Length<250,] %>% ggplot(mapping = aes(x = stock.wild, y = Weight*10^5/(Total.Length^3), fill = stock.wild)) +
   geom_boxplot() +
-  labs(y = "Average Weight (g)", fill = "") +
+  labs(y = "Condition factor", fill = "") +
   theme(axis.title.x = element_blank()) 
 
 ggplotly(condition.stock.wild)
