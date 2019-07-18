@@ -205,15 +205,8 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "m_lake",
-        box(
-          title = "Lake Champlain monitoring sites",
-          width = "100%",
-          height = "100%",
-          collapsible = TRUE,
-          htmlOutput("mymap1help"),
-          tags$style(type = "text/css", "#map {height: calc(100vh - 80px) !important;}"),
-          leafletOutput("mymap1", height = 900, width = 660)
-        )
+        htmlOutput("mymap1help"),
+        leafletOutput("mymap1", height = 900, width = 660)
       ),
       tabItem(
         tabName = "parameters_info",
@@ -297,9 +290,11 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_dens_map",
+        htmlOutput("mymap2help"),
         dropdownButton(
           label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
-          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow", "Check any parameters:", colnames(dt_out)))),
+          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow4", "Check any parameters:", colnames(dt_out)))),
+        htmlOutput("mymap2break"),
         leafletOutput("mymap2", height = 900, width = 660)
       ),
       
@@ -390,8 +385,9 @@ server <- function(input, output, session) {
   })
   
   output$mymap1help <- renderUI({ 
+    map1title <- paste0("<h3> Lake Champlain monitoring sites </h3>")
     map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth.<br/><br/>")
-    HTML(paste(map1help))
+    HTML(paste(map1title, map1help))
   })
   
   output$mymap1 <- renderLeaflet({
@@ -409,11 +405,42 @@ server <- function(input, output, session) {
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]))
   })
   
+  output$mymap2help <- renderUI({
+    map2title <- paste0("<h3> Density map of the parameters by station </h3>")
+    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another.</br></br>")
+    HTML(paste(map2title, map2help))
+  })
+  
+  output$mymap2break <- renderUI ({
+    map2breaks <- paste0("</br>")
+    HTML(paste(map2breaks))
+  })
+  
+  avg_by_station <- function(p) {
+    parameter <- p
+    min_yr    <- 1990
+    max_yr    <- 2018
+    mysubset <- total[which(as.numeric(substring(total$VisitDate, 1, 4)) >= min_yr & as.numeric(substring(total$VisitDate, 1, 4))<=max_yr),]
+    
+    n <- length(which(!is.na(mysubset[,parameter])))
+    
+    if(n>1) min_yr    <- min(as.numeric(substring(mysubset$VisitDate, 1, 4)))
+    if(n>1) max_yr    <- max(as.numeric(substring(mysubset$VisitDate, 1, 4)))
+    
+    summ_subset <- with(mysubset, 
+                        tapply(mysubset[,parameter],list("Sites"=as.factor(mysubset$StationID)), mean, na.rm=T))
+    summ_subset <- as.data.frame(summ_subset)
+    summ_subset$StationID <- as.numeric(rownames(summ_subset))
+    summ_subset$prop_subset <- as.numeric(summ_subset$summ_subset / max(summ_subset$summ_subset))
+  }
+  avg_by_station(p = "Conductivity")
+  summ_subset
+  
   output$mymap2 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
-      addTiles() %>% addProviderTiles("Esri.WorldPhysical") %>%  # Add default OpenStreetMap map tiles
+      addTiles() %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-      addCircles(color = "red", fillOpacity = 1, radius = 1000,
+      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4) * 2500,
                        data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
