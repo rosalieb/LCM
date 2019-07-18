@@ -21,9 +21,6 @@ bathy2_raster_aggregate <- aggregate(bathy2, fact=5)
 pal <- colorNumeric(c("#000b70", "#67c7f7", "#159112", "#fced4b", "#f23c24"), values(bathy2_raster_aggregate),
                     na.color = "transparent")
 
-leaflet() %>% addTiles() %>% 
-  addRasterImage(bathy2_raster_aggregate, colors = pal, opacity = 0.8)
-
 raster_LC_leaflet <- projectRasterForLeaflet(bathy2_raster_aggregate, method = "ngb")
 
 writeRaster(raster_LC_leaflet, filename = "LakeChamp_v0.3/data/raster_LC_leaflet", format = "GTiff", overwrite = TRUE)
