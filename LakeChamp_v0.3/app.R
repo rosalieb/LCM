@@ -293,7 +293,7 @@ ui <- dashboardPage(
         htmlOutput("mymap2help"),
         dropdownButton(
           label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
-          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow4", "Check any parameters:", colnames(dt_out)))),
+          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow4", "Check any parameters:", colnames(dt_out), selected = "Total Phosphorus"))),
         htmlOutput("mymap2break"),
         leafletOutput("mymap2", height = 900, width = 660)
       ),
@@ -412,7 +412,7 @@ server <- function(input, output, session) {
   })
   
   output$mymap2break <- renderUI ({
-    map2breaks <- paste0("</br>")
+    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years __ through __.")
     HTML(paste(map2breaks))
   })
   
@@ -433,14 +433,12 @@ server <- function(input, output, session) {
     summ_subset$StationID <- as.numeric(rownames(summ_subset))
     summ_subset$prop_subset <- as.numeric(summ_subset$summ_subset / max(summ_subset$summ_subset))
   }
-  avg_by_station(p = "Conductivity")
-  summ_subset
   
   output$mymap2 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4) * 2500,
+      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4) * 20000,
                        data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
