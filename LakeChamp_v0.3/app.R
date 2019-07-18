@@ -94,10 +94,11 @@ annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 1
 #dt_out <- ifelse(data_toggle_plots == 1, dt_annual, dt_day)
 dt_out <- dt_day
 
+# Timeline data frame
 timeline_data <- data.frame(
   content = c("65 million rainbow smelt stocked in Lake Champlain", "Lake trout populations disappeared", "Lake whitefish fishery closes after annual harvests of 60k fish", "Alewife first appear in LC basin in Green Pond, NY",
               "Summer water clarity in Main Lake increases by over a meter", "August surface temperatures increase by 1.6-3.8 C", "Salmonid stocking program begins", "Comprehensive fish inventory of Lake Champlain conducted", 
-              "Canadian commercial fishery for walleye closes", "Lake Champplain Fish and Wildlife Management Cooperative organized", "Harvest of lake whitefish in Missisquoi Bay decreases from 13,214 kg to 35 kg",
+              "Canadian commercial fishery for walleye closes", "Lake Champlain Fish and Wildlife Management Cooperative organized", "Harvest of lake whitefish in Missisquoi Bay decreases from 13,214 kg to 35 kg",
               "Sustained stocking program begins for reestablishment of lake trout fishery", "Strategic Plan for the Development of Salmonid Fisheries in Lake Champlain implemented", "Reduction in daily creel limit in Vermont",
               "Walleye stocking efforts first initiated", "Beginning of the expermental program to control sea lamprey", "Lake Champlain Basin Program created", "8-year forage fish evaluation", "Zebra mussels first discovered in Lake Champlain",
               "Alewife first appeared in Lake St. Catharine, VT", "Long-term control program for sea lamprey created", "Commercial fishery for american eel repealed", "Use of bait fish in Vermont restricted to 16 native species",
@@ -105,8 +106,18 @@ timeline_data <- data.frame(
               "Alewife become abundant in catches", "Major die-off of YOY alewife in Inland Sea and South Lake in late winter months"),
   start = c("1900", "1900", "1912", "1960", "1964", "1964", "1970", "1971", "1971", "1972", "1972", "1973", "1977", "1978", "1986", "1990", "1990", "1990", "1993", "1997", "2002",
             "2002", "2002", "2002", "2003", "2004", "2005", "2005", "2007", "2008"),
-  end = c(NA, NA, NA, NA, "2019", "2019", NA, "1977", NA, NA, "2004", NA, NA, NA, NA, NA, NA, "1998", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA)
-)
+  end = c(NA, NA, NA, NA, "2019", "2019", NA, "1977", NA, NA, "2004", NA, NA, NA, NA, NA, NA, "1998", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+  group = c("Stocking", "Fish population dynamics", "Regulations", "Fish population dynamics", "Notable changes in chemical and biological parameters", "Notable changes in chemical and biological parameters",
+            "Groups/committees/programs", "Groups/committees/programs", "Regulations", "Groups/committees/programs", "Fish population dynamics", "Groups/committees/programs", "Groups/committees/programs",
+            "Regulations", "Stocking", "Groups/committees/programs", "Groups/committees/programs", "Groups/committees/programs", "Species invasions", "Species invasions", "Groups/committees/programs", "Regulations",
+            "Regulations", "Species invasions", "Fish population dynamics", "Regulations", "Groups/committees/programs", "Groups/committees/programs", "Fish population dynamics", "Fish population dynamics"),
+  groups = data.frame(id = "timeline", content = c("Stocking", "Fish population dynamics", "Regulations", "Species invasions", "Groups/committees/programs", "Notable changes in chemical and biological parameters"))
+) 
+
+
+# Categories for timeline
+# Colors for categories 
+# Density plot??
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -145,9 +156,11 @@ ui <- dashboardPage(
         icon = icon("list-alt")
       ),
       menuItem(
-        "Map", 
+        "Maps", 
         tabName = "m_lake", 
-        icon = icon("map") #icon("globe"),
+        icon = icon("map"), #icon("globe"),
+        menuSubItem("Bathymetry map", tabName = "m_lake", icon = icon("globe")),
+        menuSubItem("Density map", tabName = "d_dens_map", icon = icon("map-marker"))
       ),
       menuItem(
         "Data", 
@@ -156,7 +169,6 @@ ui <- dashboardPage(
         menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
-        menuSubItem("Density map", tabName = "d_dens_map", icon = icon("map-marker")),
         prettyRadioButtons(inputId = "data_toggle",
                            label = "Annual or daily dataset", choices = list("Annual data" = 1, "Daily data" = 2),
                            inline = T),
@@ -285,6 +297,9 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_dens_map",
+        dropdownButton(
+          label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
+          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow", "Check any parameters:", colnames(dt_out)))),
         leafletOutput("mymap2", height = 900, width = 660)
       ),
       
@@ -293,6 +308,7 @@ ui <- dashboardPage(
         tabName = "history",
         #Render an output text
         htmlOutput("timeline_text"),
+        checkboxGroupInput("timeline_checkbox", "Check which groups to display:", sort(unique(timeline_data$group)), selected = c("Fish population dynamics", "Groups/committees/programs"), inline = FALSE),
         timevisOutput("timeline")
       )
     )
@@ -330,12 +346,13 @@ server <- function(input, output, session) {
   })
   
   output$timeline <- renderTimevis({
-    timevis(timeline_data, options = list(height = "400px"))
+    timevis(timeline_data[timeline_data$group %in% input$timeline_checkbox,], options = list(height = "600px")) %>%
+      setWindow("timeline", start = "1970", end = "2019") 
   })
   
   output$timeline_text <- renderUI({
     timeline_title <- paste0("<h3>Important recent events occuring in and around Lake Champlain</h3>")
-    timeline_instructions <- paste0("You can expand the app window, zoom in and out, and drag the timeline to get a better view of important events that involve the health of Lake Champlain. <b>Please note that this timeline, like the rest of the app, is a permanent work-in-progress and may not include all relevant information.</b></br></br>")
+    timeline_instructions <- paste0("You can expand the app window, zoom in and out, and drag the timeline to get a better view of important events that involve the health of Lake Champlain. Important dates as long ago as 1900 and as recent as 2008 are included in the timeline. <b>Please note that this timeline, like the rest of the app, is a permanent work-in-progress and we're gradually adding information.</b></br></br>")
     HTML(paste(timeline_title, timeline_instructions))
   })
   
@@ -373,14 +390,14 @@ server <- function(input, output, session) {
   })
   
   output$mymap1help <- renderUI({ 
-    map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth. Unfortunately, there are no depths for tributary stations.<br/><br/>")
+    map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth.<br/><br/>")
     HTML(paste(map1help))
   })
   
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>% # Add default OpenStreetMap map tiles
-      addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
+      # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
@@ -396,7 +413,7 @@ server <- function(input, output, session) {
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>% addProviderTiles("Esri.WorldPhysical") %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-      addCircles(color = "orange", fillOpacity = 0.15, stroke = TRUE, radius = ~dt_out$Chloride*100,
+      addCircles(color = "red", fillOpacity = 1, radius = 1000,
                        data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
