@@ -235,6 +235,7 @@ phyto_summ <- data.frame("Name"= gsub("Phyto_","",colnames(phyto)[-c(1,2)]),
 ggplotly(ggplot(phyto_summ, aes(x=Frequency_presence, y=Total_count, label=Name)) + geom_point())
 
 #write.table(phyto_summ, "/Volumes/-/Script R/rosaliebruelweb/Blog_articles/Data/DEC_Champlain_phyto_summ.txt", col.names = T, row.names = F)
+
 ```
 
 There are still some species we'd be losing if we chose this solution. Let's first try to match the name that are very similar.  
