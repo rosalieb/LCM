@@ -21,14 +21,15 @@ _Last updated: `r Sys.Date()`_
 # Read data
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 library(ggplot2)
 library(plyr)
 library(dplyr)
 library(gtable) # to get two plots aligned ggplot
 library(grid) # low-level grid functions are required
-
+library(plotly)
 library(reshape2)
+
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -38,7 +39,7 @@ getpath4data <- function() {
 
 ```
 
-```{r load datasets, echo=TRUE, message=FALSE, warning=FALSE}
+```{r load datasets, echo=FALSE, message=FALSE, warning=FALSE}
 plktn_pre2010  <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data pre 2010.txt"))
 plktn_post2010 <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data after 2010.txt"))
 sites_raw      <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data stations.txt"))
@@ -105,7 +106,7 @@ summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0)
 
 # Work on zooplankton
 
-```{r}
+```{r group zoop species}
 # Group the data by at least genus
 names(zoo)
 whatsleft <- 
@@ -194,17 +195,78 @@ points(zoo19$VisitDate[zoo19$GRAZER_sm != 0],zoo19$GRAZER_sm[zoo19$GRAZER_sm != 
 points(zoo19$VisitDate[zoo19$PARASITIC != 0],zoo19$PARASITIC[zoo19$PARASITIC != 0], pch=20, col=adjustcolor("green", alpha.f = .3) )
 
 
-head(plktn)
-head(zoo19)
+#head(plktn)
+#head(zoo19)
 
 zoo19 <- zoo19[rowSums(zoo19[,c("PREDATOR", "GRAZER_sm", "GRAZER_lr", "PARASITIC")])>0,]
 zoo19_month <- aggregate(zoo19[,c("PREDATOR", "GRAZER_sm", "GRAZER_lr", "PARASITIC")], list(format(zoo19$VisitDate, "%Y-%m")), mean)
-print(zoo19_month)
+#print(zoo19_month)
 zoo19_month$Year   <- as.numeric(substr(zoo19_month$Group.1,1,4))
 zoo19_month$Month  <- as.numeric(substr(zoo19_month$Group.1,6,7))
 zoo19_month_Predator <- dcast(zoo19_month, Year ~ Month, value.var = "PREDATOR", fun.aggregate = mean)
 zoo19_month_Grazer_sm <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_sm", fun.aggregate = mean)
 zoo19_month_Grazer_lr <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_lr", fun.aggregate = mean)
 
+```
+
+# Phytoplankton
+Investigate a bit more phytoplankton data. There are `r nrow(phyto)` observations for `r ncol(phyto)-2` groups/species.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+dim(phyto)
+countphyto <- apply(phyto[,-c(1,2)],2,function(x) length(which(x>0)))
+length(countphyto[countphyto>0])
+```
+
+Out of these `r ncol(phyto)-2` groups, there are in fact only `r length(countphyto[countphyto>0])` with at least 1 observation (`r length(countphyto[countphyto>1])` with at least 2 observations, `r length(countphyto[countphyto>2])` with at least 3 observations, `r length(countphyto[countphyto>3])` with at least 4 observations).
+
+
+`r ggplotly(qplot(countphyto, geom="histogram", xlab="Number of observations", ylab="Number of groups with a given number of observation", bins=max(countphyto)-min(countphyto)+1, main="Zoom in to see the details"))`
+
+The groups with the most observations (>100) are: <br>
+`r paste("- ",gsub("Phyto_","",names(countphyto[countphyto>100])), collapse="\n")`
+
+If we decide to match a mass to only these groups, how many cell count would we lose?
+```{r echo=FALSE}
+phyto_summ <- data.frame("Name"= gsub("Phyto_","",colnames(phyto)[-c(1,2)]),
+                        "Frequency_presence" = countphyto,
+                        "Total_count" = colSums(phyto[,-c(1,2)]), row.names = NULL)
+
+ggplotly(ggplot(phyto_summ, aes(x=Frequency_presence, y=Total_count, label=Name)) + geom_point())
+
+#write.table(phyto_summ, "/Volumes/-/Script R/rosaliebruelweb/Blog_articles/Data/DEC_Champlain_phyto_summ.txt", col.names = T, row.names = F)
+
+```
+
+There are still some species we'd be losing if we chose this solution. Let's first try to match the name that are very similar.  
+Trying out fuzzy matching (machine learning technique) with the <a href="https://www.google.com/search?client=safari&rls=en&ei=PWovXdr5IoXm_QaW57xg&q=fuzzy+matching+r&oq=fuzzy+matching+r&gs_l=psy-ab.3..0i203l5j0i22i10i30j0i22i30l4.15089.18111..18474...0.0..0.96.1227.16....2..0....1..gws-wiz.......0i71j35i39j0j35i39i19j0i67j0i20i263.ZVtwrl7UL6Y"> _agrep_ </a> function.
+
+* use of _ignore.case_ to avoid problems with upper/lower case letters <br>
+* use of _max.distance_ input of how many differences we allow - if we put a larger number, could be convenient to match genus? It can be an integrer, a fraction of the pattern length (maybe the best option for us? put something like 0.2?), or a list
+  + argument _all_: maximal (overall) distance. If _all_ is missing, it is set to 10%, the other components default to all. The component names can be abbreviated.<br>
+  + argument _insertions_: maximum number/fraction of insertions <br>
+  + argument _deletions_: maximum number/fraction of deletions <br>
+  + argument _substitutions_: maximum number/fraction of substitutions <br>
+
+
+```{r fuzzy matching phyto name}
+phyto_summ$Name_matched_num <- rep(NA,nrow(phyto_summ))
+phyto_summ$Name_matched <- rep(NA,nrow(phyto_summ))
+phyto_summ$Number_matched <- rep(NA,nrow(phyto_summ))
+
+initial_vec <- seq_along(phyto_summ$Name)
+edit_vec    <- initial_vec
+for(i in initial_vec) {
+  fuzzy_match <- 
+    agrep(phyto_summ$Name[i],phyto_summ$Name,
+          max = 3, ignore.case = TRUE)
+  fuzzy_match <- fuzzy_match[-which(fuzzy_match==i)]
+  if(length(fuzzy_match)>0) {
+    phyto_summ$Name_matched_num[i] <- paste(fuzzy_match,collapse="-")
+    phyto_summ$Name_matched[i] <- paste(phyto_summ$Name[fuzzy_match],collapse=", ")
+    phyto_summ$Number_matched[i] <- length(fuzzy_match)     
+  }
+}
+View(phyto_summ)
 ```
 

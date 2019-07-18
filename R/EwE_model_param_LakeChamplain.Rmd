@@ -1,0 +1,59 @@
+---
+title: "Model parameter EwE Lake Champlain"
+author: "Rosalie Bruel"
+date: "11/07/2019"
+output: 
+  html_document: 
+    df_print: paged
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+  df_print: paged
+fontsize: 11pt
+---
+
+_Last update: `r Sys.Date()`_
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The objective of this document is to gather all in one place the decisions made for the parameters of the model.
+I'm starting this document on July 16th, 2019, having entered some parameters over the past 4 months and realizing I already forgot where I got them from... Hopefully I'll find my notes back, otherwise, having everything in one place might be easier.
+
+# Detritus
+
+We use Pauly et al (1993) equation to calculate the biomass of detritus:  
+$Log10(D) = 0.954 * log10(PP) + 0.863 * log10(E) – 2.41$,
+
+with E= depth of the euphotic zone.
+I'm calculating the depth of the euphotic zone based on the secchi depth.
+
+## Secchi Depth
+
+The secchi depth across all sites and years
+
+```{r echo=FALSE}
+secchi_depth_p <- total %>% ggplot(mapping = aes(x = as.factor(StationID), y = `Secchi Depth`, fill = StationID)) +
+  geom_boxplot() +
+  xlab("Station ID") +
+  ylab("Secchi depth (m)") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle(paste0("Secchi depths across all sites and years"))
+secchi_depth_p
+
+eu_z = 4.9
+```
+We set the euphotic zone for the main lake (StationID= 16 & 19) at `r eu_z` m.
+
+
+
+```{r}
+D = 10^(0.954 * log10(1) + 0.863 * log10(eu_z) - 2.41)
+D
+```
+

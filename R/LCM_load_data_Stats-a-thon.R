@@ -129,26 +129,28 @@ for (i in 1:length(replicates)) {
         if(length(unique(test1$Lab))>1) test2$Lab <- "VT/NY"
         
         test2$Result[1] <- median(test1$Result[1:mcpt], na.rm=T)
-        test2$Result[2] <- median(test1$Result[mcpt:nrow(test1)], na.rm=T)
+        test2$Result[2] <- median(test1$Result[(mcpt+1):nrow(test1)], na.rm=T)
         
         test2$FieldID[1] <- median(test1$FieldID[1:mcpt], na.rm=T)
-        test2$FieldID[1] <- median(test1$FieldID[mcpt:nrow(test1)], na.rm=T)
+        test2$FieldID[1] <- median(test1$FieldID[(mcpt+1):nrow(test1)], na.rm=T)
         
         test2$Test <-  paste(test2$Test,c("E","H"), sep="_")
-        test2 <- dlply(test2, .(StationID, VisitDate, Test))
-        
         test2$Stratum <- c("E_changepoints", "H_changepoints")
+        
+        test2 <- dlply(test2, .(StationID, VisitDate, Test, Stratum))
         
         unique <- c(unique, test2) # Done!
       }
     }
   }
-  if (i==length(replicates)) cat("All done!")
+  if(!"list"%in%class(test2)&&nrow(test2)>1 | "list"%in%class(test2)&&any(sapply(test2,nrow))>1) stop(paste0("problem in the loop to transform row ",i," of 'replicates' dataframe. \n"))
+  if (i==length(replicates)) cat("All done!\n")
 }
 
 length(unique)
 len<-sapply(unique,nrow)
 max(len)
+plot(len)
 # max should be 1 if it worked.
 unique[[1]]
 # do.call() is very slow, but using unlist() I was losing some properties of the table

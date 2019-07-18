@@ -1,0 +1,228 @@
+---
+title: "Model parameter EwE from the literature"
+author: "Rosalie Bruel"
+date: "11/07/2019"
+output: 
+  html_document: 
+    df_print: paged
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+  df_print: paged
+fontsize: 11pt
+---
+
+_Last update: `r Sys.Date()`_
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Presentation of the database
+
+```{r load packages, include=FALSE}
+library(ggplot2)
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("ggspatial")
+library(plyr)
+library(dplyr)
+library(plotly)
+library(gridExtra)
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
+
+#read the data - model parameters.
+mp <- read.delim(paste0(getpath4data(),"model_parameter_literature.txt"))
+# for every model with min and max, calculate avg
+# Assume that the columns are somewhat ordered, meaning that biomass_max is next to biomass_min.
+for(i in grep("_max",colnames(mp))) {
+  whichcol <- grep("_min",colnames(mp))[which.min(abs(grep("_min",colnames(mp))-i))]
+  mp[,gsub("_max", "_avg", colnames(mp)[i])] <- (as.numeric(paste(mp[,i]))+as.numeric(paste(mp[,whichcol])))/2
+}
+  
+
+# Extract the metadata (for each reference, which waterbody and year of the model)
+mp_metadata <- mp[which(!duplicated(mp$Reference)),c( "Waterbody", "Latitude", "Longitude", "Year", "Reference", "Input.output.computed")]
+mp_metadata <- mp_metadata[order(mp_metadata$Waterbody),]
+```
+
+Parameters have been collected by Alex after a review of the literature, from `r nrow(mp_metadata)` papers:  
+`r paste("- ",mp_metadata$Reference[order(mp_metadata$Reference)], collapse="<br>  ")`
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+mp_metadata
+```
+
+```{r map of waterbodies with model parameters, echo=FALSE, message=FALSE, warning=FALSE}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+p <- ggplot() +  
+  geom_sf(data = world)  + 
+  coord_sf(xlim = c(-142,-50), ylim = c(30,60))  +
+  #coord_sf(xlim = c(min(mp_metadata$Longitude)-20, max(mp_metadata$Longitude)+20), ylim = c(min(mp_metadata$Latitude)-10, max(mp_metadata$Latitude)+10))  +
+  theme_set(theme_bw()) +
+    annotation_scale(location = "bl", width_hint = 0.5) +
+    annotation_north_arrow(location = "bl", which_north = "true", 
+        pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+        style = north_arrow_fancy_orienteering) +
+  xlab("Longitude") + ylab("Latitude")
+
+p + geom_point(data = mp_metadata, aes(x=Longitude, y=Latitude)) + 
+  geom_text(data = mp_metadata, aes(x=Longitude, y=Latitude, label=Waterbody), vjust = c(rep(2,4),rep(-1.5,6)), size = 2)
+
+```
+
+
+Parameters are available for `r length(unique(mp$Species))` species (with some represented by different year class):  
+`r paste("- ",unique(mp$Species)[order(unique(mp$Species))], collapse="<br>  ")`
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+msp <- c("Sea lamprey","Lake trout","Atlantic Salmon","Burbot","Cisco","Whitefish","Trout perch","Alewife","Rainbow smelt", "Slimy sculpin", "Mysis", "Bythotrephes","Zooplankton", "Phytoplankton", "Benthic invertebrates", "Detritus")
+
+```
+
+Species of interest for our Lake Champlain model are:  
+`r paste("- ",msp[order(msp)], collapse="<br>  ")`  
+__No parameter yet from the literature for `r length(msp[!msp %in% mp$Species])` groups: `r paste(msp[!msp %in% mp$Species], collapse=", ")`.__
+
+# About the parameters
+
+## Ecotrophic Efficiency (EE)
+In most Ecopath applications, the value of EE is assumed to be about 0.9. Kitchell et al (2000), who estimated EE from other parameters, found highly variable values of EE. They write that "some of that variability is due to uncertainty; some is probably due to error". EE is available for `r length(which(!is.na(mp$EE_avg)))` out of `r nrow(mp)` group we collected data for.
+<br>
+Contrary to what Kitchell et al were writting in 2000, it seems that 0.9 is rarely used. The table below shows the average value (and standard deviation) of EE used in each model, and the density plot shows the actual distribution.
+
+```{r distribution of EE values, echo=FALSE, message=FALSE, warning=FALSE,fig.height=5}
+# mean 
+mu <- ddply(mp, "Reference",summarise, Waterbody=Waterbody[1], Year.modeled=Year[1], mean.EE=mean(EE_avg, na.rm=T),sd.EE=sd(EE_avg, na.rm=T), number.group.in.model=length(EE_avg))
+mu[order(mu$Waterbody),]
+# Density plot
+p <- ggplot(mp, aes(x=EE_avg, fill=Reference)) +
+  geom_density()+
+  geom_vline(data=mu, aes(xintercept=mean.EE, color=Reference),
+             linetype="dashed") +
+  geom_density(alpha=0.2) +
+  xlab("Ecotrophic Efficiency") + 
+  labs(fill='Ref paper')
+ ggplotly(p)
+```
+
+Only Rogers et al (2014), have an EE around 0.9, with a small standard deviation. Every other models made the choice of having larger variability in EE.
+
+## Biomass
+
+Biomass decreases at higher trophic level (pyramid). See example for the `r length(unique(mp[!is.na(mp$Trophic.Level),"Reference"]))` papers including trophic level in their input data.
+
+```{r explore biomass, echo=FALSE, message=FALSE, warning=FALSE}
+b1 <- ggplot(mp[!is.na(mp$Trophic.Level),], aes(x = round(Trophic.Level), y = Biomass_avg_converted..t.km2., fill=Reference)) + 
+  #geom_bar(subset = .(Gender == "Female"), stat = "identity") + 
+  #geom_bar(subset = .(Gender == "Male"), stat = "identity") + 
+  geom_bar(position="dodge",stat="identity") + 
+  # scale_y_continuous(breaks = seq(-15000000, 15000000, 5000000), 
+  #                    labels = paste0(as.character(c(seq(15, 0, -5), seq(5, 15, 5))), "m")) + 
+  coord_flip() + 
+  # scale_fill_brewer(palette = "Set1") + 
+  theme_bw() +
+  ggtitle("Average biomass t.km-2 per trophic level (x and y limits differ)") + 
+  ylab("Average biomass t.km-2")  + xlab("round(Trophic level)") +
+  facet_wrap(~Reference, scales = "free")
+
+b1
+```
+
+
+## P/B (production/biomass, estimates of biomass turnover rates)
+
+## Q/B (consumption/biomass)
+
+total annual consumption/biomass
+
+
+# Explore data per species for Lake Champlain model
+
+Let's only look at the parameters for the species of interest. We create a subset of the table.
+
+```{r}
+mp2 <- mp[which(mp$Species %in% msp),]
+```
+
+This subset has `r nrow(mp2)` rows (vs. `r nrow(mp)` for the full dataset).
+Again, so far, we found parameters for all the species we want to include in the model have parameters but for `r paste(msp[!msp %in% mp$Species], collapse=", ")`.
+
+The following sections are generated using the same code.
+
+```{r function to repeat for sp analysis, include=FALSE}
+# Function that will be used for plot per species
+view_param <- function(namesp) {
+  indivspecies <- mp2[which(mp2$Species == namesp),]
+    if(length(indivspecies$Age_min[is.na(indivspecies$Age_min)])==nrow(indivspecies)) pl1=F else pl1 = T
+    if(length(indivspecies$Length_min[is.na(indivspecies$Length_min)])==nrow(indivspecies)) pl2=F else pl2 = T
+  # If both Age_min and Length_min missing, then turn pl1 to T to have at least one plot
+    if(pl2==F) pl1=T
+
+    # Determine the a, b, c, d
+  if( pl1 & !pl2)  lett <- c("a.","b.", NA , NA )
+  if(!pl1 &  pl2)  lett <- c( NA , NA ,"a.","b.")
+  if( pl1 &  pl2)  lett <- c("a.","b.","c.","d.")
+        
+  indivspecies$Age_min[is.na(indivspecies$Age_min)] <- -3# set to -3 when NA
+  indivspecies$Length_mi[is.na(indivspecies$Length_mi)] <- -100# set to -3 when NA
+  
+  if(pl1) {
+    p1 <- ggplot(indivspecies, aes(Age_min, P.B_avg,col= Reference)) +
+    geom_point(shape = 16, size = 2, alpha = .702) + ggtitle(paste(lett[1],namesp,"P/B, n=", length(indivspecies$P.B_avg[!is.na(indivspecies$P.B_avg)]))) + 
+  xlab("Age min reported for the group") + ylab("P/B") +
+  theme(legend.position="none")
+  
+  p2 <- ggplot(indivspecies, aes(Age_min, Q.B_avg,col= Reference)) + 
+    geom_point(shape = 16, size = 2, alpha = .702) + ggtitle(paste(lett[2],namesp,"Q/B, n=", length(indivspecies$Q.B_avg[!is.na(indivspecies$Q.B_avg)]))) + 
+    xlab("Age min reported for the group") + ylab("Q/B") + 
+    theme(legend.text=element_text(size=rel(0.8))) #theme(legend.justification = c(1, 1), legend.position = c(1, 1))
+  }
+  
+    if(pl2) {
+      p3 <- ggplot(indivspecies, aes(Length_min, P.B_avg,col= Reference)) +
+    geom_point(shape = 16, size = 2, alpha = .702) + ggtitle(paste(lett[3],namesp,"P/B, n=", length(indivspecies$P.B_avg[!is.na(indivspecies$P.B_avg)]))) + 
+  xlab("Length min reported for the group") + ylab("P/B") +
+  theme(legend.position="none")
+  
+    p4 <- ggplot(indivspecies, aes(Length_min, Q.B_avg,col= Reference)) + 
+    geom_point(shape = 16, size = 2, alpha = .702) + ggtitle(paste(lett[4],namesp,"Q/B, n=", length(indivspecies$Q.B_avg[!is.na(indivspecies$Q.B_avg)]))) + 
+    xlab("Length min reported for the group") + ylab("Q/B") + 
+    theme(legend.text=element_text(size=rel(0.8))) #theme(legend.justification = c(1, 1), legend.position = c(1, 1))
+    }
+
+if( pl1 & !pl2)  grid.arrange(p1, p2, ncol=2, widths=c(2.5,4), heights=c(4,4))
+if(!pl1 &  pl2)  grid.arrange(p3, p4, ncol=2, widths=c(2.5,4), heights=c(4,4))
+if( pl1 &  pl2)  grid.arrange(p1, p2, p3, p4, ncol=2, widths=c(2.5,4), heights=c(4,4))
+}
+```
+
+
+Note that age is set to "-3" when NA. If age is not given authors have created only one stanza.
+
+Plotting average parameters against Age_min. For Lake trout, the cut between juveniles and adults is often done after 5/6 years. 
+
+```{r message=FALSE, warning=FALSE, results='asis', fig.height=4}
+msp2 <- msp[msp %in% mp$Species]
+for (i in seq_along(msp2)){
+   cat('\n')  
+   cat("##", msp2[i], "\n") 
+   view_param(namesp=msp2[i])
+   cat('\n') 
+}
+```
+
+
+
+
+
