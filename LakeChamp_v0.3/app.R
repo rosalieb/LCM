@@ -76,12 +76,12 @@ parameters_info <- read.csv(paste0(getpath4data(),"LCM Parameter Descriptions.cs
 tweaks <- 
   list(tags$head(tags$style(HTML("
                                  .multicol { 
-                                   height: 150px;
-                                   -webkit-column-count: 5; /* Chrome, Safari, Opera */ 
-                                   -moz-column-count: 5;    /* Firefox */ 
-                                   column-count: 5; 
-                                   -moz-column-fill: auto;
-                                   -column-fill: auto;
+                                 height: 150px;
+                                 -webkit-column-count: 5; /* Chrome, Safari, Opera */ 
+                                 -moz-column-count: 5;    /* Firefox */ 
+                                 column-count: 5; 
+                                 -moz-column-fill: auto;
+                                 -column-fill: auto;
                                  } 
                                  ")) 
   ))
@@ -94,10 +94,11 @@ annual_or_daily <- div(style="display: inline-block;vertical-align:top; width: 1
 #dt_out <- ifelse(data_toggle_plots == 1, dt_annual, dt_day)
 dt_out <- dt_day
 
+# Timeline data frame
 timeline_data <- data.frame(
   content = c("65 million rainbow smelt stocked in Lake Champlain", "Lake trout populations disappeared", "Lake whitefish fishery closes after annual harvests of 60k fish", "Alewife first appear in LC basin in Green Pond, NY",
               "Summer water clarity in Main Lake increases by over a meter", "August surface temperatures increase by 1.6-3.8 C", "Salmonid stocking program begins", "Comprehensive fish inventory of Lake Champlain conducted", 
-              "Canadian commercial fishery for walleye closes", "Lake Champplain Fish and Wildlife Management Cooperative organized", "Harvest of lake whitefish in Missisquoi Bay decreases from 13,214 kg to 35 kg",
+              "Canadian commercial fishery for walleye closes", "Lake Champlain Fish and Wildlife Management Cooperative organized", "Harvest of lake whitefish in Missisquoi Bay decreases from 13,214 kg to 35 kg",
               "Sustained stocking program begins for reestablishment of lake trout fishery", "Strategic Plan for the Development of Salmonid Fisheries in Lake Champlain implemented", "Reduction in daily creel limit in Vermont",
               "Walleye stocking efforts first initiated", "Beginning of the expermental program to control sea lamprey", "Lake Champlain Basin Program created", "8-year forage fish evaluation", "Zebra mussels first discovered in Lake Champlain",
               "Alewife first appeared in Lake St. Catharine, VT", "Long-term control program for sea lamprey created", "Commercial fishery for american eel repealed", "Use of bait fish in Vermont restricted to 16 native species",
@@ -105,8 +106,18 @@ timeline_data <- data.frame(
               "Alewife become abundant in catches", "Major die-off of YOY alewife in Inland Sea and South Lake in late winter months"),
   start = c("1900", "1900", "1912", "1960", "1964", "1964", "1970", "1971", "1971", "1972", "1972", "1973", "1977", "1978", "1986", "1990", "1990", "1990", "1993", "1997", "2002",
             "2002", "2002", "2002", "2003", "2004", "2005", "2005", "2007", "2008"),
-  end = c(NA, NA, NA, NA, "2019", "2019", NA, "1977", NA, NA, "2004", NA, NA, NA, NA, NA, NA, "1998", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA)
-)
+  end = c(NA, NA, NA, NA, "2019", "2019", NA, "1977", NA, NA, "2004", NA, NA, NA, NA, NA, NA, "1998", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+  group = c("Stocking", "Fish population dynamics", "Regulations", "Fish population dynamics", "Notable changes in chemical and biological parameters", "Notable changes in chemical and biological parameters",
+            "Groups/committees/programs", "Groups/committees/programs", "Regulations", "Groups/committees/programs", "Fish population dynamics", "Groups/committees/programs", "Groups/committees/programs",
+            "Regulations", "Stocking", "Groups/committees/programs", "Groups/committees/programs", "Groups/committees/programs", "Species invasions", "Species invasions", "Groups/committees/programs", "Regulations",
+            "Regulations", "Species invasions", "Fish population dynamics", "Regulations", "Groups/committees/programs", "Groups/committees/programs", "Fish population dynamics", "Fish population dynamics"),
+  groups = data.frame(id = "timeline", content = c("Stocking", "Fish population dynamics", "Regulations", "Species invasions", "Groups/committees/programs", "Notable changes in chemical and biological parameters"))
+) 
+
+
+# Categories for timeline
+# Colors for categories 
+# Density plot??
 
 # Define UI for slider demo app ----
 ui <- dashboardPage(
@@ -145,9 +156,11 @@ ui <- dashboardPage(
         icon = icon("list-alt")
       ),
       menuItem(
-        "Map", 
+        "Maps", 
         tabName = "m_lake", 
-        icon = icon("map") #icon("globe"),
+        icon = icon("map"), #icon("globe"),
+        menuSubItem("Bathymetry map", tabName = "m_lake", icon = icon("globe")),
+        menuSubItem("Density map", tabName = "d_dens_map", icon = icon("map-marker"))
       ),
       menuItem(
         "Data", 
@@ -156,7 +169,6 @@ ui <- dashboardPage(
         menuSubItem("Charts", tabName = "d_chart", icon = icon("line-chart")),
         menuSubItem("Table", tabName = "d_table", icon = icon("table")),
         menuSubItem("Stats", tabName = "d_stats", icon = icon("percent")),
-        menuSubItem("Density map", tabName = "d_dens_map", icon = icon("map-marker")),
         prettyRadioButtons(inputId = "data_toggle",
                            label = "Annual or daily dataset", choices = list("Annual data" = 1, "Daily data" = 2),
                            inline = T),
@@ -193,15 +205,8 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "m_lake",
-        box(
-          title = "Lake Champlain monitoring sites",
-          width = "100%",
-          height = "100%",
-          collapsible = TRUE,
-          htmlOutput("mymap1help"),
-          tags$style(type = "text/css", "#map {height: calc(100vh - 80px) !important;}"),
-          leafletOutput("mymap1", height = 900, width = 660)
-        )
+        htmlOutput("mymap1help"),
+        leafletOutput("mymap1", height = 900, width = 660)
       ),
       tabItem(
         tabName = "parameters_info",
@@ -271,7 +276,7 @@ ui <- dashboardPage(
         tabsetPanel(type = "tabs", tabPanel("Correlation", htmlOutput("Stats1.1"), htmlOutput("Stats1.2"),
                                             div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
                                               label = "Parameters to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("parameters_toshow2", "Check any boxes:",
-                                                                                                                                                       colnames(dt_out)))),
+                                                                                                                                               colnames(dt_out)))),
                                             htmlOutput("Stats1.3"),
                                             sidebarPanel(sliderInput("size_slider", label = "Image size", min = 200, max = 700, value = 200)), uiOutput("corr_plot")),
                     tabPanel("Basic stats", htmlOutput("Stats2.1"), 
@@ -285,6 +290,11 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "d_dens_map",
+        htmlOutput("mymap2help"),
+        dropdownButton(
+          label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
+          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow4", "Check any parameters:", colnames(dt_out), selected = "Total Phosphorus"))),
+        htmlOutput("mymap2break"),
         leafletOutput("mymap2", height = 900, width = 660)
       ),
       
@@ -293,6 +303,7 @@ ui <- dashboardPage(
         tabName = "history",
         #Render an output text
         htmlOutput("timeline_text"),
+        checkboxGroupInput("timeline_checkbox", "Check which groups to display:", sort(unique(timeline_data$group)), selected = c("Fish population dynamics", "Groups/committees/programs"), inline = FALSE),
         timevisOutput("timeline")
       )
     )
@@ -307,14 +318,14 @@ server <- function(input, output, session) {
   #               choices = c("Annual data" = 1, "Daily data" = 2),selected = 1
   #   )
   # })
-
+  
   # output$selected_dt_out <- reactive({
   #   selected_dt_out <- load_data()
   #   selected_dt_out <- dt_all[dt_all$type==input$data_toggle_plots,]
   #   selected_dt_out <- selected_dt_out[,-which(colnames(selected_dt_out)=="type")]
   #   selected_dt_out
   # })
-
+  
   #dt_out <- input$selected_dt_out()
   
   # plot
@@ -330,12 +341,13 @@ server <- function(input, output, session) {
   })
   
   output$timeline <- renderTimevis({
-    timevis(timeline_data, options = list(height = "400px"))
+    timevis(timeline_data[timeline_data$group %in% input$timeline_checkbox,], options = list(height = "600px")) %>%
+      setWindow("timeline", start = "1970", end = "2019") 
   })
   
   output$timeline_text <- renderUI({
     timeline_title <- paste0("<h3>Important recent events occuring in and around Lake Champlain</h3>")
-    timeline_instructions <- paste0("You can expand the app window, zoom in and out, and drag the timeline to get a better view of important events that involve the health of Lake Champlain. <b>Please note that this timeline, like the rest of the app, is a permanent work-in-progress and may not include all relevant information.</b></br></br>")
+    timeline_instructions <- paste0("You can expand the app window, zoom in and out, and drag the timeline to get a better view of important events that involve the health of Lake Champlain. Important dates as long ago as 1900 and as recent as 2008 are included in the timeline. <b>Please note that this timeline, like the rest of the app, is a permanent work-in-progress and we're gradually adding information.</b></br></br>")
     HTML(paste(timeline_title, timeline_instructions))
   })
   
@@ -373,14 +385,15 @@ server <- function(input, output, session) {
   })
   
   output$mymap1help <- renderUI({ 
-    map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth. Unfortunately, there are no depths for tributary stations.<br/><br/>")
-    HTML(paste(map1help))
+    map1title <- paste0("<h3> Lake Champlain monitoring sites </h3>")
+    map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth.<br/><br/>")
+    HTML(paste(map1title, map1help))
   })
   
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>% # Add default OpenStreetMap map tiles
-      addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
+      # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
       addCircleMarkers(color = "black", opacity = 1, weight = 4, fillOpacity = 0, radius = 5, data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
@@ -392,17 +405,45 @@ server <- function(input, output, session) {
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]))
   })
   
-
+  output$mymap2help <- renderUI({
+    map2title <- paste0("<h3> Density map of the parameters by station </h3>")
+    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another.</br></br>")
+    HTML(paste(map2title, map2help))
+  })
+  
+  output$mymap2break <- renderUI ({
+    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years __ through __.")
+    HTML(paste(map2breaks))
+  })
+  
+  avg_by_station <- function(p) {
+    parameter <- p
+    min_yr    <- 1990
+    max_yr    <- 2018
+    mysubset <- total[which(as.numeric(substring(total$VisitDate, 1, 4)) >= min_yr & as.numeric(substring(total$VisitDate, 1, 4))<=max_yr),]
+    
+    n <- length(which(!is.na(mysubset[,parameter])))
+    
+    if(n>1) min_yr    <- min(as.numeric(substring(mysubset$VisitDate, 1, 4)))
+    if(n>1) max_yr    <- max(as.numeric(substring(mysubset$VisitDate, 1, 4)))
+    
+    summ_subset <- with(mysubset, 
+                        tapply(mysubset[,parameter],list("Sites"=as.factor(mysubset$StationID)), mean, na.rm=T))
+    summ_subset <- as.data.frame(summ_subset)
+    summ_subset$StationID <- as.numeric(rownames(summ_subset))
+    summ_subset$prop_subset <- as.numeric(summ_subset$summ_subset / max(summ_subset$summ_subset))
+  }
+  
   output$mymap2 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
-      addTiles() %>% addProviderTiles("Esri.WorldPhysical") %>%  # Add default OpenStreetMap map tiles
+      addTiles() %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-
-                       data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
-                       lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
-                       popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
-                                      "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
-                                      "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters"))
+      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4) * 20000,
+                 data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
+                 lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
+                 popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
+                                "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
+                                "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters"))
   })
   # <b>Instructions:</b>
   
@@ -413,12 +454,12 @@ server <- function(input, output, session) {
     } else {
       gl <- lapply(input$parameters_toshow, 
                    function(b) ggplot(      dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),], 
-                                      aes(x=as.Date(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),1]),
-                                          y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow), b])) +
+                                            aes(x=as.Date(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),1]),
+                                                y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow), b])) +
                      geom_point() +
                      xlab("Year") + ylab(b) +
-                   scale_x_date(limits=as.Date(c(paste0(as.numeric(paste(input$range[1])),"-01-01"),
-                                                 paste0(as.numeric(paste(input$range[2])),"-01-01"))))
+                     scale_x_date(limits=as.Date(c(paste0(as.numeric(paste(input$range[1])),"-01-01"),
+                                                   paste0(as.numeric(paste(input$range[2])),"-01-01"))))
                    #ggcolors(~input$mysites)
       )
       ifelse(length(gl) == 1, gl, grid.arrange(grobs = gl, nrow = round(length(gl)/2)))
@@ -433,8 +474,8 @@ server <- function(input, output, session) {
     } else {
       gl <- lapply(input$parameters_toshow, 
                    function(b) ggplot(      dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),], 
-                                      aes(x=as.Date(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),1]),
-                                          y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),b])) +
+                                            aes(x=as.Date(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),1]),
+                                                y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),b])) +
                      geom_point() + 
                      stat_smooth(method=loess, formula=y~x) +
                      xlab("Year") + ylab(b) +
@@ -474,16 +515,16 @@ server <- function(input, output, session) {
   
   # Stats
   
- output$Stats1.1  <- renderUI({ 
+  output$Stats1.1  <- renderUI({ 
     Header1       <- "<h2><u>Correlation</u></h2>"
     Theory1       <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
-                      </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
-                      </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
-                      </br>")
+                            </br>This tool allows you to calculate the correlation between two parameters. Correlation doesn't mean causation, but a strong correlation can hint to important processes. </br>
+                            </br>For example, the correlation between Dissolved Oxygen (DO) and Temperature (T) is strongly negative. When the water in the epilimnion is warm, the dissolved oxygen concentration is lower.</br>
+                            </br>")
     
     HTML(paste(Header1, Theory1))
   })
- 
+  
   output$corr_plot <- renderUI({
     Img1           <- img(src='20190521_corrplot.pdf', width = as.integer(input$size_slider))
     HTML(paste(Img1))
@@ -500,7 +541,7 @@ server <- function(input, output, session) {
   
   output$Stats1.3 <- renderUI({
     Results_Corr  <- paste0("</br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is:", verbatimTextOutput("mcor"),"calculated from </br>",verbatimTextOutput("n")," observations. </br></br>This is calculated across ALL sites, for the <b>", input$range[1],"-",input$range[2],"</b> period.
-                           If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br></br>")
+                            If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br></br>")
     Corr_plot_instruct <- paste0("Below is a correlation plot of all of the parameters plotted against one another. Use the slider to expand or shrink the image.</br></br>")
     HTML(paste(Results_Corr, Corr_plot_instruct))
   })
@@ -508,8 +549,8 @@ server <- function(input, output, session) {
   output$Stats2.1 <- renderUI({
     Header2       <- paste0("<h2><u>Basic statistics</u></h2>")
     Theory2       <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
-                           </br>The statistics can be done with the annual or daily averages dataset!)
-                           </br>")
+                            </br>The statistics can be done with the annual or daily averages dataset!)
+                            </br>")
     Header22      <- "<h3>Try it for yourself!</h3>"
     Instruct_basic_stats <- paste0("<b>Instructions:</b> select as many parameters and stations as desired from the dropdown menus below. </br></br>")
     HTML(paste(Header2, Theory2, Header22, Instruct_basic_stats))
