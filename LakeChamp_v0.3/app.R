@@ -392,11 +392,12 @@ server <- function(input, output, session) {
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]))
   })
   
+
   output$mymap2 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>% addProviderTiles("Esri.WorldPhysical") %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-      addCircles(color = "orange", fillOpacity = 0.15, stroke = TRUE, radius = ~dt_out$Chloride*100,
+
                        data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                        popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
