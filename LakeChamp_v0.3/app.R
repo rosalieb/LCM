@@ -159,7 +159,7 @@ ui <- dashboardPage(
         "Maps", 
         tabName = "m_lake", 
         icon = icon("map"), #icon("globe"),
-        menuSubItem("Bathymetry map", tabName = "m_lake", icon = icon("globe")),
+        menuSubItem("General map", tabName = "m_lake", icon = icon("globe")),
         menuSubItem("Density map", tabName = "d_dens_map", icon = icon("map-marker"))
       ),
       menuItem(
@@ -291,14 +291,16 @@ ui <- dashboardPage(
       tabItem(
         tabName = "d_dens_map",
         htmlOutput("mymap2help"),
-        dropdownButton(
+        div(style="display: inline-block;vertical-align:top; width: 200px;", dropdownButton(
           label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
-          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow4", "Check any parameters:", colnames(dt_out), selected = "Total Phosphorus"))),
+          div(style='max-height: 40vh; overflow-y: auto;', radioButtons("parameters_toshow4", "Check any parameters:", colnames(dt_out[,3:37]), selected = "Total Phosphorus")))),
+        div(style="display: inline-block;vertical-align:top; width: 400px;", sliderInput("range_map", "Years selected",
+                    min = min(dt_out$year,na.rm=FALSE), max = max(dt_out$year,na.rm=FALSE),
+                    value = c(2000,2012),sep = "")), 
         htmlOutput("mymap2break"),
         leafletOutput("mymap2", height = 900, width = 660)
       ),
       
-      # div(style="display: inline-block;vertical-align:top; width: 150px;",
       tabItem(
         tabName = "history",
         #Render an output text
@@ -412,14 +414,14 @@ server <- function(input, output, session) {
   })
   
   output$mymap2break <- renderUI ({
-    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years __ through __.")
+    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>.")
     HTML(paste(map2breaks))
   })
   
-  avg_by_station <- function(p) {
+  avg_by_station <- function(p, yr_input1, yr_input2) {
     parameter <- p
-    min_yr    <- 1990
-    max_yr    <- 2018
+    min_yr    <- yr_input1
+    max_yr    <- yr_input2
     mysubset <- total[which(as.numeric(substring(total$VisitDate, 1, 4)) >= min_yr & as.numeric(substring(total$VisitDate, 1, 4))<=max_yr),]
     
     n <- length(which(!is.na(mysubset[,parameter])))
@@ -438,7 +440,7 @@ server <- function(input, output, session) {
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4) * 20000,
+      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]) * 2500,
                  data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
