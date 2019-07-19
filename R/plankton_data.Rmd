@@ -29,7 +29,7 @@ library(gtable) # to get two plots aligned ggplot
 library(grid) # low-level grid functions are required
 library(plotly)
 library(reshape2)
-
+library(lubridate)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -47,7 +47,7 @@ sites          <- sites_raw[sites_raw$LocationID %in% as.factor(plktn_pre2010$Lo
 
 plktn <- rbind(plktn_pre2010,plktn_post2010)
 
-plktn$VisitDate <- as.Date(plktn$PlanktonData.VisitDate, format="%d-%b-%y")
+plktn$VisitDate <- parse_date_time(x = plktn$PlanktonData.VisitDate, orders = c("d-b-y","d/m/Y"))
 head(plktn)
 
 names(plktn)
@@ -210,6 +210,8 @@ zoo19_month_Grazer_lr <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_lr
 ```
 
 # Phytoplankton
+
+## Look at the data -- problems
 Investigate a bit more phytoplankton data. There are `r nrow(phyto)` observations for `r ncol(phyto)-2` groups/species.
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
@@ -235,38 +237,246 @@ phyto_summ <- data.frame("Name"= gsub("Phyto_","",colnames(phyto)[-c(1,2)]),
 ggplotly(ggplot(phyto_summ, aes(x=Frequency_presence, y=Total_count, label=Name)) + geom_point())
 
 #write.table(phyto_summ, "/Volumes/-/Script R/rosaliebruelweb/Blog_articles/Data/DEC_Champlain_phyto_summ.txt", col.names = T, row.names = F)
+#write.table(plktn[,c(1:3,5,6)], "/Volumes/-/Script R/rosaliebruelweb/Blog_articles/Data/DEC_Champlain_sampling_dates.txt", col.names = T, row.names = F)
 
 ```
 
 There are still some species we'd be losing if we chose this solution. Let's first try to match the name that are very similar.  
-Trying out fuzzy matching (machine learning technique) with the <a href="https://www.google.com/search?client=safari&rls=en&ei=PWovXdr5IoXm_QaW57xg&q=fuzzy+matching+r&oq=fuzzy+matching+r&gs_l=psy-ab.3..0i203l5j0i22i10i30j0i22i30l4.15089.18111..18474...0.0..0.96.1227.16....2..0....1..gws-wiz.......0i71j35i39j0j35i39i19j0i67j0i20i263.ZVtwrl7UL6Y"> _agrep_ </a> function.
 
+## Solution -- fuzzy matching?
+__Fuzzy matching__ is a method to search approximate matches in a string to a pattern.
+
+I used the <a href="https://www.google.com/search?client=safari&rls=en&ei=PWovXdr5IoXm_QaW57xg&q=fuzzy+matching+r&oq=fuzzy+matching+r&gs_l=psy-ab.3..0i203l5j0i22i10i30j0i22i30l4.15089.18111..18474...0.0..0.96.1227.16....2..0....1..gws-wiz.......0i71j35i39j0j35i39i19j0i67j0i20i263.ZVtwrl7UL6Y"> _agrep_ </a> function.  
+
+> agrep(pattern, x, ignore.case = FALSE, value = FALSE,max.distance = 0.1)
+
+
+* _pattern_ would be the specie name <br>
+* _x_ is the character string in which the function will try to find names that resemble the pattern <br>
 * use of _ignore.case_ to avoid problems with upper/lower case letters <br>
-* use of _max.distance_ input of how many differences we allow - if we put a larger number, could be convenient to match genus? It can be an integrer, a fraction of the pattern length (maybe the best option for us? put something like 0.2?), or a list
-  + argument _all_: maximal (overall) distance. If _all_ is missing, it is set to 10%, the other components default to all. The component names can be abbreviated.<br>
-  + argument _insertions_: maximum number/fraction of insertions <br>
-  + argument _deletions_: maximum number/fraction of deletions <br>
-  + argument _substitutions_: maximum number/fraction of substitutions <br>
+* use of _max.distance_ input of how many differences we allow - if we put a larger number, could be convenient to match genus? It can be an integrer, a fraction of the pattern length (maybe an interesting option to explore if names are more complicated than the one I'm dealing with), or a list
+    + argument _all_: maximal (overall) distance. If _all_ is missing, it is set to 10%, the other components default to all. The component names can be abbreviated.<br>
+    + argument _costs_: maximum number/fraction of match cost (generalized <a href="https://en.wikipedia.org/wiki/Levenshtein_distance">Levenshtein distance</a>) <br>
+    + argument _insertions_: maximum number/fraction of insertions <br>
+    + argument _deletions_: maximum number/fraction of deletions <br>
+    + argument _substitutions_: maximum number/fraction of substitutions <br>
 
 
-```{r fuzzy matching phyto name}
-phyto_summ$Name_matched_num <- rep(NA,nrow(phyto_summ))
+### Searching for good function parameters
+
+```{r fuzzy matching phyto name, echo=TRUE, message=FALSE, warning=FALSE}
+# Saving which rows have been matched
+phyto_summ$Row_matched <- rep(NA,nrow(phyto_summ))
+# Saving the name that have been matched
 phyto_summ$Name_matched <- rep(NA,nrow(phyto_summ))
+# Saving the number of matches
 phyto_summ$Number_matched <- rep(NA,nrow(phyto_summ))
 
-initial_vec <- seq_along(phyto_summ$Name)
-edit_vec    <- initial_vec
-for(i in initial_vec) {
+unique_name  <-  seq_along(phyto_summ$Name)
+for(i in seq_along(phyto_summ$Name)) {
   fuzzy_match <- 
     agrep(phyto_summ$Name[i],phyto_summ$Name,
           max = 3, ignore.case = TRUE)
   fuzzy_match <- fuzzy_match[-which(fuzzy_match==i)]
+  unique_name <- unique_name[!unique_name %in% fuzzy_match[fuzzy_match>i]]
   if(length(fuzzy_match)>0) {
-    phyto_summ$Name_matched_num[i] <- paste(fuzzy_match,collapse="-")
+    phyto_summ$Row_matched[i] <- paste(fuzzy_match,collapse="-")
     phyto_summ$Name_matched[i] <- paste(phyto_summ$Name[fuzzy_match],collapse=", ")
     phyto_summ$Number_matched[i] <- length(fuzzy_match)     
   }
 }
-View(phyto_summ)
+
 ```
+
+Fuzzy matching correctly identified these 4 items countaining the pattern "ougeoti" as possible same elements. So this fuzzy matching is working the same way than the grep function, without me having to specifically ask for the patterns.
+
+`r phyto_summ[grep("ougeoti", phyto_summ$Name),]`
+
+Below are the rows with a lot of matches, and it looks more problematic.
+
+`r phyto_summ[!is.na(phyto_summ$Number_matched)&phyto_summ$Number_matched>5,]`
+phyto_summ[159,]
+ 
+The value we chose for the argument _max_ determines how many differences are allowed. Trying to make the other arguments ( _insertions_, _deletions_, _substitutions_) vary from 1 to 15, I found that the maximum number of match was 272, and that, as soon as all parameters are turned to 2. That makes me wonder whether I'm totally using this correctly, I will update this in the future if I realize / if I'm told I've used the function the wrong way.
+
+The following plot shows the number of match using several values of insertions, deletions, and substitutions: <br>
+  1.  Deletion, insertion and coests vary together
+  2.  Substitution of just 1 character results in not matching 5 names that are otherwise matched for 'substitution ≥ 2'.
+
+
+```{r sensitivity analyses for fuzzy matching, echo=FALSE, message=FALSE, warning=FALSE}
+# Look at basic parameter, using only max
+how_many_match <- data.frame("max_ignore_value" = 1:3,
+                               "costs"     = rep(NA,3),
+                               "insertions"     = rep(NA,3),
+                               "deletions"      = rep(NA,3),
+                               "substitutions"  = rep(NA,3))
+# Create the matrix of choices
+mchoice <- expand.grid("costs" = c(1:3,7,15),
+                       "insertions" = c(1:3,7,15),
+                       "deletions"  = c(1:3,7,15),
+                       "substitutions" = c(1:3,7,15))
+mchoice$max_ignore_value <- rep(NA, nrow(mchoice))
+
+# Bind the two sets we want to try:
+how_many_match <- rbind(how_many_match,mchoice)
+
+# Create the column we will fill in with number of match
+how_many_match$number_match <- rep(NA, nrow(how_many_match))
+
+
+for(i in seq_along(phyto_summ$Name)) {
+  for(j in 1:nrow(how_many_match)) {
+     if(!is.na(how_many_match$max_ignore_value[j])) {
+       fuzzy_match <- 
+     agrep(phyto_summ$Name[i],phyto_summ$Name,
+           max = how_many_match$max_ignore_value[j], ignore.case = TRUE)
+     } else {
+       fuzzy_match <- 
+     agrep(phyto_summ$Name[i],phyto_summ$Name,
+          max = list(insertions    = how_many_match$insertions[j],
+                     deletions     = how_many_match$deletions[j],
+                     substitutions = how_many_match$substitutions[j]), ignore.case = TRUE)
+     }
+    fuzzy_match <- fuzzy_match[-which(fuzzy_match==i)]
+    how_many_match[j,"number_match"] <- ifelse(is.na(how_many_match[j,"number_match"]),
+                                  length(fuzzy_match),
+                                  how_many_match[j,"number_match"] + length(fuzzy_match))
+  }
+}
+
+p <- ggplot(how_many_match,aes(x=as.factor(insertions),
+                          y=number_match,
+                          col=as.factor(costs),
+                          size=substitutions)) + geom_point(alpha = 1/4) + ylim(250,280)
+ggplotly(p)
+
+# Choosing to turn all the parameters to 2 to compare which values are matched.
+# Saving which rows have been matched
+phyto_summ$Row_matched_2 <- rep(NA,nrow(phyto_summ))
+# Saving the name that have been matched
+phyto_summ$Name_matched_2 <- rep(NA,nrow(phyto_summ))
+# Saving the number of matches
+phyto_summ$Number_matched_2 <- rep(NA,nrow(phyto_summ))
+
+unique_name  <-  seq_along(phyto_summ$Name)
+for(i in seq_along(phyto_summ$Name)) {
+  fuzzy_match <- 
+    agrep(phyto_summ$Name[i],phyto_summ$Name,
+          max = list(insertions    = 2,
+                     deletions     = 2,
+                     substitutions = 2), ignore.case = TRUE)
+  fuzzy_match <- fuzzy_match[-which(fuzzy_match==i)]
+  unique_name <- unique_name[!unique_name %in% fuzzy_match[fuzzy_match>i]]
+  if(length(fuzzy_match)>0) {
+    phyto_summ$Row_matched_2[i] <- paste(fuzzy_match,collapse="-")
+    phyto_summ$Name_matched_2[i] <- paste(phyto_summ$Name[fuzzy_match],collapse=", ")
+    phyto_summ$Number_matched_2[i] <- length(fuzzy_match)     
+  }
+}
+
+phyto_summ$Number_matched[is.na(phyto_summ$Number_matched)] <- 0
+phyto_summ$Number_matched_2[is.na(phyto_summ$Number_matched_2)] <- 0
+
+write.table(phyto_summ, file = "/Volumes/-/Script R/LCM_GitHub_Data_LCM/LCM_bio_PeteStangel/WORK_name_phyto_fuzzy_matching.txt", sep="\t", col.names = T, row.names = F)
+```
+
+With that in mind, I re-run the same loop than above but using this time the flexible _costs/insertions/deletions/substitutions_ arguments:
+
+> agrep(phyto_summ$Name[i],phyto_summ$Name,
+>           max = list(costs         = 2
+>                      insertions    = 2,
+>                      deletions     = 2,
+>                      substitutions = 2), ignore.case = TRUE)
+ 
+
+```{r looking at the different output by fuzzy method,  message=FALSE, warning=FALSE}
+# Creating a new column for the species that generated different match
+phyto_summ$different_match_by_method <-
+  phyto_summ$Number_matched - # species matched with max=2
+  phyto_summ$Number_matched_2 # species matched with max=list(all=2)
+n1 <- length(which(phyto_summ$different_match_by_method>0)) # How many match were different - quantitative appproach
+n2 <- nrow(phyto_summ[phyto_summ$Number_matched != phyto_summ$Number_matched_2,]) # qualitative appproach
+
+n1==n2 # Should be the same value
+```
+
+
+Different match were created by both method for `r length(which(phyto_summ$different_match_by_method>0))` names from our initial dataset. The second method is more strict and I'm struggling to understand why some match are not made (even by allowing increasing values of _costs/substitutions/etc._).
+
+I think it is still better to use this second method and use "only" `r sum(phyto_summ$Number_matched_2)` matches (vs. `r sum(phyto_summ$Number_matched)` matches for the first method) for now.
+
+### Merging the phytoplankton count together using the max = list(2,2,2,2) 
+
+```{r new phytoplankton count using max 2, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# not using this method- not working for now
+
+#### 1.2.2.1 Using the max = 2
+# With this approach, we are matching too many names. An option would be to merge only the names that have been matched in both directions. <br>
+# Below is the script for that.
+
+phyto_summ_2 <- data.frame("Name"=phyto_summ$Name,"Is_matched"=rep(NA,nrow(phyto_summ)),"Number_matched"=rep(0,nrow(phyto_summ)))
+
+
+for(i in seq_along(unique_name)) {
+  # Getting here the match we got (for example, row 3 has match in rows 69, 70, 71).
+  which_match <- as.numeric(unlist(strsplit(phyto_summ[i,"Row_matched"],"-")))
+  # If the row as also be identified in the next vectors, then we'll want to merge them
+  if(any(!is.na(which_match))) for (j in which_match[!is.na(which_match)]) {
+    if(i %in% as.numeric(unlist(strsplit(phyto_summ[j,"Row_matched"],"-")))) {
+      phyto_summ_2$Is_matched[j] <- paste(phyto_summ_2$Is_matched[j],i,sep="-",collapse = "-")
+      phyto_summ_2$Number_matched[j] <- phyto_summ_2$Number_matched[j]+1
+    }
+  }
+}  
+phyto_summ_2$Is_matched <- gsub("NA-","",phyto_summ_2$Is_matched)
+sum(phyto_summ$Number_matched - phyto_summ_2$Number_matched)
+sum(phyto_summ_2$Number_matched)
+sum(phyto_summ$Number_matched)
+
+is.numeric(unlist(strsplit(phyto_summ[which_match,"Row_matched"],"-")))
+  phyto_summ_2 <- c(phyto_summ_2,
+                  as.character(phyto_summ[i,"Name"]),
+                  paste(sum(phyto_summ[c(i, which_match),"Frequency_presence"], na.rm = T)),
+                  paste(sum(phyto_summ[c(i, which_match),"Total_count"], na.rm = T)))
+  unique_name <- unique_name[!unique_name %in% which_match[which_match>i]]
+
+
+```
+
+The whole objective is to be able to match phytoplankton counts belonging to the same species/genus rapidly and systematically. I'm writting down below the code I'm using at the moment:
+
+```{r new phytoplankton count using max list, message=FALSE, warning=FALSE}
+phyto_summ_3 <- NULL
+unique_name  <-  seq_along(phyto_summ$Name)
+for(i in seq_along(unique_name)) {
+  which_match <- as.numeric(unlist(strsplit(phyto_summ[i,"Row_matched_2"],"-")))
+  phyto_summ_3 <- c(phyto_summ_3,
+                  as.character(phyto_summ[i,"Name"]),
+                  paste(sum(phyto_summ[c(i, which_match),"Frequency_presence"], na.rm = T)),
+                  paste(sum(phyto_summ[c(i, which_match),"Total_count"], na.rm = T)))
+  unique_name <- unique_name[!unique_name %in% which_match[which_match>i]]
+}
+phyto_summ_3 <- as.data.frame(matrix(phyto_summ_3,ncol=3,byrow=T))
+phyto_summ_3 <- phyto_summ_3[unique_name,]
+colnames(phyto_summ_3) <- c("Name","Frequency_presence","Total_count")
+
+# Making frenquencies and counts numeric
+phyto_summ_3$Frequency_presence <- as.numeric(paste(phyto_summ_3$Frequency_presence))
+phyto_summ_3$Total_count <- as.numeric(paste(phyto_summ_3$Total_count))
+```
+
+Out of this smaller dataset, there are `r nrow(phyto_summ_3)-nrow(phyto_summ_3[phyto_summ_3$Frequency_presence>0,])` names with no observations over the 2006-2018 period.
+
+```{r delete species with no observations, message=FALSE, warning=FALSE}
+phyto_summ_3 <- phyto_summ_3[phyto_summ_3$Frequency_presence>0,]
+```
+
+```{r}
+# Removing interogation point - it was the first name used
+phyto_summ_3$Name <- gsub('?','',phyto_summ_3$Name, fixed = TRUE)
+
+phyto_summ_3 <- phyto_summ_3[order(phyto_summ_3$Name),]
+```
+
 
