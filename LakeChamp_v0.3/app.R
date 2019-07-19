@@ -421,7 +421,10 @@ server <- function(input, output, session) {
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
-                                "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters"))
+                                "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters",
+                                "</br><b> Data value: </b>", round(as.numeric(summ_subset$summ_subset), 2))) %>% 
+      addLegend("bottomright", pal = pal, values = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]), 
+                title = "Data values", opacity = 1)
   })
   
   # Scatterplot
