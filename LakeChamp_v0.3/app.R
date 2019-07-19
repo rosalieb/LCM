@@ -114,11 +114,6 @@ timeline_data <- data.frame(
   groups = data.frame(id = "timeline", content = c("Stocking", "Fish population dynamics", "Regulations", "Species invasions", "Groups/committees/programs", "Notable changes in chemical and biological parameters"))
 ) 
 
-
-# Categories for timeline
-# Colors for categories 
-# Density plot??
-
 # Define UI for slider demo app ----
 ui <- dashboardPage(
   #define color
@@ -175,20 +170,6 @@ ui <- dashboardPage(
         sliderInput("range", "Years selected",
                     min = min(dt_out$year,na.rm=FALSE), max = max(dt_out$year,na.rm=FALSE),
                     value = c(2000,2012),sep = "")),
-      # conditionalPanel(
-      #   'input$id == "graph"',
-      #   checkboxGroupInput("parameters_toshow", "Phosphorus:",
-      #                      colnames(out[,c(36,10,25)])),
-      #   checkboxGroupInput("parameters_toshow", "Nitrogen:",
-      #                      colnames(out[,c(34,32,33,31)])),
-      #   checkboxGroupInput("parameters_toshow", "Carbon:",
-      #                      colnames(out[,c(35,9,8)])),
-      #   checkboxGroupInput("parameters_toshow", "Other minerals/nutrients/elements:",
-      #                      colnames(out[,c(12,4,14,29,27,11,13)])),
-      #   checkboxGroupInput("parameters_toshow", "Water quality",
-      #                      colnames(out[,c(38,37,6,3,5,30,7,26,28)])),
-      #   checkboxGroupInput("parameters_toshow", "Phytoplankton",
-      #                      colnames(out[,c(24,23,20,19,16,15,18,17,22,21)])))#, selected = colnames(out)))
       menuItem(
         "Historic data/information", 
         tabName = "history", 
@@ -226,15 +207,14 @@ ui <- dashboardPage(
           title = "Instructions",
           width = "100%", 
           height = "100%",
-          #Render an output text
+          # Render an output text
           htmlOutput("Instructions_plot_1"),
-          # radioButtons(
-          #   inputId = "data_toggle_plots", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
-          # ),
+          # Checkbox for parameters to plot
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Parameters to plot", status = "default", width = 80, circle = FALSE,
             div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("parameters_toshow", "Check any parameters:",
                                                                                 colnames(dt_out))))),
+          # Checkbox for stations to plot
           div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
             label = "Stations to plot", status = "default", width = 80, circle = FALSE,
             div(style='max-height: 40vh; overflow-y: auto;', checkboxGroupInput("stations_toshow", "Check any stations:",
@@ -266,26 +246,28 @@ ui <- dashboardPage(
       tabItem(
         tabName = "d_table",
         htmlOutput("mytable1help"),
-        # radioButtons(
-        #   inputId = "data_toggle_table", label = "Annual or daily data", choices = list("Annual data" = 1, "Daily data" = 2)
-        # ),
         DT::dataTableOutput("mytable1")
       ),
       tabItem(
         tabName = "d_stats",
-        tabsetPanel(type = "tabs", tabPanel("Correlation", htmlOutput("Stats1.1"), htmlOutput("Stats1.2"),
-                                            div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
-                                              label = "Parameters to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("parameters_toshow2", "Check any boxes:",
-                                                                                                                                               colnames(dt_out)))),
-                                            htmlOutput("Stats1.3"),
-                                            sidebarPanel(sliderInput("size_slider", label = "Image size", min = 200, max = 700, value = 200)), uiOutput("corr_plot")),
+        tabsetPanel(type = "tabs", 
+                    tabPanel("Correlation",
+                             # All htmlOutput is written toward the end of the script
+                             htmlOutput("Stats1.1"), 
+                             htmlOutput("Stats1.2"),
+                             # Need a different parameter dropdown menu
+                             div(style="display: inline-block;vertical-align:top; width: 150px;", 
+                                 dropdownButton(label = "Parameters to plot", status = "default", width = 80, circle = FALSE, 
+                                                checkboxGroupInput("parameters_toshow2", "Check any boxes:", colnames(dt_out)))),
+                             htmlOutput("Stats1.3"),
+                             sidebarPanel(sliderInput("size_slider", label = "Image size", min = 200, max = 700, value = 200)), uiOutput("corr_plot")),
                     tabPanel("Basic stats", htmlOutput("Stats2.1"), 
                              div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
-                               label = "Parameters to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("parameters_toshow3", "Check any boxes:",
-                                                                                                                                colnames(dt_out)))),
+                               label = "Parameters to plot", status = "default", width = 80, circle = FALSE, 
+                               checkboxGroupInput("parameters_toshow3", "Check any boxes:", colnames(dt_out)))),
                              div(style="display: inline-block;vertical-align:top; width: 150px;", dropdownButton(
-                               label = "Stations to plot", status = "default", width = 80, circle = FALSE, checkboxGroupInput("stations_toshow2", "Check any boxes:",
-                                                                                                                              sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE))),
+                               label = "Stations to plot", status = "default", width = 80, circle = FALSE, 
+                               checkboxGroupInput("stations_toshow2", "Check any boxes:", sort(unique(dt_out$StationID)), selected = sort(unique(dt_out$StationID)), inline = FALSE))),
                              htmlOutput("Stats2.2")))
       ),
       tabItem(
@@ -315,22 +297,7 @@ ui <- dashboardPage(
 # Server ####
 server <- function(input, output, session) {
   
-  # output$which_dt_out<-renderUI({
-  #   selectInput("which_dt_out", label = h4("Annual or daily data"),
-  #               choices = c("Annual data" = 1, "Daily data" = 2),selected = 1
-  #   )
-  # })
-  
-  # output$selected_dt_out <- reactive({
-  #   selected_dt_out <- load_data()
-  #   selected_dt_out <- dt_all[dt_all$type==input$data_toggle_plots,]
-  #   selected_dt_out <- selected_dt_out[,-which(colnames(selected_dt_out)=="type")]
-  #   selected_dt_out
-  # })
-  
-  #dt_out <- input$selected_dt_out()
-  
-  # plot
+  # Text for the home page
   output$mytext1 <- renderUI({ 
     header <- "<h2>Lake Champlain</h2>"
     myparagraph1 <- "Spanning a length of 190 km from Whitehall, NY to its outlet at the Richelieu River in Québec, Canada, Lake Champlain covers 113,000 hectares and is estimated to hold roughly 25 trillion liters. Average lake depth is 19.5 meters (64.5 feet), with the greatest lake depth of 122 meters (400 feet). A majority of the water that enters Lake Champlain runs through its basin, which covers over 21,000 square kilometers. Over half of the basin is in Vermont, about a third in New York, and less than a tenth in the Province of Québec. The water retention time varies by lake segment, ranging between two months in the South Lake to about 3 years in the Main Lake. <br/> <br/>"
@@ -342,17 +309,20 @@ server <- function(input, output, session) {
     HTML(paste(header, myparagraph1, header2, myparagraph2, linkToSite, linkToData, final_note))
   })
   
+  # Timeline
   output$timeline <- renderTimevis({
     timevis(timeline_data[timeline_data$group %in% input$timeline_checkbox,], options = list(height = "600px")) %>%
       setWindow("timeline", start = "1970", end = "2019") 
   })
   
+  # Timeline text
   output$timeline_text <- renderUI({
     timeline_title <- paste0("<h3>Important recent events occuring in and around Lake Champlain</h3>")
     timeline_instructions <- paste0("You can expand the app window, zoom in and out, and drag the timeline to get a better view of important events that involve the health of Lake Champlain. Important dates as long ago as 1900 and as recent as 2008 are included in the timeline. <b>Please note that this timeline, like the rest of the app, is a permanent work-in-progress and we're gradually adding information.</b></br></br>")
     HTML(paste(timeline_title, timeline_instructions))
   })
   
+  # Brings user back to home page when they click the 'home' icon
   observeEvent(input$home, {
     updateTabItems(session, "main_sidebar", "home")
   })
@@ -380,18 +350,20 @@ server <- function(input, output, session) {
     HTML(paste(p_table_help))
   })
   
-  
+  # Raw data table text - annual and daily averages data
   output$mytable1help <- renderUI({ 
     table1help <- paste0("<h3>", ifelse(input$data_toggle == 1, "Annual", "Daily"), " averages data</h3> <br/> For more information on the parameters in this table, visit the parameters tab on the left side. There, you'll see the units they were measured in, a description of the overall importance of the parameter, as well as the date of availability for the data. <br/><br/>")
     HTML(paste(table1help))
   })
   
+  # Text for map with monitoring site locations (not density map)
   output$mymap1help <- renderUI({ 
     map1title <- paste0("<h3> Lake Champlain monitoring sites </h3>")
     map1help <- paste0("In the map below, you'll see the lake and tributary stations where data were collected. X's indicate the location of a tributary station while the circles represent the location of a lake station. If you click on the icons, you'll be able to see the name of the station, the station ID, the latitude and longitude of the station, as well as the station depth.<br/><br/>")
     HTML(paste(map1title, map1help))
   })
   
+  # Map with monitoring sites
   output$mymap1 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>% # Add default OpenStreetMap map tiles
@@ -407,17 +379,20 @@ server <- function(input, output, session) {
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Trib"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Trib"]))
   })
   
+  # Text for density map 
   output$mymap2help <- renderUI({
     map2title <- paste0("<h3> Density map of the parameters by station </h3>")
     map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another.</br></br>")
     HTML(paste(map2title, map2help))
   })
   
+  # Text for output visualization 
   output$mymap2break <- renderUI ({
-    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>.")
+    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>. </br>")
     HTML(paste(map2breaks))
   })
   
+  # Function for the density map 
   avg_by_station <- function(p, yr_input1, yr_input2) {
     parameter <- p
     min_yr    <- yr_input1
@@ -436,6 +411,7 @@ server <- function(input, output, session) {
     summ_subset$prop_subset <- as.numeric(summ_subset$summ_subset / max(summ_subset$summ_subset))
   }
   
+  # Density map
   output$mymap2 <- renderLeaflet({
     leaflet(stations_metadata_subset) %>% 
       addTiles() %>%  # Add default OpenStreetMap map tiles
@@ -447,8 +423,8 @@ server <- function(input, output, session) {
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
                                 "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters"))
   })
-  # <b>Instructions:</b>
   
+  # Scatterplot
   output$myplot1 <- renderPlot({
     dt_out <- dt_all[which(as.numeric(dt_all$type)==as.numeric(input$data_toggle)),]
     if (length(input$parameters_toshow) == 0) {
@@ -469,6 +445,7 @@ server <- function(input, output, session) {
     
   })
   
+  # Scatterplot with trendline 
   output$myplot2 <- renderPlot({
     dt_out <- dt_all[which(as.numeric(dt_all$type)==as.numeric(input$data_toggle)),]
     if (length(input$parameters_toshow) == 0) {
@@ -489,7 +466,7 @@ server <- function(input, output, session) {
     
   })
   
-  # An attempt to put in a bar plot of a single parameter's average by StationID, also should be dependent upon the time range selected
+  # Boxplots
   output$myplot3 <- renderPlot({
     dt_out <- dt_all[which(as.numeric(dt_all$type)==as.numeric(input$data_toggle)),]
     if (length(input$parameters_toshow) == 0) {
@@ -507,7 +484,7 @@ server <- function(input, output, session) {
   })
   
   
-  # table
+  # Data table with raw data - annual and daily averages data
   output$mytable1 <- DT::renderDataTable({
     dt_out <- dt_all[which(as.numeric(dt_all$type)==as.numeric(input$data_toggle)),]
     if (input$data_toggle==1) dt_out$VisitDate <- dt_out$year
@@ -515,8 +492,7 @@ server <- function(input, output, session) {
                   filter = 'top', options = list(orderClasses = TRUE, scrollX = TRUE))
   })
   
-  # Stats
-  
+  # Stats text
   output$Stats1.1  <- renderUI({ 
     Header1       <- "<h2><u>Correlation</u></h2>"
     Theory1       <- paste0("Correlation between two variables (Y1 and Y2 for example) is a statistical measure of the extent to which they fluctuate together. Correlation varies between -1 and 1. A positive correlation between Y1 and Y2 indicates that when Y1 increases, Y2 increases as well; a negative correlation between Y1 and Y2 indicates that when one variable increases, the other decreases. A value close to 0 indicates that the two variables are not strongly correlated. </br>
@@ -527,20 +503,24 @@ server <- function(input, output, session) {
     HTML(paste(Header1, Theory1))
   })
   
+  # Correlation plot image
   output$corr_plot <- renderUI({
     Img1           <- img(src='20190521_corrplot.pdf', width = as.integer(input$size_slider))
     HTML(paste(Img1))
   })
   
+  # Calculates correlation and number of observations. Need them here since they are in their own individual output boxes
   output$mcor    <- renderText(if(length(input$parameters_toshow2)>1) round(cor(dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[1]], dt_out[dt_out$year>input$range[1] & dt_out$year<input$range[2], input$parameters_toshow2[2]], use = "na.or.complete"),4) else HTML("<i> Select another variable </i>"))
   output$n       <- renderText(if(length(input$parameters_toshow2)>1) nrow(dt_out[dt_out$year>=input$range[1] & dt_out$year<=input$range[2] & !is.na(dt_out[,input$parameters_toshow2[1]]) & !is.na(dt_out[,input$parameters_toshow2[2]]), ]) else "NA")
   
+  # More stats tab text
   output$Stats1.2 <- renderUI({
     Header12      <- "<h3>Try it for yourself!</h3>"
     Instruct_Corr <- paste0("<b>Instructions:</b> select TWO parameters from the dropdown menu below. If you select more than that, the correlation will be calculated for the two first parameters.</br></br>")
     HTML(paste(Header12, Instruct_Corr))
   })
   
+  # More stats tab text
   output$Stats1.3 <- renderUI({
     Results_Corr  <- paste0("</br>The correlation between <b>", input$parameters_toshow2[1], "</b> and <b>", input$parameters_toshow2[2], "</b> is:", verbatimTextOutput("mcor"),"calculated from </br>",verbatimTextOutput("n")," observations. </br></br>This is calculated across ALL sites, for the <b>", input$range[1],"-",input$range[2],"</b> period.
                             If NA are displayed, try another parameter or change the time period. Some variables were never measured at the same time.</br></br>")
@@ -548,6 +528,7 @@ server <- function(input, output, session) {
     HTML(paste(Results_Corr, Corr_plot_instruct))
   })
   
+  # More stats tab text
   output$Stats2.1 <- renderUI({
     Header2       <- paste0("<h2><u>Basic statistics</u></h2>")
     Theory2       <- paste0("This tool allows you to compute basic statistics on the dataset, including mean, minimal and maximal values. 
@@ -558,6 +539,7 @@ server <- function(input, output, session) {
     HTML(paste(Header2, Theory2, Header22, Instruct_basic_stats))
   })
   
+  # More stats tab text
   output$Stats2.2 <- renderUI({
     mstations     <- paste(as.numeric(input$stations_toshow3),sep="", collapse=", ")
     Results_basic_stats <- paste0("</br>The stats are calculated for stations ", mstations,", selected in the plot tab, for the period <b>",input$range[1],"-",input$range[2],"</b>. </br>")
