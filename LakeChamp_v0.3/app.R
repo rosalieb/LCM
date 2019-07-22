@@ -383,7 +383,7 @@ server <- function(input, output, session) {
   # Text for density map 
   output$mymap2help <- renderUI({
     map2title <- paste0("<h3> Density map of the parameters by station </h3>")
-    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another. Please note: if you receive an error that says, 'wasn't able to determine range of domain', please widen your time range. Data values for that parameter within that time range don't exist. </br></br>")
+    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another. Please note: if you receive an error that says, 'wasn't able to determine range of domain', please widen your time range. Data values for that parameter within that time range don't exist. Stations with a black color do not have any data for that parameter. Click on each station to view the data value for which the color represents.</br></br>")
     HTML(paste(map2title, map2help))
   })
   

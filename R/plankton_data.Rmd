@@ -168,6 +168,19 @@ zoo$Year         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%Y"))
 zoo$Month        <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%m"))
 zoo$yday         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%j"))
 
+zoo$BOSMINA_biom      <- zoo$BOSMINA      * 1.76
+zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 32.15
+zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA * 6.32
+zoo$LEPTO_biom        <- zoo$LEPTO        * 113.31
+zoo$CYCLOP_biom       <- zoo$CYCLOP       * 16.52
+zoo$CALANOID_biom     <- zoo$CALANOID     * 0.00
+zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.00
+zoo$COPEPOD_biom      <- zoo$COPEPOD      * 1.58
+zoo$PREDATOR_biom     <- zoo$PREDATOR     * 94.77
+zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * 1.86
+zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 23.59
+zoo$PARASITIC_biom    <- zoo$PARASITIC    * 0.00
+
 # Model species
 library(mgcv)
 mod1 <- gamm(GRAZER_sm ~ s(Year, by=as.factor(LocationID2))+s(yday, by=as.factor(LocationID2)), data=zoo)
