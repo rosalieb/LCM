@@ -383,13 +383,13 @@ server <- function(input, output, session) {
   # Text for density map 
   output$mymap2help <- renderUI({
     map2title <- paste0("<h3> Density map of the parameters by station </h3>")
-    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another. Please note: if you receive an error that says, 'wasn't able to determine range of domain', please widen your time range. Average values for that parameter within that time range don't exist. Stations with a black color do not have any data for that parameter. Click on each station to view the data value for which the color represents.</br></br>")
+    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another. Please note: if you receive an error that says, 'wasn't able to determine range of domain', please widen your time range. Average values for that parameter within that time range don't exist. Click on each station to view the data value for which the color represents.</br></br>")
     HTML(paste(map2title, map2help))
   })
   
   # Text for output visualization 
   output$mymap2break <- renderUI ({
-    map2breaks <- paste0("<h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>. </br> </br>")
+    map2breaks <- paste0("<h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>. </h4> <i> Data for <b>", input$parameters_toshow4, "</b> are available from ", min(dt_out$year[!is.na(dt_out[,input$parameters_toshow4])]), " through ", max(dt_out$year[!is.na(dt_out[,input$parameters_toshow4])]), ". </br></br>")
     HTML(paste(map2breaks))
   })
   
@@ -418,7 +418,7 @@ server <- function(input, output, session) {
   # Density map
   output$mymap2 <- renderLeaflet({
     clrs <- rev(brewer.pal(7, "Reds"))
-    qpal <- colorBin(palette = "YlOrRd", domain = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]), bins = 5)
+    qpal <- colorBin(palette = "YlOrRd", domain = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]), bins = 7)
     leaflet(stations_metadata_subset) %>% 
       addProviderTiles("Esri.WorldImagery") %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
