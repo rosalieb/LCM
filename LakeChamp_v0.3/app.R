@@ -23,6 +23,7 @@ library(htmlTable)
 library(shinyWidgets)
 library(raster) # to read the raster layer
 library(timevis)
+library(RColorBrewer)
 
 # Introducing the dataframe dt_annual, which contains annual averages of the data we're working with.
 dt_annual <- total_year
@@ -382,13 +383,13 @@ server <- function(input, output, session) {
   # Text for density map 
   output$mymap2help <- renderUI({
     map2title <- paste0("<h3> Density map of the parameters by station </h3>")
-    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another.</br></br>")
+    map2help <- paste0("In the dropdown menu below, you'll see the chemical and biological parameters collected. Select a parameter to visualize each station's value for that parameter relative to one another. Please note: if you receive an error that says, 'wasn't able to determine range of domain', please widen your time range. Data values for that parameter within that time range don't exist. </br></br>")
     HTML(paste(map2title, map2help))
   })
   
   # Text for output visualization 
   output$mymap2break <- renderUI ({
-    map2breaks <- paste0("<br> <h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>. </br>")
+    map2breaks <- paste0("<h4> You've selected to plot <b>", input$parameters_toshow4, "</b> for the years <b>", input$range_map[1], "</b> through <b>", input$range_map[2], "</b>. </br> </br>")
     HTML(paste(map2breaks))
   })
   
@@ -407,24 +408,29 @@ server <- function(input, output, session) {
     summ_subset <- with(mysubset, 
                         tapply(mysubset[,parameter],list("Sites"=as.factor(mysubset$StationID)), mean, na.rm=T))
     summ_subset <- as.data.frame(summ_subset)
-    summ_subset$StationID <- as.numeric(rownames(summ_subset))
-    summ_subset$prop_subset <- as.numeric(summ_subset$summ_subset / max(summ_subset$summ_subset))
+    summ_subset$value <- as.numeric(summ_subset$summ_subset)
+    # summ_subset$StationID <- as.numeric(rownames(summ_subset))
+    # summ_subset$prop_subset <- as.numeric(summ_subset$summ_subset / max(summ_subset$summ_subset))
   }
+  
+  
   
   # Density map
   output$mymap2 <- renderLeaflet({
+    clrs <- rev(brewer.pal(7, "Reds"))
+    qpal <- colorNumeric(palette = "YlOrRd", domain = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]), n = 5)
     leaflet(stations_metadata_subset) %>% 
-      addTiles() %>%  # Add default OpenStreetMap map tiles
+      addProviderTiles("Esri.WorldImagery") %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
-      addCircles(color = "red", fillOpacity = 1, radius = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]) * 2500,
+      addCircles(color = ~qpal(avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2])), fillOpacity = 1, radius = 2000,
+                 # radius = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]) * 2500
                  data = stations_metadata_subset, lat = as.numeric(stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  lng = as.numeric(stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"]), 
                  popup = paste0("<b>Station name: </b>", stations_metadata_subset$StationName[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> StationID: </b>", stations_metadata_subset$StationID[stations_metadata_subset$WaterbodyType == "Lake"], 
                                 "</br><b> Latitude: </b>", stations_metadata_subset$Latitude[stations_metadata_subset$WaterbodyType == "Lake"], "</br><b> Longitude: </b>", stations_metadata_subset$Longitude[stations_metadata_subset$WaterbodyType == "Lake"],
                                 "</br><b> Station depth: </b>", as.numeric(stations_metadata_subset$StationDepth[stations_metadata_subset$WaterbodyType == "Lake"]), " meters",
-                                "</br><b> Data value: </b>", round(as.numeric(summ_subset$summ_subset), 2))) %>% 
-      addLegend("bottomright", pal = pal, values = avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]), 
-                title = "Data values", opacity = 1)
+                                "</br><b> Data value: </b>", round(as.numeric(avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2])), 2))) %>% 
+      addLegend(title = c(input$parameters_toshow4), pal = qpal, values = ~avg_by_station(p = input$parameters_toshow4, yr_input1 = input$range_map[1], yr_input2 = input$range_map[2]), opacity = 1)
   })
   
   # Scatterplot
