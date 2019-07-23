@@ -31,7 +31,7 @@ library(plotly)
 library(plyr)
 library(dplyr)
 library(stringr)
-library(FSA)
+library(FSA) # Fisheries Stock Assessment
 library(rgdal) # to read bathymetry
 library("sf") # transform projection CRS
 library("rnaturalearth")

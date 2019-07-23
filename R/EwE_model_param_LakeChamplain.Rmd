@@ -20,10 +20,27 @@ _Last update: `r Sys.Date()`_
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
 ```
 
 The objective of this document is to gather all in one place the decisions made for the parameters of the model.
 I'm starting this document on July 16th, 2019, having entered some parameters over the past 4 months and realizing I already forgot where I got them from... Hopefully I'll find my notes back, otherwise, having everything in one place might be easier.
+
+For the Lake Champlain monitoring data, I'm using the data I processed for the Stats-a-thon. The idea was to get something a bit homogeneous in term of depths (hypolimnion and epilimnion data when lake stratified, and hypolimnion=epilimnion when lake mixed).
+
+```{r read data}
+dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step5.txt"))
+names(dtlcm)
+
+```
+
 
 # Detritus
 
@@ -35,10 +52,13 @@ I'm calculating the depth of the euphotic zone based on the secchi depth.
 
 ## Secchi Depth
 
-The secchi depth across all sites and years
+__Data__:  
+* Long-term monitoring dataset
 
-```{r echo=FALSE}
-secchi_depth_p <- total %>% ggplot(mapping = aes(x = as.factor(StationID), y = `Secchi Depth`, fill = StationID)) +
+The secchi depth across all sites and years is ploted below.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = Secchi.Depth, fill = as.factor(StationID))) +
   geom_boxplot() +
   xlab("Station ID") +
   ylab("Secchi depth (m)") + 
@@ -50,10 +70,73 @@ eu_z = 4.9
 ```
 We set the euphotic zone for the main lake (StationID= 16 & 19) at `r eu_z` m.
 
+The following code is not run yet, we need a value for the primary production.
 
-
-```{r}
-D = 10^(0.954 * log10(1) + 0.863 * log10(eu_z) - 2.41)
+```{r eval=FALSE}
+D = 10^(0.954 * log10(PP) + 0.863 * log10(eu_z) - 2.41)
 D
 ```
+
+# Phytoplankton
+
+__Data__:  
+* Long-term monitoring dataset
+
+Phytoplankton data are collected since 2006. The field methodology described by the program says: 2x secchi by integrated hose or by 63 um net tow, lugols preserved samples, and are then counted on settling chambers or Sedgewick Rafter cells.
+
+Biovolume are given in µm<sup>3</sup>/l.
+
+We need: <br>
+* The dimensions of the net <br>
+* The depth sampled (use the secchi depth) <br>
+
+```{r}
+diameter_net <- .8 #in meter
+```
+
+Create a special dataframe for phytoplankton.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+phyto <- dtlcm[,c("StationID", "VisitDate","Secchi.Depth", "Net.phytoplankton..total.biovolume")]
+
+n1 = nrow(phyto)
+phyto <- phyto[!is.na(phyto$Secchi.Depth),]
+n2 = nrow(phyto)
+phyto <- phyto[!is.na(phyto$Net.phytoplankton..total.biovolume),]
+n3 = nrow(phyto)
+head(phyto)
+
+phyto$Volume.sampled <- pi*(diameter_net/2)^2*(2*phyto$Secchi.Depth)
+
+head(phyto)
+
+```
+
+`r n1-n2` rows deleted because Secchi.Depth=NA. <br>
+`r n2-n3` rows deleted because Net.phytoplankton..total.biovolume=NA<br>
+
+Conversion of µm<sup>3</sup>/l in t/km<sup>2</sup>:<br>
+<center>
+1 µm<sup>3</sup> = 1*10<sup>-15</sup> l    <br>
+1 l = 1*10<sup>-6</sup> t
+</center>
+
+# Zooplankton
+
+See script 'plankton_data.Rmd'.
+
+Organisms density available (#/m<sup>3</sup>). To convert them to biomass, we use McCauley (1984), Chapter 7. The Estimation of the Abundance and Biomass of Zooplankton in Samples.
+He established Weight/Length relationships for zooplankton.
+We used average length of organisms collected from pictures found online, use the equations in McCauley (1984) to get an estimation of the weight, and converted #/m<sup>3</sup> to g/<sup>3</sup> that way.
+
+
+```{r calculate weight from size, echo=FALSE, message=FALSE, warning=FALSE}
+# Size data, from McCauley 1984 (Chapter 7)
+size_zoop      <- read.delim(paste0(getpath4data(),"plankton/Zoop_size.txt"))
+# Calculate average weight to get biomass
+size_zoop$weight <- exp(size_zoop$a +  size_zoop$b*log(size_zoop$Average_Size))
+size_zoop
+```
+
+
 
