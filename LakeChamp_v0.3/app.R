@@ -417,7 +417,7 @@ server <- function(input, output, session) {
   
   # Density map
   output$mymap2 <- renderLeaflet({
-    qpal <- colorBin(palette = "YlOrRd", domain = total[,input$parameters_toshow4], bins = 7)
+    qpal <- colorBin(palette = "YlOrRd", domain = total_year[,input$parameters_toshow4], bins = 7)
     leaflet(stations_metadata_subset) %>% 
       addProviderTiles("Esri.WorldImagery") %>%  # Add default OpenStreetMap map tiles
       # addRasterImage(raster_LC_leaflet, colors = pal, opacity = 0.8) %>% 
