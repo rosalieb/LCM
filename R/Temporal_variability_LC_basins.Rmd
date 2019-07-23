@@ -377,7 +377,7 @@ head(weather)
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 weather$date <- parse_date_time(weather$date,orders = c("d/m/Y"))
-ggplot(weather,aes(x = date, y= AvgApparentTemperatureCelsius)) + geom_line()
+ggplot(weather,aes(x = date, y= AvgApparentTemperatureCelsius)) + geom_line() + geom_smooth()
 
 ```
 
