@@ -108,6 +108,8 @@ summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0)
 
 The multiplied factor for rotifers comes from <a href= "http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.595.698&rep=rep1&type=pdf"> </a>.
 
+The biomass values for each zooplankton group represent grams of t/km3 of dry weight. 
+
 ```{r group zoop species}
 # Group the data by at least genus
 names(zoo)
