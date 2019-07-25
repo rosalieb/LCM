@@ -51,7 +51,7 @@ This is the length-weight relationship of rainbow smelt in Lake Champlain. It's 
 
 ```{r length weight relationship, results = FALSE, warning = FALSE}
 # Scatterplot of weight-length relationship without a line of best fit
-plot(y = smelt$Weight, x = smelt$Length, pch=20)
+plot(y = smelt$Weight, x = smelt$Length, pch=20, xlab="Length (mm)", ylab="Weigth (g)")
 
 # Weight-length relationship of rainbow smelt with the R-generated line of best fit 
 ggplot(aes(x=Length, y=Weight), data=smelt )+
@@ -62,7 +62,13 @@ ggplot(aes(x=Length, y=Weight), data=smelt )+
 # Weight-length relationship of rainbow smelt with a polynomial line of best fit, rather than R-generated line of best fit
 ggplot(aes(x=Length, y=Weight), data=smelt )+
   geom_point() +
-  stat_smooth(method = 'lm', formula = y ~ poly(x,2), se= FALSE)
+  stat_smooth(method = 'lm', formula = y ~ poly(x,2), se= TRUE)
+
+# Test of a fit without assumptions
+ggplot(aes(x=Length, y=Weight), data=smelt )+
+  geom_point() +
+  stat_smooth()
+
 ```
 
 ## Getting familiar with the stations
@@ -150,7 +156,9 @@ ggplot(data = summ_smelt_ageclass[3:12,], aes(x = year_class, y = num_fish)) +
   labs(x = "Year Class", y = "Number of Fish")
 ```
 
-## Sampling effort of rainbow smelt in Lake Champlain 
+## Number of rainbow smelt caught per sampled year in Lake Champlain 
+
+<span style="color:red">Note from Rosalie: The former title of this section was "Sampling effort of rainbow smelt in Lake Champlain ". Effort is different from what you calculated here. Counting the number of observation per year just gives you how many fish were caught. We would need the number of sampling event + duration to calculate the actual effort. </span>
 
 For 1986, 1988, and 1989, there were no data. Therefore, the number of stations and number of fish sampled for those years are equal to 0. 2002, 2003, and 2012 had particularly large sample sizes of smelt in comparison to the other years. 
 
@@ -158,24 +166,24 @@ In addition, the table of 0's and 1's indicates whether or not a station was sam
 
 ```{r sample effort, warning = FALSE, message = FALSE, results = "asis"}
 # Data frame which includes the number of fish sampled per year
-summ_smelt_effort1 <- as.data.frame(summary(as.factor(smelt$Year)))
-summ_smelt_effort1 <- cbind(rownames(summ_smelt_effort1), summ_smelt_effort1)
-rownames(summ_smelt_effort1) <- c()
-colnames(summ_smelt_effort1) <- c("Year", "num_fish")
+summ_smelt_catches1 <- as.data.frame(summary(as.factor(smelt$Year)))
+summ_smelt_catches1 <- cbind(rownames(summ_smelt_catches1), summ_smelt_catches1)
+rownames(summ_smelt_catches1) <- c()
+colnames(summ_smelt_catches1) <- c("Year", "num_fish")
 
 # Bar plot which displays the number of fish sampled per year
-ggplot(data = summ_smelt_effort1, mapping = aes(x = Year, y = num_fish)) + 
+ggplot(data = summ_smelt_catches1, mapping = aes(x = Year, y = num_fish)) + 
   geom_bar(stat = "summary") + 
   labs(x = "Year", y = "Number of Fish Sampled") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Data frame which includes the years, list of the stations sampled during that year, and number of stations sampled that year
-summ_smelt_effort2 <- smelt %>% 
+summ_smelt_catches2 <- smelt %>% 
   group_by(Year) %>% 
   summarise(list_stations = list(unique(Station)), num_stations = length(list_stations))
 
 # Bar plot showing the number of stations sampled per year
-ggplot(data = summ_smelt_effort2, mapping = aes(x = as.factor(Year), y = num_stations)) +
+ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_stations)) +
   geom_bar(stat = "summary") +
   labs(x = "Year", y = "Number of Stations Sampled") + 
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
