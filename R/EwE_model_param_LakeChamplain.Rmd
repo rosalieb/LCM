@@ -21,7 +21,23 @@ _Last update: `r Sys.Date()`_
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
+library(plotly)
+library(plyr) #for ddply
 library(dplyr)
+library(lubridate) # for date time
+library(changepoint) #changepoint analysis
+library(reshape2) # for melt
+library(Hmisc) # for err bar plot
+library(FSA);library(FSAdata) # Fisheries stock assessment methods and data
+library(leaflet)
+library(janitor)
+library(rgdal)
+library(raster)
+library(rnaturalearth)
+library(RColorBrewer)
+library(gridExtra) # get two plots side by side
+library(knitr) # for kable
+library(stringr) # for str_replace()
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -35,9 +51,55 @@ I'm starting this document on July 16th, 2019, having entered some parameters ov
 
 For the Lake Champlain monitoring data, I'm using the data I processed for the Stats-a-thon. The idea was to get something a bit homogeneous in term of depths (hypolimnion and epilimnion data when lake stratified, and hypolimnion=epilimnion when lake mixed).
 
-```{r read data}
+```{r read data from LTM}
 dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step5.txt"))
 names(dtlcm)
+
+```
+
+
+```{r read detailed plankton database, message=FALSE, warning=FALSE, include=FALSE}
+plktn_pre2010  <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data pre 2010.txt"))
+plktn_post2010 <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data after 2010.txt"))
+sites_raw      <- read.delim(paste0(getpath4data(),"LCM_bio_PeteStangel/Plankton data stations.txt"))
+sites          <- sites_raw[sites_raw$LocationID %in% as.factor(plktn_pre2010$LocationID),]
+
+plktn <- rbind(plktn_pre2010,plktn_post2010)
+
+plktn$VisitDate <- parse_date_time(x = plktn$PlanktonData.VisitDate, orders = c("d-b-y","d/m/Y"))
+
+plktn$StationID  <- sites[match(plktn$LocationID, sites$LocationID), "StationID"]
+
+names(plktn)
+plktn$PlanktonType[plktn$PlanktonType=="phyto"] <- "Phyto"
+summary(plktn$PlanktonType)
+
+summary(plktn$ResultType[plktn$PlanktonType=="Phyto"])
+summary(plktn$ResultType[plktn$PlanktonType=="Zoo"])
+summary(plktn$SampleType[plktn$PlanktonType=="Zoo"])
+
+# Reshape the dataframe with the type of plankton+name as column name
+plktn$Type_SpeciesID <- paste(plktn$PlanktonType, plktn$SpeciesID, sep="_")
+plktn2 <- dcast(plktn,  VisitDate + StationID ~ Type_SpeciesID,value.var = "Result",fun.aggregate = sum, na.rm = TRUE )
+head( plktn2)
+dim(plktn2)
+names(plktn2)
+
+phyto <- plktn2[,c(1, 2, grep("Phyto_", names(plktn2)))]
+zoo   <- plktn2[,c(1, 2, grep("Zoo_",   names(plktn2)))]
+
+dim(zoo)
+dim(phyto)
+
+names(zoo)
+rowSums(phyto[,-c(1:2)])
+
+# Often, when we get 0 for zoo, we get value for phyto, and vice versa.
+# no overlap of sampling? Are zoo and phyto samples taken on different days?
+# There are only 69 days for which we got values both for zoo and phyto.
+summary(which(rowSums(zoo[,-c(1,2)])!=0) %in% which(rowSums(phyto[,-c(1,2)])!=0))
+summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0))
+
 
 ```
 
@@ -57,7 +119,7 @@ __Data__:
 
 The secchi depth across all sites and years is ploted below.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r get secchi depth from LTM, echo=FALSE, message=FALSE, warning=FALSE}
 secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = Secchi.Depth, fill = as.factor(StationID))) +
   geom_boxplot() +
   xlab("Station ID") +
@@ -72,7 +134,7 @@ We set the euphotic zone for the main lake (StationID= 16 & 19) at `r eu_z` m.
 
 The following code is not run yet, we need a value for the primary production.
 
-```{r eval=FALSE}
+```{r calculate detritus, eval=FALSE}
 D = 10^(0.954 * log10(PP) + 0.863 * log10(eu_z) - 2.41)
 D
 ```
@@ -90,13 +152,13 @@ We need: <br>
 * The dimensions of the net <br>
 * The depth sampled (use the secchi depth) <br>
 
-```{r}
+```{r set diameter phytoplankton net}
 diameter_net <- .8 #in meter
 ```
 
 Create a special dataframe for phytoplankton.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r create a special dataframe for phytoplankton, echo=FALSE, message=FALSE, warning=FALSE}
 phyto <- dtlcm[,c("StationID", "VisitDate","Secchi.Depth", "Net.phytoplankton..total.biovolume")]
 
 n1 = nrow(phyto)
@@ -129,7 +191,6 @@ Organisms density available (#/m<sup>3</sup>). To convert them to biomass, we us
 He established Weight/Length relationships for zooplankton.
 We used average length of organisms collected from pictures found online, use the equations in McCauley (1984) to get an estimation of the weight, and converted #/m<sup>3</sup> to g/<sup>3</sup> that way.
 
-
 ```{r calculate weight from size, echo=FALSE, message=FALSE, warning=FALSE}
 # Size data, from McCauley 1984 (Chapter 7)
 size_zoop      <- read.delim(paste0(getpath4data(),"plankton/Zoop_size.txt"))
@@ -137,6 +198,1532 @@ size_zoop      <- read.delim(paste0(getpath4data(),"plankton/Zoop_size.txt"))
 size_zoop$weight <- exp(size_zoop$a +  size_zoop$b*log(size_zoop$Average_Size))
 size_zoop
 ```
+
+Rotifers are not listed in the McCauley chapter, so we used a multiplying factor from <a href= "http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.595.698&rep=rep1&type=pdf"> </a>.
+> Dry Weights of the Zooplankton of Lake Mikri Prespa (Macedonia, Greece), Evangelia Michaloudi (2005)
+
+But first, we need to group the species into larger group.
+
+## Group zoop in larger groups
+
+```{r grouping zoop species, message=FALSE, warning=FALSE}
+# Group the data by at least genus
+
+#names(zoo)
+whatsleft <- 
+  names(zoo[,-c(grep("aphni",     names(zoo)),
+              grep("osmin",       names(zoo)),
+              grep("epto",        names(zoo)),
+              grep("otifer|Anuraeopsis|Ascomorpha|Asplanchna|Brachi|Collotheca|Conochilus|Cupelopagis|Euchlanis|Filinia|Kellicottia|Keratella|Lecane|Monostyla|Nothalca|Ploesoma|Polyarthra|Synchaeta|Trichocerca",    names(zoo)),
+              grep("iaphanoso",               names(zoo)),
+              grep("yclop",                   names(zoo)),
+              grep("alanoid|Limnocalanus",    names(zoo)),
+              grep("opepo|Epischura|Harpacticoid",names(zoo)))])
+zoo$BOSMINA      <- rowSums(zoo[,grep("osmin",names(zoo))])     # small grazer
+zoo$DAPHNIA      <- rowSums(zoo[,grep("aphni",names(zoo))])     # medium grazer
+zoo$DIAPHANOSOMA <- rowSums(zoo[,grep("iaphanoso",names(zoo))]) # medium grazer
+zoo$LEPTO        <- rowSums(zoo[,grep("epto", names(zoo))])      # predator
+zoo$CYCLOP       <- rowSums(zoo[,grep("yclop",names(zoo))])     # copepod
+zoo$CALANOID     <- rowSums(zoo[,grep("alanoid|Limnocalanus",
+                                              names(zoo))])   # copepod
+zoo$ROTIFER      <- rowSums(zoo[,grep("otifer|Anuraeopsis|Ascomorpha|Asplanchna|Brachi|Collotheca|Conochilus|Cupelopagis|Euchlanis|Filinia|Kellicottia|Keratella|Lecane|Monostyla|Nothalca|Ploesoma|Polyarthra|Synchaeta|Trichocerca",names(zoo))])    # small grazer
+zoo$COPEPOD      <- rowSums(zoo[,grep("opepo|Epischura|Harpacticoid",names(zoo))])    # large grazer
+
+
+# Group by very large groups (i.e. grazers, predators)
+zoo$PREDATOR    <- rowSums(zoo[,grep("Polyphemus|LEPTO|Holopedium",names(zoo))])   
+zoo$GRAZER_sm   <- rowSums(zoo[,grep("BOSMINA|Alon|Chyd|ROTIF|leurox|ladocer",names(zoo))])  
+zoo$GRAZER_lr   <- rowSums(zoo[,grep("DAPHNIA|Sida|DIAPHA|CYCLOP|CALANO|opep|Eurycercus|aupl",names(zoo))])  
+zoo$PARASITIC   <- zoo[,grep("Ergasilus",names(zoo))]
+  
+# There should be no species left here if we selected all species (only VisitDate and StationID)
+whatsleft[-c(grep("Polyphemus|LEPTO|Holopedium",whatsleft),
+            grep("BOSMINA|Sida|Alon|Chyd|ROTIF|leurox|ladocer",whatsleft),
+            grep("DAPHNIA|DIAPHA|CYCLOP|CALANO|COPEPOD|Eurycercus|aupl",whatsleft),
+            grep("Ergasilus",whatsleft))]
+
+# Add explanatory variables to my dataframe
+zoo$Year         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%Y"))
+zoo$Month        <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%m"))
+zoo$yday         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%j"))
+
+```
+
+## Number of organisms per groups over the years
+
+This is the number of organisms per group over the years:
+
+```{r visualize abundance over years, echo=FALSE, message=FALSE, warning=FALSE}
+zoo_summ <- melt(zoo[,c("VisitDate", "StationID","LEPTO", "DAPHNIA", "BOSMINA", "PARASITIC")], id.vars = c("VisitDate", "StationID"))
+pzoo <- ggplot(zoo_summ, aes(VisitDate,value,color=variable)) + geom_point() +
+  stat_smooth() +
+  xlab("Visit Date") + ylab("# organisms per m3")
+
+ggplotly(pzoo)
+```
+
+
+```{r View abundance per station, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = zoo, aes(x = VisitDate, y = PREDATOR)) + geom_point() +
+  facet_wrap(~as.factor(zoo$StationID)) + ylim(0,20000)
+
+ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_lr)) + geom_point() +
+  facet_wrap(~as.factor(zoo$StationID)) + ylim(0,100000)
+
+ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_sm)) + geom_point() +
+  facet_wrap(~as.factor(zoo$StationID)) + ylim(0,250000)
+
+```
+
+## Biomass
+
+Calculate biomass 
+```{r get biomass, message=FALSE, warning=FALSE}
+# Biomass values were obtained from the size_zoop table
+# When multiplier = 0, we're still working on collecting the data
+# Biomass values      <- old zoop counts  ug/m3    g/m3      g/km3        t/km3
+zoo$BOSMINA_biom      <- zoo$BOSMINA      * 1.76   / 1000000 * 1000000000 / 1000000
+zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 32.15  / 1000000 * 1000000000 / 1000000
+zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA * 6.32   / 1000000 * 1000000000 / 1000000
+zoo$LEPTO_biom        <- zoo$LEPTO        * 113.31 / 1000000 * 1000000000 / 1000000
+zoo$Polyphemus_biom <- 
+         zoo$`Zoo_Polyphemus pediculus`   * 12.84  / 1000000 * 1000000000 / 1000000
+zoo$Holopedium_biom <- 
+         zoo$`Zoo_Holopedium gibberum`    * 158.15 / 1000000 * 1000000000 / 1000000
+zoo$CYCLOP_biom       <- zoo$CYCLOP       * 16.52  / 1000000 * 1000000000 / 1000000
+zoo$CALANOID_biom     <- zoo$CALANOID     * 0.00   / 1000000 * 1000000000 / 1000000
+zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.2556 / 1000000 * 1000000000 / 1000000 
+zoo$COPEPOD_biom      <- zoo$COPEPOD      * 1.58   / 1000000 * 1000000000 / 1000000
+zoo$PREDATOR_biom     <- zoo$PREDATOR     * 94.77  / 1000000 * 1000000000 / 1000000
+zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * 1.86   / 1000000 * 1000000000 / 1000000
+zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 23.59  / 1000000 * 1000000000 / 1000000
+zoo$PARASITIC_biom    <- zoo$PARASITIC    * 0.00   / 1000000 * 1000000000 / 1000000
+
+# Group by very large groups (i.e. grazers, predators)
+zoo$PREDATOR_biom    <- rowSums(zoo[,grep("Polyphemus_biom|LEPTO_biom|Holopedium_biom",names(zoo))]) 
+zoo$GRAZER_sm_biom   <- rowSums(zoo[,grep("BOSMINA_biom|Alon_biom|Chyd_biom|ROTIFER_biom|leurox_biom|ladocer_biom",names(zoo))])  
+zoo$GRAZER_lr_biom   <- rowSums(zoo[,grep("DAPHNIA_biom|Sida|DIAPHANOSOMA_biom|CYCLOP_biom|CALANOID_biom|opep_biom|Eurycercus_biom|aupl_biom",names(zoo))])  
+
+
+# Focus on main lake
+zoo19 <- zoo[zoo$StationID==19,c("VisitDate", "StationID", "Year", "Month", "yday",
+                                   "PREDATOR_biom", "GRAZER_sm_biom", "GRAZER_lr_biom", "PARASITIC_biom")]
+
+
+plot(zoo19$VisitDate[zoo19$PREDATOR != 0],zoo19$PREDATOR[zoo19$PREDATOR != 0], pch=20, col=adjustcolor("black", alpha.f = .3) , xlab="Visit Date", ylab="Biomass, t/km2")
+points(zoo19$VisitDate[zoo19$GRAZER_lr != 0],zoo19$GRAZER_lr[zoo19$GRAZER_lr != 0], pch=20, col=adjustcolor("blue", alpha.f = .3) )
+points(zoo19$VisitDate[zoo19$GRAZER_sm != 0],zoo19$GRAZER_sm[zoo19$GRAZER_sm != 0], pch=20, col=adjustcolor("red", alpha.f = .3) )
+points(zoo19$VisitDate[zoo19$PARASITIC != 0],zoo19$PARASITIC[zoo19$PARASITIC != 0], pch=20, col=adjustcolor("green", alpha.f = .3) )
+
+
+#head(plktn)
+#head(zoo19)
+
+zoo19 <- zoo19[rowSums(zoo19[,c("PREDATOR_biom", "GRAZER_sm_biom", "GRAZER_lr_biom", "PARASITIC_biom")])>0,]
+zoo19_month <- aggregate(zoo19[,c("PREDATOR_biom", "GRAZER_sm_biom", "GRAZER_lr_biom", "PARASITIC_biom")], list(format(zoo19$VisitDate, "%Y-%m")), mean)
+#print(zoo19_month)
+zoo19_month$Year   <- as.numeric(substr(zoo19_month$Group.1,1,4))
+zoo19_month$Month  <- as.numeric(substr(zoo19_month$Group.1,6,7))
+zoo19_month_Predator <- dcast(zoo19_month, Year ~ Month, value.var = "PREDATOR_biom", fun.aggregate = mean)
+zoo19_month_Grazer_sm <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_sm_biom", fun.aggregate = mean)
+zoo19_month_Grazer_lr <- dcast(zoo19_month, Year ~ Month, value.var = "GRAZER_lr_biom", fun.aggregate = mean)
+
+zoo19_month_Predator
+```
+
+
+
+# Mysis
+
+
+```{r load datasets, echo=FALSE, message=FALSE, warning=FALSE}
+mysis <- read.delim(paste0(getpath4data(), "data_from_Jason/mysis_long_term.txt"))
+mysis$Date <- parse_date_time(mysis$Date, orders = c("d/m/Y"))
+head(mysis)
+```
+
+Mysis data are available from `r paste(min(mysis$Year),"to",max(mysis$Year))`, usually from months `r paste(min(month(mysis$Date)),"to",max(month(mysis$Date)))`, for `r length(unique(mysis$Station))` (`r paste(unique(mysis$Station),sep="", collapse=", ")`).
+
+Lake Champlain Mysid net tows = 0.5 m net, whole water column tows. 
+To calculate the net area, we use the formula for the volume of a cylinder: $V = r^2 * \pi $
+
+```{r get net area fo mysis tow}
+diameter_tow = 0.5
+net_area = (diameter_tow/2)^2*pi
+```
+
+The #/m<sup>2</sup> is obtained that by dividing the number counted in the tow by the volume.
+
+```{r recalculate the number of mysis per m2}
+mysis$number.m2 = mysis$Total/net_area
+```
+
+## Calculate average per year.
+
+
+```{r average mysis per year, echo=FALSE, message=FALSE, warning=FALSE}
+mysis_summ_d <- as.data.frame(with(mysis, tapply(number.m2
+  ,list("Year"=Year,"depth_round"=round(mysis$Depth/10)*10), mean, na.rm=T)))
+mysis_summ_d <- data.frame(melt(mysis_summ_d), "Year"=rep(unique(mysis$Year), times=ncol(mysis_summ_d)))
+
+ggplot(mysis_summ_d, aes(variable, Year)) + geom_tile(aes(fill = value),colour = "white") + scale_fill_gradient(low = "white", high = "steelblue") + ggtitle("Total number of mysis per m2") + xlab("Average depth (rounded to 10 m)")
+
+
+```
+
+
+```{r summary biomass per year, echo=FALSE, message=FALSE, warning=FALSE}
+mysis_summ <- data.frame(
+  "Year"=unique(mysis$Year),
+  "mean"=as.vector(with(mysis, tapply(number.m2
+  ,list("Year"=Year), mean, na.rm=T))),
+  "sd"=as.vector(with(mysis, tapply(number.m2
+  ,list("Year"=Year), sd, na.rm=T))))
+
+mysis_summ
+```
+
+
+```{r view data}
+with (data=mysis_summ
+      , expr = errbar(Year,mean,mean+sd/2,mean-sd/2, pch=16, cap=.01, xlab="Year",ylab="mean density (# mysis/m2)", cex=.8)
+        )
+```
+
+## Changepoint analysis
+
+```{r do changepoint analysis}
+#library(changepoint)
+ans=cpt.mean(as.vector(mysis_summ$mean))
+summary(ans)
+#mysis_summ$Year[cpts(ans)]
+```
+
+Changepoint detected in `r mysis_summ$Year[cpts(ans)]`.
+
+```{r plot changepoint on graph}
+lm1 <- lm(mysis_summ$mean[1:cpts(ans)]~mysis_summ$Year[1:cpts(ans)])
+lm2 <- lm(mysis_summ$mean[-c(1:cpts(ans))]~mysis_summ$Year[-c(1:cpts(ans))])
+
+
+with (data=mysis_summ
+      , expr = errbar(Year,mean,mean+sd/2,mean-sd/2, pch=16, cap=.01, xlab="Year",ylab="mean density (# mysis/m2)", cex=.8)
+        )
+
+
+
+lines(mysis_summ$Year[1:cpts(ans)], c(lm1$coefficients[1]+mysis_summ$Year[1:cpts(ans)]*lm1$coefficients[2]), lwd=2)
+
+lines(mysis_summ$Year[-c(1:cpts(ans))], c(lm2$coefficients[1]+mysis_summ$Year[-c(1:cpts(ans))]*lm2$coefficients[2]), lwd=2)
+                            
+
+
+```
+
+## Get biomass in grams
+Using mysis weight data from Chesapeake Bay (given by Rosie) to get an estimate of average/median weigth.
+
+```{r read mysis data}
+mysis_w <- read.delim(paste0(getpath4data(),"data_from_Rosie/ChesapeakeBay_Mysis_oxygen_consumption_data_RC_AN.txt"))
+```
+
+```{r plot mysis weigth, echo=FALSE, message=FALSE, warning=FALSE}
+p1<- ggplot(data=mysis_w, aes(mysis_w$Wet_wt, fill=Sex)) + 
+  geom_histogram(col="black") + xlab("Mysis wet weight (mg)") + theme(legend.position = "none")
+p2<- ggplot(data=mysis_w, aes(mysis_w$Dry_wt..mg., fill=Sex)) + 
+  geom_histogram(col="black") + xlab("Mysis dry weight (mg)")
+
+grid.arrange(p1,p2,nrow=1, widths=c(1,1.3))
+
+mysis_w_mean    = mean(mysis_w$Wet_wt, na.rm=T)
+mysis_w_median  = median(mysis_w$Wet_wt, na.rm=T)
+```
+
+The distribution is not normal, so median value should be chosen over mean. <br>
+* mean: `r mysis_w_mean` <br
+* median: `r mysis_w_median`<br>
+
+We multiply the mysis count per this biomass:
+```{r calculate mean mysis biomass and visualise}
+mysis_summ$mean_w <- mysis_summ$mean*mysis_w_median
+mysis_summ$sd_w <- mysis_summ$sd*mysis_w_median
+
+with (data=mysis_summ
+      , expr = errbar(Year,mean_w,mean_w+sd_w/2,mean_w-sd_w/2, pch=16, cap=.01, xlab="Year",ylab="mean biomass (mg mysis/m2)", cex=.8)
+        )
+```
+
+
+# Benthic invertebrates
+
+Use dresseinid mussels?
+
+# Sculpin
+
+# Trout-perch
+
+# Smelt
+For fish in general, we need to get the a and b parameters of the $ W = a L^{b} $ equation.
+
+__Data:__ <br>
+The data was provided by Ellen Marsden. It contains 24,982 observations of smelt. Each row has some metadata associated (date and basin sampled) as well as individuals characteristics (length, weight, year class, condition).
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+smelt <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltBio1984-2015-2-24-16.csv"))
+smelt <- smelt[smelt$Species == "Rainbow Smelt",]
+smelt$Station <- gsub("-"," ",smelt$Station)
+head(smelt)
+
+smelt_coord <- read.csv(file = paste0(getpath4data(), "smelt_coord.csv"))
+
+xIcon <- makeIcon(
+  iconUrl = "https://cdn4.iconfinder.com/data/icons/defaulticon/icons/png/256x256/cancel.png",
+  iconWidth = 20, iconHeight = 20)
+```
+
+## Metadata / general considerations about the sampling
+
+### Sampling stations
+Here, you can see rough coordinates of the stations sampled for rainbow smelt throughout the years. For ambiguous locations such as Main Lake, Main Lake North, Main Lake South, etc., we just coordinates roughly in the center of the area. You can click on the icons to see the stations specific coordinates. 
+
+```{r map smelt sampling sites, echo=FALSE, message=FALSE, warning=FALSE}
+# Creation of the map with each station. Includes name of station, latitude, and longitude
+coord_map <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(icon = xIcon, lng = smelt_coord$Longitude, lat = smelt_coord$Latitude,
+             popup = paste("<b>Station:</b>", smelt_coord$Station, "<br>",
+                           "<b>Latitude:</b>", smelt_coord$Latitude, "<br>",
+                           "<b>Longitude:</b>", smelt_coord$Longitude))
+
+coord_map
+```
+
+### Number of fish caught per year
+
+Note that there are no data for 1986, 1988, and 1989.
+
+```{r number smelt caught per yr, echo=FALSE, message=FALSE, warning=FALSE}
+# Data frame which includes the number of fish sampled per year
+summ_smelt_catches1 <- as.data.frame(summary(as.factor(smelt$Year)))
+summ_smelt_catches1 <- cbind(rownames(summ_smelt_catches1), summ_smelt_catches1)
+rownames(summ_smelt_catches1) <- c()
+colnames(summ_smelt_catches1) <- c("Year", "num_fish")
+
+# Bar plot which displays the number of fish sampled per year
+ggplot(data = summ_smelt_catches1, mapping = aes(x = Year, y = num_fish)) + 
+  geom_bar(stat = "summary") + 
+  labs(x = "Year", y = "Number of Fish Sampled") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Table which displays the number of fish sampled each year at each station 
+station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
+  ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
+station_number_sampled[is.na(station_number_sampled)] <- 0
+kable(station_number_sampled)
+```
+
+### Evolution of sampled stations
+
+The table of 0's and 1's indicates whether or not a station was sampled for a particular year.
+
+```{r stations sampled per yr, echo=FALSE, message=FALSE, warning=FALSE}
+# Data frame which includes the years, list of the stations sampled during that year, and number of stations sampled that year
+summ_smelt_catches2 <- smelt %>% 
+  group_by(Year) %>% 
+  summarise(list_stations = list(unique(Station)), num_stations = length(list_stations))
+
+# Bar plot showing the number of stations sampled per year
+ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_stations)) +
+  geom_bar(stat = "summary") +
+  labs(x = "Year", y = "Number of Stations Sampled") + 
+  scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Table which displays which stations were sampled when
+station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
+  ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
+station_which_sampled[is.na(station_which_sampled)] <- 0
+station_which_sampled[station_which_sampled > 0] <- 1
+
+# Put in red the sites that were sampled to make it easier to see which sites were sampled when
+library(huxtable)
+ht <- as_hux(station_which_sampled)
+ht <- set_background_color(ht, where(ht == 1), "pink")
+ht <- huxtable::add_colnames(ht, colnames = colnames(station_which_sampled))
+ht <- huxtable::add_rownames(ht, rownames = rownames(station_which_sampled))
+col_width(ht) <- 0.5
+wrap(ht) <- TRUE
+ht
+
+
+
+# Table which displays the total number of fish sampled at each station across all years
+station_total_sampled <- station_number_sampled %>% summarise_all(list(sum))
+kable(station_total_sampled)
+```
+
+## Length/weigth/condition evolution
+
+### Weigth/length relationship
+```{r smelt weight length, echo=FALSE, message=FALSE, warning=FALSE}
+# Test of a fit without assumptions
+p1 <- ggplot(aes(x=Length, y=Weight), data=smelt )+
+  geom_point() + stat_smooth()
+
+# per station
+p2 <- ggplot(aes(y=Weight, x=Length), data=smelt )+
+  geom_point()+ geom_smooth() +
+  facet_wrap(~Station)
+
+grid.arrange(p1,p2,nrow=1)
+```
+
+### Condition of rainbow smelt over time by lake station 
+
+It appears that the condition of rainbow smelt has stayed realtively constant over time in Lake Champlain. The trendlines show an average condition of roughly 0.5 to 0.7 over time.
+
+```{r condition by station, warning = FALSE}
+# Grid of plots which display the condition of rainbow smelt over time at each station
+ggplot(aes(y=condition, x=Year), data=smelt )+
+  ylim(0,6)+
+  geom_point()+
+  #geom_line() +
+  geom_smooth(method="gam", formula = y ~ s(x)) +
+  facet_wrap(~Station)
+```
+
+### Rainbow smelt per year class in Lake Champlain
+
+```{r catch per year, warning = FALSE, message = FALSE}
+# Data frame which includes the number of fish obtained per year class
+summ_smelt_ageclass <- as.data.frame(summary(as.factor(smelt$Age)))
+summ_smelt_ageclass <- cbind(rownames(summ_smelt_ageclass), summ_smelt_ageclass)
+rownames(summ_smelt_ageclass) <- c()
+colnames(summ_smelt_ageclass) <- c("year_class", "num_fish")
+summ_smelt_ageclass
+
+# Bar plot which displays the number of fish obtained per year class
+ggplot(data = summ_smelt_ageclass[3:12,], aes(x = year_class, y = num_fish)) + 
+  geom_bar(stat = "summary") + 
+  labs(x = "Year Class", y = "Number of Fish")
+```
+
+## Exploring growth parameters for rainbow smelt
+
+### Weight-length relationship
+
+Using Rosalie's code from LT analysis and Derek Ogle's tutorial.
+
+```{r smelt weigth length relationship basic plot, message = FALSE, warning = FALSE}
+# Two plots here--the first is the weight-length relationship of rainbow smelt without a log-transformation. The second plot is a log-transformed plot of this relationship with a line of best fit
+par(mfrow=c(1,2))
+plot(smelt$Weight ~ smelt$Length ,xlab="Total Length (mm)", ylab = "Weight (g)", main = "", pch=20)
+
+smelt$logW <- log(smelt$Weight)
+smelt$logL <- log(smelt$Length)
+
+lm1 <- lm(logW~logL,data = smelt)
+fitPlot(lm1,xlab="Log Total Length (mm)", ylab = "Log Weight (g)", main="")
+
+```
+
+The relationship is not linear without log-transforming the data. Here, we have the coefficients of the log-transformed data. 
+
+```{r summary model smelt W ~ L, message = FALSE, warning = FALSE}
+summary(lm1)
+```
+
+### Test whether rainbow smelt exhibit isometric or allometric growth
+
+A test of whether the fish in a population exhibit isometric growth or not can be obtained by noting that b is the estimated slope from fitting the transformed length-weight model. The slope is generically labeled with β such that the test for allometry can be translated into the following statistical hypotheses:
+* H0: β=3 ⇒ H0 :"Isometricgrowth"
+* HA: β≠3 ⇒ HA :"Allometricgrowth"
+(All taken from Derek Ogle tutorial. Go back there for more details).
+
+A test, and confidence interval for b, of whether rainbow smelt from Lake Champlain exhibited allometric growth or not is constructed with:
+
+```{r smelt allo or isometric growth, message = FALSE, warning = FALSE}
+hoCoef(lm1,2,3)
+confint(lm1)
+```
+
+These results show that LT exhibit allometric growth (p = 1.3e-93) with an exponent parameter (b) between 2.87 and 2.89, with 95% confidence.
+
+### Prediction on original scale
+Again, from Derek Ogle tutorial: "Predictions of the mean value of the response variable given a value of the explanatory variable can be made with predict(). In the length-weight regression, the value predicted is the mean log of weight. Most often, of course, the researcher is interested in predicting the mean weight on the original scale. An intuitive and common notion is that the log result can simply be back-transformed to the original scale by exponentiation. However, back-transforming the mean value on the log scale in this manner underestimates the mean value on the original scale. This observation stems from the fact that the back-transformed mean value from the log scale is equal to the geometric mean of the values on the original scale. The geometric mean is always less than the arithmetic mean and, thus, the back-transformed mean always underestimates the arithmetic mean from the original scale."
+
+We want to extract the sigma, and then get the correction factor:
+
+```{r get growth parameters smelt original scale, message = FALSE, warning = FALSE}
+syx <- summary(lm1)$sigma
+(cf <- exp((syx^2)/2))
+```
+
+(1) Predict log weight of a rainbow smelt of size 130 mm
+(2) Biased prediction on original scale
+(3) Corrected prediction on original scale
+
+```{r check error and bias, message = FALSE, warning = FALSE}
+(pred.log <- predict(lm1,data.frame(logL=log(130)),interval="c")) ##(1)
+(bias.pred.orig <- exp(pred.log)) ##(2)
+(pred.orig <- cf*bias.pred.orig) ##(3)
+```
+
+### Comparison of weight-length relationship {.tabset}
+
+#### Across years
+
+Include year as a factor.  
+
+```{r does weigth length relationship for smelt change across yrs, message = FALSE, warning = FALSE}
+smelt$fyear <- factor(smelt$Year)
+lm2 <- lm(logW~logL*fyear, data = smelt)
+```
+
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such: 
+
+```{r anova lm2, message = FALSE, warning = FALSE}
+anova(lm2)
+```
+
+These results indicate that the interaction terms are significant (p = 2.2e-16). There is evidence to conclude that there is a difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three years (p = 2.2e-16).
+
+Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+
+```{r confint of model, message = FALSE, warning = FALSE}
+confint(lm2)
+par(mfrow=c(1,1))
+fitPlot(lm2,xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",main = "", col = adjustcolor(c("red","blue","grey"), alpha.f = .5))
+```
+
+
+#### Across stations
+
+Include stations as a factor.  
+
+```{r does weigth length relationship for smelt change across stations, message = FALSE, warning = FALSE}
+smelt$fstations <- factor(smelt$Station)
+lm3 <- lm(logW~logL*fstations, data = smelt)
+``` 
+
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such:
+
+```{r anova lm3, message = FALSE, warning = FALSE}
+anova(lm3)
+```
+
+These results indicate that the interaction terms is significant (p = 2.2e-16). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three sites (p = 2.2e-16). 
+
+Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+```{r confint model 3, message = FALSE, warning = FALSE}
+confint(lm3)
+par(mfrow=c(1,1))
+fitPlot(lm3, xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",main = "", col = adjustcolor(c("red","blue","grey"), alpha.f = .5))
+```
+
+## Conclusion: a and b parameters
+In <a href=http://www.dnr.state.mi.us/publications/pdfs/ifr/manual/smii%20chapter17.pdf> Schneider et al 2010 report for Michigan Department of Natural Resources</a>, growth parameter are reported for rainbow smelt:    
+  *  a = -5.12117 <br/>
+  *  b =  2.96408 <br/>
+We found (see results for lm1):  <br/>
+  *  a = -5.05001<br/>
+  *  b =  2.88230<br/>
+There are some discrepancies between the two, but they're fairly close.  <br/>
+
+To convert them to the initial equation W = aL<sup>b</sup>:  
+```{r conclusion a and b parameters for rainbow smelt, message = FALSE, warning = FALSE}
+(a = exp(lm1$coefficients[1]))
+(b = lm1$coefficients[2])
+```
+
+Therefore, the intial equation is W = 0.000009405 x L<sup>2.88230</sup>
+
+***
+
+## Weight-length relationships for specific groups of rainbow smelt {.tabset}
+
+### Age-0 (for Lake Champlain fish.xlsx)
+
+The calculations for a and b for age-0 and age-1 rainbow smelt are for the purpose of transcribing rainbow smelt density to biomass values in Lake Champlain fish.xlsx in our Dropbox!
+
+n = 89
+
+Because most rainbow smelt of age-0 or with a year class of "YOY" don't have a weight, we will calculate an average weight for them based on the average length of rainbow smelt of age-0 (n = 89). We will use the weight-length equation calculated earlier for all rainbow smelt in Lake Champlain. Again, the equation from earlier was: <br/><br/> 
+W = 0.000009405 x L<sup>2.88230</sup> 
+<br/><br/>
+Therefore, if we use the average length of 41 mm for the 89 fish with a classification of "YOY", our equation is: <br/><br/> 
+W = 0.000009405 x 41<sup>2.88230</sup> 
+
+```{r W and L for smelt YOY}
+mean(smelt$Length[smelt$YearClass == "YOY"], na.rm = TRUE)
+length(smelt$Length[smelt$YearClass == "YOY"])
+(weight_age0 <- 0.000009405 * (41^2.8830))
+```
+
+The average weight of age-0 smelt in Lake Champlain is around 0.42 grams. 
+
+### Age-1 (for Lake Champlain fish.xlsx)
+
+n = 9,754
+
+Using data from 9,754 rainbow smelt of age-1, we can find an average weight.
+
+```{r W and L for smelt Age-1}
+mean(smelt$Weight[smelt$Age == 1], na.rm = TRUE)
+mean(smelt$Length[smelt$Age == 1], na.rm = TRUE)
+length(smelt$Weight[smelt$Age == 1])
+```
+
+The average weight of age-0 rainbow smelt in Lake Champlain is around 8.59 grams. Their average length is 114 mm.
+
+### <4 years old
+
+n = 10,987
+
+```{r W and L for smelt Age2-4}
+lm_4years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 4,])
+fitPlot(lm_4years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_4years)
+```
+
+a = -5.19480 <br/>
+b =  2.96750 <br/>
+
+W = 0.0000064 x L<sup>2.96750</sup>
+
+### <5 years old
+
+n = 19,412
+
+```{r W and L for smelt Age4-5}
+lm_5years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 5,])
+fitPlot(lm_5years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_5years)
+```
+
+a = -5.12426 <br/>
+b =  2.93121 <br/>
+
+W = 0.0000075 x L<sup>2.93121</sup>
+
+### <6 years old
+
+n = 23,296
+
+```{r W and L for smelt Age6-7}
+lm_6years <- lm(logW~logL,data = smelt[as.numeric(smelt$Age) <= 6,])
+fitPlot(lm_6years, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_6years)
+```
+
+a = -5.14460 <br/>
+b =  2.90205 <br/>
+
+W = 0.0000086 x L<sup>2.90205</sup>
+
+### At or below 200 mm
+
+n = 24,816
+
+```{r W and L for smelt below 200mm}
+lm_below200mm <- lm(logW~logL,data = smelt[as.numeric(smelt$Length) <= 200,])
+fitPlot(lm_below200mm, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_below200mm)
+```
+
+a = -5.02208 <br/>
+b =  2.88082 <br/>
+
+W = 0.0000095 x L<sup>2.880817</sup>
+
+### Above 200 mm
+
+n = 180
+
+```{r W and L for smelt above 200 mm}
+lm_above200mm <- lm(logW~logL,data = smelt[as.numeric(smelt$Length) > 200,])
+fitPlot(lm_above200mm, xlab = "Log Total Length (mm)", ylab = "Log Weight (g)", main = "")
+summary(lm_above200mm)
+```
+
+a = -5.3648 <br/>
+b =  3.0303 <br/>
+
+W = 0.0000043 x L<sup>3.0303</sup>
+
+## Summary of a and b
+
+```{r summary a and b for smelt}
+# Table which includes the age/size group and their respective a and b parameters
+age_group <- c("All", "<4 years", "<5 years", "<6 years", "<=200 mm", ">200 mm")
+a <- c(-5.05001, -5.19480, -5.12426, -5.14460, -5.02208, -5.3648)
+b <- c(2.88230, 2.96750, 2.93121, 2.90205, 2.88082, 3.0303)
+
+a_and_b_summary <- data.frame(age_group, a, b)
+kable(a_and_b_summary)
+```
+
+# Whitefish
+
+
+# Cisco
+
+
+# Lake Trout
+
+__Data:__ <br>
+Data for 2016-2018 field seasons provided by Pascal Wilkins.
+Displaying some summary data, including number of wild vs. stocked fish per year and basins, and number of fish collected per year (lot more in 2018 than the previous years).
+```{r read data LT, include=FALSE}
+LTcond <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_ConditionOverall.txt"))
+#head(LTcond)
+with(LTcond, tapply(rep(1,nrow(LTcond)),list("Year#"=Year, "Clipped#"=Clipped), sum))
+with(LTcond, tapply(rep(1,nrow(LTcond)),list("Site"=Local, "Clipped#"=Clipped), sum))
+with(LTcond, tapply(rep(1,nrow(LTcond)),list("Year#"=Year, "Site"=Local), sum))
+
+```
+
+## Read and explore effort data
+
+
+First, import the data. They are all kept in different files, so that need to be processed a little bit.  
+```{r read data effort LT, include=FALSE}
+# Read data
+LTeff16 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2016_effort2.txt"))
+LTeff17 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2017_effort2.txt"))
+LTeff18 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2018_effort2.txt"))
+
+# Check which columns match and which don't
+colnames(LTeff16)[!colnames(LTeff16) %in% colnames(LTeff17)]
+colnames(LTeff16)[!colnames(LTeff16) %in% colnames(LTeff18)]
+colnames(LTeff18)[!colnames(LTeff18) %in% colnames(LTeff16)]
+colnames(LTeff18)[!colnames(LTeff18) %in% colnames(LTeff17)]
+
+# Vector to reordinate columns at the end following LTeff18 template
+order_name <- names(LTeff18)
+
+# Order so all columns are in the same order
+LTeff16 <- LTeff16[,c(order(colnames(LTeff16)))]
+LTeff17 <- LTeff17[,c(colnames(LTeff16)[order(colnames(LTeff16))],colnames(LTeff17)[!colnames(LTeff17) %in% colnames(LTeff16)])]
+LTeff18 <- LTeff18[,c(colnames(LTeff17)[order(colnames(LTeff17))],colnames(LTeff18)[!colnames(LTeff18) %in% colnames(LTeff17)])]
+
+# merge dataframe
+LTeff <- merge(t(LTeff17),t(LTeff16), by = "row.names", all = T)
+  rownames(LTeff) <- LTeff[,grep("Row.names", colnames(LTeff))]
+  LTeff <- LTeff[,-grep("Row.names", colnames(LTeff))]
+LTeff <- merge(t(LTeff18),LTeff, by = "row.names", all = T)
+  rownames(LTeff) <- LTeff[,grep("Row.names", colnames(LTeff))]
+  LTeff <- LTeff[,-grep("Row.names", colnames(LTeff))]
+LTeff <- as.data.frame(t(LTeff))
+# Check that we have the correct number of rows - two extra, because rownames were added as columns (and then transformed in rows, so two extra rows)
+dim(LTeff)
+sum(nrow(LTeff16)+nrow(LTeff17)+nrow(LTeff18))
+
+LTeff <- LTeff[,c(order(order_name))]
+
+head(LTeff)
+
+LTeff$AvDepth_m <- (as.numeric(paste(LTeff$start.depth.m)) + as.numeric(paste(LTeff$end.depth.m)))/2
+# Just checking Pascal also calculated the average depth by averaging start and end depth:
+plot(LTeff$AvDepth_m, as.numeric(paste(LTeff$Average.Depth..m.)))
+abline(a=0, b=1)
+
+names(LTeff)
+```
+
+Number of fish collected per year and per sites: Main Lake is mainly targeted.
+
+```{r number of LT collected per year per basin, echo=FALSE}
+sites = unique(LTcond$Local)
+plot(c(unique(LTcond$Year)), rep(1,3),
+     cex=sqrt(summary(as.factor(LTcond$Year[LTcond$Local==sites[1]]))/15),
+     xlim=c(2015,2019),ylim=c(0,4), axes=F, xlab="", ylab="", main="Relative number of data per year and per site", pch=20)
+points(c(unique(LTcond$Year)), rep(2,3),
+       cex=sqrt(summary(as.factor(LTcond$Year[LTcond$Local==sites[2]])))/15, pch=20)
+points(c(unique(LTcond$Year)), rep(3,3),
+       cex=sqrt(summary(as.factor(LTcond$Year[LTcond$Local==sites[3]])))/15, pch=20)
+axis(1, at=c(1000,3000));axis(1, at = unique(LTcond$Year))
+text(x=rep(2015,3), y=seq(1.5,3.5,1), labels = paste(sites, "lake"), adj = 0)
+
+```
+
+
+When where the trips done? There are two x-scales here (on top of the depth): year and hour of the day.
+
+```{r when were the trips for LT done, echo=FALSE, message=FALSE, warning=FALSE}
+LTeff$date <- as.POSIXlt(substr(parse_date_time(x = LTeff$date,orders = c("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d")),1,10), format = "%Y-%m-%d")
+LTeff$yday <- LTeff$date$yday
+
+LTeff$fyear <- as.factor(LTeff$year)
+LTeff$year <- as.numeric(paste(LTeff$year))
+
+LTeff$year_hour <- LTeff$year + as.numeric(paste0(substr(LTeff$start.time, 1,2),substr(LTeff$start.time, 4,5)))/5000-.24
+
+LTeff$netID2 <- paste(LTeff$year,as.numeric(paste(LTeff$netID)),sep="_")
+LTeff <- LTeff[order(LTeff$date),]
+
+
+LTeff <- LTeff[!is.na(LTeff$year),]
+
+ggplot(LTeff, aes(x=year_hour, y=-yday, color=LTeff$AvDepth_m)) + 
+  geom_point() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  scale_x_discrete(name ="Year", limits=c(2016,2017,2018)) +
+  ylab("Julian Day") +
+  annotate(geom="text",x=2016:2018, y=c(rep(-80,3)), label=paste("n=",summary(LTeff$fyear))) + 
+  labs(color='Average depth (m)') + scale_fill_continuous(guide = guide_legend()) +
+    theme(legend.position="bottom") +
+  scale_colour_gradient(high = "grey10", low = "#56B1F7",
+  space = "Lab", na.value = "blue", guide = "colourbar",
+  aesthetics = "colour")
+
+```
+
+## Map trips
+```{r map trip LT, message=FALSE, warning=FALSE, include=FALSE}
+bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
+lcgroupmap=c("lake",rep("island", 84562))
+bathy2 <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+class(bathy)
+crs(bathy)
+crs(world)
+bathy <- spTransform(bathy,crs(world))
+crs(bathy)
+bathy2 <- projectRaster(bathy2, crs = crs(world))
+
+res(bathy2)
+#aggregate by factor = 3 to increase plotting speed
+bathy2 <- aggregate(bathy2, fact=3)
+
+
+LTeff$start.lat.dd <- as.numeric(paste(LTeff$start.lat.dd))
+LTeff$start.lon.dd <- as.numeric(paste(LTeff$start.lon.dd))
+LTeff$end.lat.dd <- as.numeric(paste(LTeff$end.lat.dd))
+LTeff$end.lon.dd <- as.numeric(paste(LTeff$end.lon.dd))
+
+# Step not necessary at the moment but make sure we're in the right projection.
+LTeff_coord <- LTeff[,c("date","start.lon.dd","start.lat.dd","end.lon.dd","end.lat.dd")]
+LTeff_coord <- LTeff_coord[complete.cases(LTeff_coord$start.lon.dd),]
+LTeff_coord <- LTeff_coord[complete.cases(LTeff_coord$end.lon.dd),]
+class(LTeff_coord)
+## [1] "data.frame"
+LTeff_start <- LTeff_coord[,c("start.lon.dd","start.lat.dd")]
+coordinates(LTeff_start)<-~start.lon.dd+start.lat.dd
+class(LTeff_start)
+## [1] "SpatialPointsDataFrame"
+## attr(,"package")
+## [1] "sp"
+
+# does it have a projection/coordinate system assigned?
+proj4string(LTeff_start) # nope
+## [1] NA
+
+proj4string(bathy)
+
+# we know that the coordinate system is NAD83 so we can manually
+# tell R what the coordinate system is
+proj4string(LTeff_start)<-CRS("+proj=longlat +datum=WGS84")
+
+# now we can use the spTransform function to project. We will project
+# the mapdata and for coordinate reference system (CRS) we will
+# assign the projection from counties
+
+LTeff_start<-spTransform(LTeff_start, CRS(proj4string(bathy)))
+
+# double check that they match
+identical(proj4string(LTeff_start),proj4string(bathy))
+
+# Do the same for end coords
+LTeff_end <- LTeff_coord[,c("end.lon.dd","end.lat.dd")]
+coordinates(LTeff_end)<-~end.lon.dd+end.lat.dd
+proj4string(LTeff_end)<-CRS("+proj=longlat +datum=WGS84")
+LTeff_end<-spTransform(LTeff_end, CRS(proj4string(bathy)))
+
+# double check that they match
+identical(proj4string(LTeff_end),proj4string(bathy))
+
+
+# Go back to dataframe
+LTeff_start_df <- as.data.frame(LTeff_start)
+LTeff_end_df <- as.data.frame(LTeff_end)
+# Include to initial dataframe
+LTeff_coord$start.lon.dd <- LTeff_start_df$start.lon.dd
+LTeff_coord$start.lat.dd <- LTeff_start_df$start.lat.dd
+LTeff_coord$end.lon.dd   <- LTeff_end_df$end.lon.dd
+LTeff_coord$end.lat.dd   <- LTeff_end_df$end.lat.dd
+
+```
+
+
+There are some outliers, so deleting all longitude < -73.48 (2 points) and thus > -73.1.
+
+```{r remove outliers from LT trawls coord}
+LTeff_coord <- LTeff_coord[LTeff_coord$start.lon.dd<(-73.1) & LTeff_coord$start.lon.dd > (-73.48),]
+```
+
+Map visualising all the trips
+
+```{r map visualize all trips, echo=FALSE, message=FALSE, warning=FALSE}
+p2 <- ggplot() +  geom_polygon(data=bathy, aes(x=long, y=lat, group=group, fill=lcgroupmap), show.legend = FALSE) +
+  scale_fill_manual(values = c("white","darkgrey")) +
+  geom_point(data=LTeff_coord, aes(x=start.lon.dd, y=start.lat.dd), color=NA) +
+  xlab("Longitude") + ylab("Latitude") + theme_minimal()  +
+  theme_set(theme_bw()) +
+  coord_equal(ratio=1) # square plot to avoid the distortion
+
+  
+
+p2 <- p2 + geom_segment(aes(x = LTeff_coord$start.lon.dd, y = LTeff_coord$start.lat.dd, xend = LTeff_coord$end.lon.dd, yend = LTeff_coord$end.lat.dd))
+
+p2
+
+
+#ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Trawl_trips_",min(LTeff$year, na.rm=T),"-",max(LTeff$year, na.rm=T),".pdf"), p2)
+
+## Scale on map varies by more than 10%, scale bar may be inaccurate
+
+```
+
+## Explore growth parameters
+
+### Weight-length relationship
+
+Based on <a href=http://derekogle.com/fishR/examples/oldFishRVignettes/LengthWeight.pdf> this tutorial by Derek Ogle</a>, using FSA package.
+The relationship between length and weigth is not linear, because length is a linear measure and weight is related to volume
+```{r W ~ L plot for LT}
+par(mfrow=c(1,2))
+plot(LTcond$weight ~ LTcond$frozen.tl,xlab="total length (mm)",ylab="weight (g)",main="", pch=20)
+
+LTcond$logW <- log(LTcond$weight)
+LTcond$logL <- log(LTcond$frozen.tl)
+
+lm1 <- lm(logW~logL,data=LTcond)
+fitPlot(lm1,xlab="log total length (mm)",ylab="log weight (g)",main="")
+
+```
+
+The relationship is indeed not linear, but we can get the coefficients by log-transforming the data. The coefficients are given below:
+```{r summary W ~ L for LT}
+summary(lm1)
+```
+
+
+Try the quantile regression to fit the non-tranformed data
+```{r quantile regression, message=FALSE, warning=FALSE}
+library(quantreg)
+LTcond$weight ~ LTcond$frozen.tl
+m1 <- rq(weight~poly(frozen.tl,2), data=LTcond,tau=0.9)
+m2 <- rq(weight~poly(frozen.tl,3), data=LTcond,tau=0.9)
+m3 <- rq(weight~poly(frozen.tl,4), data=LTcond,tau=0.9)
+AIC(m1)
+AIC(m2)
+AIC(m3)
+# geom_quantile uses rq()
+ggplot(LTcond, aes(frozen.tl,weight))+ geom_point()+
+    geom_quantile(formula=y~poly(x,3),quantiles=0.9)
+
+```
+
+
+### Test whether LT exhibit isometric or allometric growth
+
+A test of whether the fish in a population exhibit isometric growth or not can be obtained by noting that b is the estimated slope from fitting the transformed length-weight model. The slope is generically labeled with β such that the test for allometry can be translated into the following statistical hypotheses:
+* H0: β=3 ⇒ H0 :"Isometric growth"
+* HA: β≠3 ⇒ HA :"Allometric growth"
+(All taken from Derek Ogle tutorial, go back there for more details).
+
+A test, and confidence interval for b, of whether Lake Trout from Lake Champlain exhibited allometric growth or not is constructed with
+```{r iso or allometric growth for LT}
+hoCoef(lm1,2,3)
+confint(lm1)
+```
+These results show that LT exhibit allometric growth (p < 0.0000001) with an exponent parameter (b) between 3.22 and 3.24, with 95% confidence.
+
+### Prediction on original scale
+Again, from Derek Ogle tutorial: "Predictions of the mean value of the response variable given a value of the explanatory variable can be made with predict(). In the length-weight regression, the value predicted is the mean log of weight. Most often, of course, the researcher is interested in predicting the mean weight on the original scale. An intuitive and common notion is that the log result can simply be back-transformed to the original scale by exponentiation. However, back-transforming the mean value on the log scale in this manner underestimates the mean value on the original scale. This observation stems from the fact that the back-transformed mean value from the log scale is equal to the geometric mean of the values on the original scale. The geometric mean is always less than the arithmetic mean and, thus, the back-transformed mean always underestimates the arithmetic mean from the original scale."
+
+We want to extract the sigma, and then get the correction factor:
+```{r sigma for LT growth}
+syx <- summary(lm1)$sigma
+( cf <- exp((syx^2)/2) )
+```
+
+(1) Predict log weight of a LT of size 200 mm
+(2) Biased prediction on original scale
+(3) Corrected prediction on original scale
+```{r check bias for LT growth parameters}
+( pred.log <- predict(lm1,data.frame(logL=log(200)),interval="c") ) ##(1)
+( bias.pred.orig <- exp(pred.log) ) ##(2)
+( pred.orig <- cf*bias.pred.orig ) ##(3)
+```
+
+### Comparison of Weight-Length relationship {.tabset}
+
+#### Across years
+
+Include year as a factor.  
+```{r condition LT across years}
+LTcond$fyear <- factor(LTcond$Year)
+lm2 <- lm(logW~logL*fyear,data=LTcond)
+```
+
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such
+```{r anova on condition LT across years}
+anova(lm2)
+```
+These results indicate that the interaction terms is significant (p = 1.850e-10). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three years (p = 1.086e-07). 
+
+Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+```{r confint for condition LT across years}
+confint(lm2)
+par(mfrow=c(1,1))
+fitPlot(lm2,xlab="log frozen length (mm)",ylab="log weight (g)",legend="topleft",main="", col=adjustcolor(c("red","blue","grey"), alpha.f = .5))
+```
+
+The difference is not so obvious once plotted
+
+
+#### Across sites
+
+Include sites as a factor.  
+```{r condition LT across sites}
+LTcond$fsites <- factor(LTcond$Local)
+lm3 <- lm(logW~logL*fsites,data=LTcond)
+```
+
+The analysis of variable table is constructed by submitting the saved lm object to anova() as such
+```{r anova condition LT across sites}
+anova(lm3)
+```
+
+These results indicate that the interaction terms is significant (p = 
+0.008697). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three sites (p = 1.193e-13). 
+
+Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
+```{r confint condition LT across sites}
+confint(lm3)
+par(mfrow=c(1,1))
+fitPlot(lm3,xlab="log frozen length (mm)",ylab="log weight (g)",legend="topleft",main="", col=adjustcolor(c("red","blue","grey"), alpha.f = .5))
+```
+
+### Conclusion: a and b parameters
+In <a href=http://www.dnr.state.mi.us/publications/pdfs/ifr/manual/smii%20chapter17.pdf> Schneider et al 2010 report for Michigan Department of Natural Resources</a>, growth parameter are reported for Lake Trout:  
+  *  a= -5.519  
+  *  b= 3.17882  
+_Warning:_ These parameters are not on original scale.  
+We found (see results for lm1):  <br>
+  * a= -5.578692 
+  * b= 3.225599  
+So not too far off.  
+
+To convert them to the initial equation W = aL<sup>b</sup>:  
+```{r conclusion a and b parameters for LT}
+(a= exp(lm1$coefficients[1]))
+(b= lm1$coefficients[2])
+```
+
+Year and sites were significant when we tested for interaction: I should probably use parameter for one year and one site? Or on the contrary, we're aware there's some differences but it's more relevant to average them out by using several years.
+
+
+## Target catch and bycatch
+
+### Read and explore data {.tabset}
+
+First, import the data. They are all kept in different files, so that need to be processed a little bit. <br> 
+[code hidden to save room on the .html] 
+```{r read data catch, message=FALSE, warning=FALSE, include=FALSE}
+# Read data
+# target catch
+tg16 <- read.delim(paste0(getpath4data(), "data_from_Pascal/LT_2016_targetcatch.txt"));tg16$notes <- rep(NA, nrow(tg16))
+tg17 <- read.delim(paste0(getpath4data(), "data_from_Pascal/LT_2017_targetcatch.txt"))
+tg18 <- read.delim(paste0(getpath4data(), "data_from_Pascal/LT_2018_targetcatch.txt"))
+# bycatch
+byc16 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2016_bycatch.txt"))
+byc17 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2017_bycatch.txt"))
+byc18 <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_2018_bycatch.txt"))
+
+# merge dataframe
+tg <- merge(t(tg17),t(tg16), by = "row.names", all = T)
+  rownames(tg) <- tg[,grep("Row.names", colnames(tg))]
+  tg <- tg[,-grep("Row.names", colnames(tg))]
+tg <- merge(t(tg18),tg, by = "row.names", all = T)
+  rownames(tg) <- tg[,grep("Row.names", colnames(tg))]
+  tg <- tg[,-grep("Row.names", colnames(tg))]
+tg <- as.data.frame(t(tg))
+tg <- mutate_all(tg, tolower)
+# Check that we have the correct number of rows - two extra, because rownames were added as columns (and then transformed in rows, so two extra rows)
+dim(tg)
+sum(nrow(tg16)+nrow(tg17)+nrow(tg18))
+
+tg$fyear <- tg$year
+tg$year <- as.numeric(paste(tg$year))
+tg$netID2 <- paste(tg$year,as.numeric(paste(tg$netID)),sep="_")
+
+date <- as.POSIXlt(tg$date, format = "%d/%m/%Y")
+tg$yday <- date$yday
+tg <- tg[order(date),]
+head(tg)
+
+# Do the same for bycatch
+byc <- merge(t(byc17),t(byc16), by = "row.names", all = T)
+rownames(byc) <- byc[,grep("Row.names", colnames(byc))]
+byc <- byc[,-grep("Row.names", colnames(byc))]
+byc <- merge(t(byc18),byc, by = "row.names", all = T)
+rownames(byc) <- byc[,grep("Row.names", colnames(byc))]
+byc <- byc[,-grep("Row.names", colnames(byc))]
+byc <- as.data.frame(t(byc))
+byc <- mutate_all(byc, tolower)
+# Check that we have the correct number of rows - two extra, because rownames were added as columns (and then transformed in rows, so two extra rows)
+dim(byc)
+sum(nrow(byc16)+nrow(byc17)+nrow(byc18))
+
+byc$fyear <- byc$year
+byc$year <- as.numeric(paste(byc$year))
+byc$netID2 <- paste(byc$year,as.numeric(paste(byc$netID)),sep="_")
+
+date <- as.POSIXlt(byc$date, format = "%d/%m/%Y")
+byc$yday <- date$yday
+byc <- byc[order(date),]
+head(byc)
+
+
+
+```
+
+
+Summary of the target catch and bycatch. Note that for bycatch, a count doesn't represent one individual necesseraly, because sometimes presence was recorded in tote fullness.
+
+```{r summary target and by catch, message=FALSE, warning=FALSE, include=FALSE}
+summ_tg <- with(tg, tapply(rep(1,nrow(tg)),list("species#"=species,"Year#"=year), sum))
+
+summ_by <- with(byc, tapply(rep(1,nrow(byc)),list("species#"=species,"Year#"=year), sum))
+
+```
+
+#### Target catch
+```{r view target catch, echo=FALSE}
+as.data.frame(summ_tg)
+```
+
+#### Bycatch
+```{r view bycatch, echo=FALSE}
+as.data.frame(summ_by)
+```
+
+### Look more in details at target catch data
+
+The distribution of length is relatively similar one year to the other, with a spreader distribution in 2017. Most fish caught are less than 50 cm long.  
+
+```{r plot target catch length density, echo=FALSE, message=FALSE, warning=FALSE}
+tg$tl_mm <- tg$tl_mm  %>% paste() %>% as.numeric()
+
+# mean 
+mu <- ddply(tg, "fyear", summarise, grp.mean=mean(tl_mm, na.rm=T))
+# Density plot
+p <- ggplot(tg, aes(x=tl_mm, fill=fyear)) +
+  geom_density()+
+  geom_vline(data=mu, aes(xintercept=grp.mean, color=fyear),
+             linetype="dashed") +
+  geom_density(alpha=0.2) +
+  xlab("total length (mm)") + 
+  labs(fill='Year')
+ ggplotly(p)
+
+```
+
+The variation in length is linked to the capture day of the year, but probably because some species with really different size were caught only then. Year is also a significant explanatory variable. However, there is a lot of noise (very low R<sup>2</sup>).  
+```{r explain variation in max total length, echo=FALSE}
+lm4a <- lm(tl_mm ~ yday, data=tg)
+lm4b <- lm(tl_mm ~ yday*fyear, data=tg)
+lm4c <- lm(tl_mm ~ yday*fyear*species, data=tg)
+lm4d <- lm(tl_mm ~ yday*species, data=tg)
+AIC(lm4a,lm4b,lm4c,lm4d)[order(AIC(lm4a,lm4b,lm4c,lm4d)$AIC),]
+
+```
+
+All AIC are high. Species explain the most, which doesn't come as a surprise: not all species grow as big as the others. 
+We're looking at the results of the first model that doesn't include the species (we do not necesseraly want to see how some species are bigger than other here, the idea is to know whether the sampling day in the season or the year have targetted different catch.
+There are no strong trend, if larger species were collected on some days, it may have to do with whe zone of the lake that was surveyed instead of actual in-year variation.
+The only species with a real trend is sea lamprey. Average size increases by about 200 mm over the season.
+
+```{r summary on model explaining best total length,  echo=FALSE, message=FALSE, warning=FALSE}
+summary(lm4b)
+
+ggplot(tg[tg$species=="lake trout"|tg$species=="alewife"|tg$species=="lake whitefish"|tg$species=="rainbow smelt"|tg$species=="sea lamprey"|tg$species=="burbot",], aes(x=yday,y=tl_mm,color=fyear)) + geom_point() + stat_smooth() + facet_wrap(~species)
+
+```
+
+## Extract mortality for LT from only wild data
+
+```{r try looking at mortality in wild LT, include=FALSE}
+# create a dataframe with lake trout wild
+ltw <- tg[tg$species == "lake trout",]
+ltw <- ltw[ltw$fin_clip == "na" | ltw$fin_clip == "nc" ,]
+nrow(ltw)
+
+par(mfrow=c(3,1))
+hist(ltw$tl_mm[ltw$year==2016], col=adjustcolor("yellow", alpha.f = .4), xlim=c(0,max(ltw$tl_mm, na.rm = T)), xlab="length (mm)", main="2016")
+hist(ltw$tl_mm[ltw$year==2017], col=adjustcolor("grey", alpha.f = .4), xlim=c(0,max(ltw$tl_mm, na.rm = T)), xlab="length (mm)", main="2017")
+hist(ltw$tl_mm[ltw$year==2018], col=adjustcolor("pink", alpha.f = .4), xlim=c(0,max(ltw$tl_mm, na.rm = T)), xlab="length (mm)", main="2018")
+par(mfrow=c(1,1))
+
+
+
+```
+
+
+## Lake Trout diet analysis
+
+Helping Alex with some code, but he'll do the bulk of it (see other .Rmd on diet analysis).  
+An example with the size, but he will do the same to look at stomach content. Here, we learn that 40% of our sample of fish smaller than 100mm were sampled in 2016. (but he will repeat it to learn whether size class impact stomach emptyness)
+
+```{r LT diet analysis create size class, echo=FALSE}
+
+# Create the size class in a new column
+tg <- tg  %>% mutate(size_class = case_when(
+                      tl_mm <= 100 ~ "[0,100]",
+        tl_mm > 100 & tl_mm <= 200 ~ "]100,200]", 
+        tl_mm > 200 & tl_mm <= 300 ~ "]200,300]",
+        tl_mm > 300 & tl_mm <= 400 ~ "]300,400]",
+        tl_mm > 400                ~ "]400,∞]"))
+
+# This is a way around since we're not going to use the histogram function (that deals with counts), but histogram instead (we're getting the count another way). Look up the difference between histogram and barplots and let me know if you don't understand it.
+# First step, I'm getting here the number of row that correspond to these two factors. You would want to replace 'Year' by 'empty_stomach'. Note that the two columns (size_class and fyear) are factors.
+(summ_sc <- with(tg, tapply(rep(1,nrow(tg)),list("Size class"=size_class, "Year"=fyear), sum)))
+
+# Then, to get the percentage of fish with empty stomach per size class, you would do the following:
+(summ_sc <- as.data.frame(summ_sc/rowSums(summ_sc, na.rm=T)))
+# Here, we learn that 40% of our sample of fish smaller than 100mm were sampled in 2016.
+
+# You can plot the output in a histogram (here I'm only plotting the proportion that was sampled in 2016, you will only plot the proportion were empty_stomach = F).
+ggplot(data=summ_sc, aes(x=rownames(summ_sc),y=summ_sc[,1])) +
+  geom_bar(stat="identity") + xlab("Size class") + ylab("Percentage") 
+
+```
+
+### Stomach full (Y/N) per size
+
+```{r LT stomach full Y or N, message=FALSE, warning=FALSE, include=FALSE}
+LTdiet <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_diet_2016-2018.txt"))
+LTdiet$Total.Length <- as.numeric(paste(LTdiet$Total.Length..mm.))
+LTdiet$Start.Depth <- as.numeric(paste(LTdiet$Start.Depth..m.))
+LTdiet$Food.in.Stomach..Y.N.
+colnames(LTdiet) <- str_replace(colnames(LTdiet), "Food.in.Stomach..Y.N.", "Food.in.Stomach")
+summary(LTdiet$Food.in.Stomach)
+LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="no"] <- "N"
+LTdiet$Food.in.Stomach[LTdiet$Food.in.Stomach=="yes"|LTdiet$Food.in.Stomach=="T"] <- "Y"
+summary(LTdiet$Food.in.Stomach)
+LTdiet$stock.wild <- ifelse(LTdiet$Clip.Location == "NC", "Wild", "Stocked")
+
+# Create the size class in a new column
+LTdiet <- LTdiet  %>% mutate(size_class = case_when(
+  Total.Length <= 100 ~ "[0,100]",
+  Total.Length > 100 & Total.Length <= 200 ~ "]100,200]", 
+  Total.Length > 200 & Total.Length <= 300 ~ "]200,300]",
+  Total.Length > 300 & Total.Length <= 400 ~ "]300,400]",
+  Total.Length > 400 & Total.Length <= 500 ~ "]400,500]",
+  Total.Length > 500 ~ "]500,∞]"))
+
+# First step, I'm getting here the number of row that correspond to these two factors. 
+summ_sc <- with(LTdiet, tapply(rep(1,nrow(LTdiet)),list("Size class"=size_class, "Food"=Food.in.Stomach), sum))
+(summ_sc <- summ_sc[,colSums(summ_sc, na.rm = T)>0])
+summ_sc2 <- melt(summ_sc[,c('Y','N')],id.vars = 1)
+
+# Then, to get the percentage of fish with empty stomach per size class, you would do the following:
+(summ_sc_per <- as.data.frame(summ_sc/rowSums(summ_sc, na.rm=T)))
+
+```
+
+Fish above 400 mm have less food in their stomach but thats also the class with the least catch.
+
+```{r percent fish with food in stomach, echo=FALSE, message=FALSE, warning=FALSE}
+# You can plot the output in a histogram (here I'm only plotting the proportion that was sampled in 2016, you will only plot the proportion were empty_stomach = F).
+p1 <- ggplot(summ_sc2,aes(x = `Size class`,y = value)) + 
+    geom_bar(aes(fill = Food),stat = "identity",position = "dodge") + 
+     xlab("Size class") + ylab("Number of fish per size class")  +
+    theme(legend.position="bottom")
+ggplotly(p1)
+
+p2 <- ggplot(data=summ_sc_per, aes(x=rownames(summ_sc_per),y=summ_sc_per[,"Y"])) +
+  geom_bar(stat="identity") + xlab("Size class") + ylab("Percentage of individuals with \nat least some food in their stomach") 
+ggplotly(p2)
+```
+
+
+### Stomach full (Y/N) per time of sampling
+
+```{r LT stomach fullness per time of sampling create data, message=FALSE, warning=FALSE, include=FALSE}
+head(LTeff)
+tail(LTdiet)
+#load lubridate to handle several date/time format
+LTdiet$Capture.Date2 <- parse_date_time(x = LTdiet$Capture.Date,orders = c("d-b-y", "m/d/y", "m/d/Y"))
+# 6 without actual sampling date written as "unknown 2016"
+```
+
+Here, we need to link diet data to the sampling info (effort dataset).
+Some fish (`r length(LTdiet$Capture.Date2[is.na(LTdiet$Capture.Date2)])
+`) don't have the sample date available (e.g., line 451-456, it says "unknown 2016"). I'm removing these from the analysis.  
+
+Here, we could match every fish to the effort, using first day of sampling, then starting depth.
+
+```{r LT stomach fullness per time of sampling, message=FALSE, warning=FALSE, include=FALSE}
+# Removing the unknown date we can't link back to the effort
+LTdiet <- LTdiet[!is.na(LTdiet$Capture.Date2),]
+
+# Match
+LTeff$Capture.Date2 <- parse_date_time(x = LTeff$date,orders = c("%Y-%m-%d"))
+
+LTdiet$Hour.sampled <- rep(NA, nrow(LTdiet))
+for (i in 1:nrow(LTdiet)) {
+  if(i==1) {n1=0;n2=0}
+  narrow2day <- LTeff[LTeff$Capture.Date2==LTdiet$Capture.Date2[i],]
+  effortdate <- narrow2day[narrow2day$start.depth.m==LTdiet$Start.Depth[i],]
+  if(nrow(effortdate)==1) {
+    LTdiet$Hour.sampled[i] <- substr(effortdate$start.time,1,2)
+    n1 <- n1+1 # for info message
+  } else {
+      n <- n2+1 # for info message
+      }
+  # Info message
+  if(i==nrow(LTdiet)) message(paste0(" ✓ Found single sampling event for ", n1," of the individuals","\n ✕ No or several sampling events were found for ", n2, " of the individuals" ))
+}
+
+LTdiet$Hour.sampled <- as.numeric(paste(LTdiet$Hour.sampled))
+
+# Create class for hour in the day in a new column
+min(LTdiet$Hour.sampled, na.rm=T)
+max(LTdiet$Hour.sampled, na.rm=T)
+LTdiet <- LTdiet  %>% mutate(hour_class = case_when(
+  Hour.sampled >= 5 & Hour.sampled <= 6 ~ "5am-6am", 
+  Hour.sampled >= 7 & Hour.sampled <= 8 ~ "7am-8am",
+  Hour.sampled >= 9 & Hour.sampled <= 10 ~ "9am-10am",
+  Hour.sampled >= 10 & Hour.sampled <= 10 ~ "10am-11am", 
+  Hour.sampled >= 12 & Hour.sampled <= 13 ~ "12pm-1pm", 
+  Hour.sampled >= 14 & Hour.sampled <= 15 ~ "2pm-3pm", 
+  Hour.sampled >= 16 & Hour.sampled <= 17 ~ "4pm-5pm"))
+
+# Actually I won't even do it by hour class but just by hour
+
+# First step, I'm getting here the number of row that correspond to these two factors. 
+summ_hc <- with(LTdiet, tapply(rep(1,nrow(LTdiet)),list("Hour class"=Hour.sampled, "Food"=Food.in.Stomach), sum, na.rm=T))
+(summ_hc <- summ_hc[,colSums(summ_hc, na.rm = T)>0])
+
+# Then, to get the percentage of fish with empty stomach per size class, you would do the following:
+(summ_hc <- as.data.frame(summ_hc/rowSums(summ_hc, na.rm=T)))
+
+
+```
+
+```{r plot percentage of individuals with food in stomach per time of the day, echo=FALSE, message=FALSE, warning=FALSE}
+# You can plot the output in a histogram (here I'm only plotting the proportion that was sampled in 2016, you will only plot the proportion were empty_stomach = F).
+p1 <- qplot(LTdiet$Hour.sampled,geom="histogram",binwidth = 1,  main = "Number of observations", xlab = "Hour of the day",col=I("white"))
+ggplotly(p1)
+
+p1 <- ggplot(data=summ_hc, aes(x=as.numeric(rownames(summ_hc)),y=summ_hc[,"Y"])) +
+  geom_bar(stat="identity") + xlab("Time of the day") + ylab("Percentage of individuals with \nat least some food in their stomach") 
+ggplotly(p1)
+
+
+```
+
+
+### Stomach contents for all Lake Trout
+
+Here is a distribution of the food items preyed upon by lake trout. Some of the most common food items include alewife, mysus, and daphnia, which make up over 58.3% of their diet. The next sections will break down their diet for each length class. The "other" category contributes over 35.6% of the lake trout's diet, so there's a large portion of their diet that was unidentified.
+
+```{r as numeric for stomach content and visualisation, echo=FALSE, message=FALSE, warning=FALSE}
+LTdiet$Smelt <- as.numeric(LTdiet$Smelt)
+LTdiet$Smelt.YOY <- as.numeric(LTdiet$Smelt.YOY)
+LTdiet$Alewife <- as.numeric(LTdiet$Alewife)
+LTdiet$Alewife.YOY <- as.numeric(LTdiet$Alewife.YOY)
+LTdiet$Sculpin <- as.numeric(LTdiet$Sculpin)
+LTdiet$Sculpin.YOY <- as.numeric(LTdiet$Sculpin.YOY)
+LTdiet$YOY <- as.numeric(LTdiet$YOY)
+LTdiet$Mysis <- as.numeric(LTdiet$Mysis)
+LTdiet$Yellow.Perch <- as.numeric(LTdiet$Yellow.Perch)
+LTdiet$Unidentifiable.Fish <- as.numeric(LTdiet$Unidentifiable.Fish)
+LTdiet$Daphnia <- as.numeric(LTdiet$Daphnia)
+LTdiet$Copepod <- as.numeric(LTdiet$Copepod)
+LTdiet$zoops <- as.numeric(LTdiet$zoops)
+LTdiet$Spiny.Water.Flea <- as.numeric(LTdiet$Spiny.Water.Flea)
+LTdiet$Trout.perch <- as.numeric(LTdiet$Trout.perch)
+LTdiet$Tess..Darter <- as.numeric(LTdiet$Tess..Darter)
+LTdiet$Macroinvert <- as.numeric(LTdiet$Macroinvert)
+LTdiet$fishes <- as.numeric(LTdiet$fishes)
+LTdiet$Other <- as.numeric(LTdiet$Other)
+
+sumFoods <- colSums(LTdiet[, 21:39], na.rm = FALSE, dims = 1)
+sumFoods <- sumFoods[!is.na(sumFoods)]
+contents.all <- as.data.frame(sumFoods)
+ID <- rownames(contents.all)
+propFoods <- sumFoods / sum(sumFoods) * 100
+
+contents.all <- data.frame(sumFoods, propFoods, ID)
+
+diet.total <- ggplot(data = contents.all, mapping = aes(x = "", y = propFoods, fill = contents.all$ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item")
+
+ggplotly(diet.total)
+```
+
+### Stomach Contents for Each Length Class
+
+I'm creating six different bar plots to show the distribution of feeding patterns for each of the size classes we created earlier. From a quick glance at the outputs, it appears that lake trout of larger size tend to consume more alewife. In addition, longer lake trout tend to utilize smelt more than smaller lake trout. LT of smaller sizes utilize mysis and zooplankton much more than lake trout of larger size as well. It appears their diet shifts from small items such as mysis and zooplankton early on in their life to larger prey items such as smelt and alewife. 
+
+And just a note for all of us, there are much more efficient ways of obtaining what I wanted here. However, I'm not that advanced! Rosalie has created code with a loop that is much more concise and accomplishes the same thing, but for now, this will do.
+
+<span style="color:red">Note from Rosalie: Hey, it's impressive you've learned so much in 7 months! 80% of being a researcher seems to be about not giving up based on my experience.</span>
+
+
+```{r contents.by.size_class, echo=FALSE}
+# I'm first creating column sums for each of the prey items. 
+sumFoods_0_100 <- colSums(LTdiet[which(LTdiet$size_class == "[0,100]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_100_200 <- colSums(LTdiet[which(LTdiet$size_class == "]100,200]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_200_300 <- colSums(LTdiet[which(LTdiet$size_class == "]200,300]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_300_400 <- colSums(LTdiet[which(LTdiet$size_class == "]300,400]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_400_500 <- colSums(LTdiet[which(LTdiet$size_class == "]400,500]"), 21:39], na.rm = FALSE, dims = 1)
+sumFoods_500_up <- colSums(LTdiet[which(LTdiet$size_class == "]500,∞]"), 21:39], na.rm = FALSE, dims = 1)
+
+# I'm placing these sums in a data frame for now, so I can obtain row names for the next little code chunk. 
+contents.all.SC <- data.frame(sumFoods_0_100, sumFoods_100_200, sumFoods_200_300, sumFoods_300_400, sumFoods_400_500, sumFoods_500_up)
+
+# Now I'm obtaining the prey ID's so I can eventually use them as a filter in my barplots. 
+Food.ID <- rownames(contents.all.SC)
+
+# I'm now calculating percentages of each of the prey items for each size class. 
+propFoods_0_100 <- sumFoods_0_100 / sum(sumFoods_0_100, na.rm = TRUE) * 100
+propFoods_100_200 <- sumFoods_100_200 / sum(sumFoods_100_200, na.rm = TRUE) * 100
+propFoods_200_300 <- sumFoods_200_300 / sum(sumFoods_200_300, na.rm = TRUE) * 100
+propFoods_300_400 <- sumFoods_300_400 / sum(sumFoods_300_400, na.rm = TRUE) * 100
+propFoods_400_500 <- sumFoods_400_500 / sum(sumFoods_400_500, na.rm = TRUE) * 100
+propFoods_500_up <- sumFoods_500_up / sum(sumFoods_500_up, na.rm = TRUE) * 100
+
+# Tossing in the proportions as well as prey ID into the data frame. 
+contents.all.SC <- data.frame(sumFoods_0_100, propFoods_0_100, sumFoods_100_200, propFoods_100_200, sumFoods_200_300, propFoods_200_300, sumFoods_300_400, propFoods_300_400, sumFoods_400_500, propFoods_400_500, sumFoods_500_up, propFoods_500_up, Food.ID)
+
+# Making sure all of the NAs in the data frame are 0, because ggplot doesn't like creating graphs with NAs.
+contents.all.SC[is.na(contents.all.SC)] <- 0
+
+# Barplot for 0-100 size class.
+barplot_0_100 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_0_100, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "[0-100]")
+
+# Barplot for 101-200 size class.
+barplot_100_200 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_100_200, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]100-200]")
+
+# Barplot for 201-300 size class. 
+barplot_200_300 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_200_300, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]200-300]")
+
+# Barplot for 301-400 size class. 
+barplot_300_400 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_300_400, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]300-400]")
+
+# Barplot for 401-500 size class. 
+barplot_400_500 <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_400_500, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]400-500]")
+
+# Barplot for 501 and up size class. 
+barplot_500_up <- ggplot(data = contents.all.SC, mapping = aes(x = "", y = propFoods_500_up, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "]500-∞]")
+
+# Converting all of my ggplot outputs to ggplotly outputs so the users can be interactive with the outputs. 
+ggplotly(barplot_0_100)
+ggplotly(barplot_100_200)
+ggplotly(barplot_200_300)
+ggplotly(barplot_300_400)
+ggplotly(barplot_400_500)
+ggplotly(barplot_500_up)
+```
+
+
+### Stomach Contents in the Main Lake
+
+Share of the diet for main lake. <br>
+/!\\ no age class distinction here.
+
+```{r contents.by.location}
+# Creating a new variable called Lake.Segment based on the capture location. Segments determined from epa.gov document. Hill Bay and Central Lake, NY locations were unidentified on Google Maps, and were therefore placed in the "Unknown" lake segment. 
+LTdiet <- LTdiet %>% mutate(Lake.Segment = case_when(Capture.Location == "Au Sable Point" ~ "Main Lake",
+                                    Capture.Location == "Boquet Bay" ~ "Main Lake",
+                                    Capture.Location == "Boquet Delta to Essex" ~ "Main Lake",
+                                    Capture.Location == "Boquet River" ~ "Main Lake",
+                                    Capture.Location == "Boquet River Delta" ~ "Main Lake",
+                                    Capture.Location == "Burlington Bay" ~ "Main Lake",
+                                    Capture.Location == "Burlington Bay Far" ~ "Main Lake",
+                                    Capture.Location == "Burlington Far" ~ "Main Lake",
+                                    Capture.Location == "Essex" ~ "Main Lake",
+                                    Capture.Location == "Essex  " ~ "Main Lake",
+                                    Capture.Location == "Essex to Bouquet Delta" ~ "Main Lake",
+                                    Capture.Location == "Essex, NY" ~ "Main Lake",
+                                    Capture.Location == "Essex, NY to Whallon" ~ "Main Lake",
+                                    Capture.Location == "Jackson Point" ~ "Main Lake",
+                                    Capture.Location == "Port Kent" ~ "Main Lake",
+                                    Capture.Location == "Providence Island" ~ "Main Lake",
+                                    Capture.Location == "Rockwell" ~ "Main Lake",
+                                    Capture.Location == "Rockwell Bay" ~ "Main Lake",
+                                    Capture.Location == "South Hero- Jackson Pt" ~ "Main Lake",
+                                    Capture.Location == "South Hero- Rockwell Bay" ~ "Main Lake",
+                                    Capture.Location == "South Hero-Jackson Pt" ~ "Main Lake",
+                                    Capture.Location == "Trembleau Point" ~ "Main Lake",
+                                    Capture.Location == "Valcour" ~ "Main Lake",
+                                    Capture.Location == "Whallon" ~ "Main Lake",
+                                    Capture.Location == "Whallon Bay" ~ "Main Lake",
+                                    Capture.Location == "Whallon-Essex" ~ "Main Lake",
+                                    Capture.Location == "Wilcox" ~ "Main Lake",
+                                    Capture.Location == "Willsboro Bay, NY" ~ "Main Lake",
+                                    Capture.Location == "Winooski" ~ "Main Lake"))
+
+# Summing up food items for each lake segment.
+sumFoods_MainLake <- colSums(LTdiet[which(LTdiet$Lake.Segment == "Main Lake"), 21:39], na.rm = FALSE, dims = 1)
+
+# Converting sums to proportions of total diet.
+propFoods_MainLake <- sumFoods_MainLake / sum(sumFoods_MainLake, na.rm = TRUE) * 100
+
+# Creating a data frame with all sums and proportions.
+contents.lake.segment <- data.frame(sumFoods_MainLake, propFoods_MainLake)
+
+# Making sure all of my NAs are 0's again.
+contents.lake.segment[is.na(contents.lake.segment)] <- 0
+
+# Barplot for diet distribution in Main Lake. 
+barplot_MainLake <- ggplot(data = contents.lake.segment, mapping = aes(x = "", y = propFoods_MainLake, fill = contents.all.SC$Food.ID)) +
+  geom_bar(stat = "identity") +
+  theme(axis.title.x = element_blank(), axis.ticks.x = element_blank()) +
+  labs(y = "Proportion of Total Diet", fill = "Food Item", title = "Main Lake")
+
+# Converting ggplot outputs to ggplotly outputs. 
+ggplotly(barplot_MainLake)
+
+```
+
+# Atlantic Salmon
+
+# Burbot
+
+# Lamprey
+
+Waiting on Brad Young data to figure out a plan
+
 
 
 
