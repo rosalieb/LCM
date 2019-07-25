@@ -1,0 +1,126 @@
+---
+title: "Mysis data"
+author: "Rosalie Bruel with data from Jason Stockwell"
+date: "24/07/2019"
+output: 
+  html_document: 
+    df_print: paged
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+editor_options: 
+  chunk_output_type: console
+  df_print: paged
+fontsize: 11pt
+---
+
+_Last updated: `r Sys.Date()`_
+
+# Read data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(gtable) # to get two plots aligned ggplot
+library(grid) # low-level grid functions are required
+library(plotly)
+library(reshape2)
+library(lubridate)
+library(Hmisc) # for errbar plots
+library(changepoint)
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
+```
+
+```{r load datasets, echo=FALSE, message=FALSE, warning=FALSE}
+mysis <- read.delim(paste0(getpath4data(), "data_from_Jason/mysis_long_term.txt"))
+mysis$Date <- parse_date_time(mysis$Date, orders = c("d/m/Y"))
+head(mysis)
+```
+
+Lake Champlain Mysid net tows = 0.5 m net, whole water column tows. 
+To calculate the net area, we use the formula for the volume of a cylinder: $V = r^2 * \pi $
+
+```{r get net area fo mysis tow}
+diameter_tow = 0.5
+net_area = (diameter_tow/2)^2*pi
+```
+
+The #/m<sup>2</sup> is obtained that by dividing the number counted in the tow by the volume.
+
+```{r recalculate the number of mysis per m2}
+mysis$number.m2 = mysis$Total/net_area
+```
+
+# Calculate average per year.
+
+
+```{r average mysis per year, echo=FALSE, message=FALSE, warning=FALSE}
+mysis_summ_d <- as.data.frame(with(mysis, tapply(number.m2
+  ,list("Year"=Year,"depth_round"=round(mysis$Depth/10)*10), mean, na.rm=T)))
+mysis_summ_d <- data.frame(melt(mysis_summ_d), "Year"=rep(unique(mysis$Year), times=ncol(mysis_summ_d)))
+
+ggplot(mysis_summ_d, aes(variable, Year)) + geom_tile(aes(fill = value),colour = "white") + scale_fill_gradient(low = "white", high = "steelblue") + ggtitle("Total number of mysis per m2") + xlab("Average depth (rounded to 10 m)")
+
+
+```
+
+
+```{r summary biomass per year, echo=FALSE, message=FALSE, warning=FALSE}
+mysis_summ <- data.frame(
+  "Year"=unique(mysis$Year),
+  "mean"=as.vector(with(mysis, tapply(number.m2
+  ,list("Year"=Year), mean, na.rm=T))),
+  "sd"=as.vector(with(mysis, tapply(number.m2
+  ,list("Year"=Year), sd, na.rm=T))))
+
+mysis_summ
+```
+
+
+```{r view data}
+with (data=mysis_summ
+      , expr = errbar(Year,mean,mean+sd/2,mean-sd/2, pch=16, cap=.01, xlab="Year",ylab="mean density (# mysis/m2)", cex=.8)
+        )
+```
+
+# Changepoint analysis
+
+```{r do changepoint analysis}
+#library(changepoint)
+ans=cpt.mean(as.vector(mysis_summ$mean))
+summary(ans)
+#mysis_summ$Year[cpts(ans)]
+```
+
+Changepoint detected in `r mysis_summ$Year[cpts(ans)]`.
+
+```{r plot changepoint on graph}
+lm1 <- lm(mysis_summ$mean[1:cpts(ans)]~mysis_summ$Year[1:cpts(ans)])
+lm2 <- lm(mysis_summ$mean[-c(1:cpts(ans))]~mysis_summ$Year[-c(1:cpts(ans))])
+
+
+with (data=mysis_summ
+      , expr = errbar(Year,mean,mean+sd/2,mean-sd/2, pch=16, cap=.01, xlab="Year",ylab="mean density (# mysis/m2)", cex=.8)
+        )
+
+
+
+lines(mysis_summ$Year[1:cpts(ans)], c(lm1$coefficients[1]+mysis_summ$Year[1:cpts(ans)]*lm1$coefficients[2]), lwd=2)
+
+lines(mysis_summ$Year[-c(1:cpts(ans))], c(lm2$coefficients[1]+mysis_summ$Year[-c(1:cpts(ans))]*lm2$coefficients[2]), lwd=2)
+                            
+
+
+```
+
+
