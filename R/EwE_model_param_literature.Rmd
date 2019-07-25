@@ -86,7 +86,7 @@ Parameters are available for `r length(unique(mp$Species))` species (with some r
 `r paste("- ",unique(mp$Species)[order(unique(mp$Species))], collapse="<br>  ")`
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-msp <- c("Sea lamprey","Lake trout","Atlantic Salmon","Burbot","Cisco","Whitefish","Trout perch","Alewife","Rainbow smelt", "Slimy sculpin", "Mysis", "Bythotrephes","Zooplankton", "Phytoplankton", "Benthic invertebrates", "Detritus")
+msp <- c("Sea lamprey","Lake trout","Atlantic Salmon","Burbot","Cisco","Whitefish","Trout perch","Alewife","Rainbow smelt", "Slimy sculpin", "Mysis", "Bythotrephes","Zooplankton", "Phytoplankton", "Benthic invertebrates", "Dreissenid mussels", "Detritus")
 
 ```
 
