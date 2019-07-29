@@ -106,7 +106,7 @@ summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0)
 
 # Work on zooplankton
 
-The multiplied factor for rotifers comes from <a href= "http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.595.698&rep=rep1&type=pdf"> </a>.
+The multiplied factor for the rotifer group comes from species in <a "https://www.researchgate.net/publication/279910395_Empirical_equations_for_biomass_calculation_of_planktonic_rotifers"> </a>. The multiplied factor for the calanoid group comes from <a "https://www.researchgate.net/publication/10674663_Culture_of_Harpacticoid_Copepods_Potential_as_Live_Feed_for_Rearing_Marine_Fish"> </a>.
 
 The biomass values for each zooplankton group represent grams of t/km3 of dry weight. 
 
@@ -178,11 +178,11 @@ zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 32.15  / 1000000 * 1000000000 / 1000
 zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA * 6.32   / 1000000 * 1000000000 / 1000000
 zoo$LEPTO_biom        <- zoo$LEPTO        * 113.31 / 1000000 * 1000000000 / 1000000
 zoo$CYCLOP_biom       <- zoo$CYCLOP       * 16.52  / 1000000 * 1000000000 / 1000000
-zoo$CALANOID_biom     <- zoo$CALANOID     * 0.00   / 1000000 * 1000000000 / 1000000
-zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.2556 / 1000000 * 1000000000 / 1000000 
+zoo$CALANOID_biom     <- zoo$CALANOID     * 4      / 1000000 * 1000000000 / 1000000
+zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.824  / 1000000 * 1000000000 / 1000000 
 zoo$COPEPOD_biom      <- zoo$COPEPOD      * 1.58   / 1000000 * 1000000000 / 1000000
 zoo$PREDATOR_biom     <- zoo$PREDATOR     * 94.77  / 1000000 * 1000000000 / 1000000
-zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * 1.86   / 1000000 * 1000000000 / 1000000
+zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * 1.54   / 1000000 * 1000000000 / 1000000
 zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 23.59  / 1000000 * 1000000000 / 1000000
 zoo$PARASITIC_biom    <- zoo$PARASITIC    * 0.00   / 1000000 * 1000000000 / 1000000
 
