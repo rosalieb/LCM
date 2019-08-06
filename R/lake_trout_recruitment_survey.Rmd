@@ -667,6 +667,9 @@ byc <- byc[order(date),]
 head(byc)
 
 
+#Save bycatch and target catch
+# write.table(tg, file=paste0(getpath4data(),"data_from_Pascal/target_catch_2016-2018.txt"), sep="\t")
+# write.table(byc, file=paste0(getpath4data(),"data_from_Pascal/bycatch_2016-2018.txt"), sep="\t")
 
 ```
 

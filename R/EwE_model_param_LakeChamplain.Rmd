@@ -104,6 +104,25 @@ summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0)
 ```
 
 
+```{r read target and bycatch data here because they could be used at several steps, message=FALSE, warning=FALSE, include=FALSE}
+tg <- read.delim(paste0(getpath4data(),"data_from_Pascal/target_catch_2016-2018.txt"))
+#head(tg)
+byc <- read.delim(paste0(getpath4data(),"data_from_Pascal/bycatch_2016-2018.txt"))
+#head(byc)
+
+```
+Here are also the number of observations collected for different species during the trawls (`r min(tg$year,na.rm=T)`-`r max(tg$year,na.rm=T)`).
+
+```{r summary target/bycatch, message=FALSE, warning=FALSE, include=FALSE}
+summ_tg <- with(tg, tapply(rep(1,nrow(tg)),list("species#"=species,"Year#"=year), sum))
+summ_by <- with(byc, tapply(rep(1,nrow(byc)),list("species#"=species,"Year#"=year), sum))
+summ_tgby <- as.data.frame(rbind(summ_tg,summ_by))
+summ_tgby$df_origin <- c(rep("targetcatch",nrow(summ_tg)),rep("bycatch",nrow(summ_by)))
+summ_tgby <- summ_tgby[order(rownames(summ_tgby)),]
+summ_tgby
+```
+
+
 # Detritus
 
 We use Pauly et al (1993) equation to calculate the biomass of detritus:  
@@ -130,6 +149,7 @@ secchi_depth_p
 
 eu_z = 4.9
 ```
+<br>
 We set the euphotic zone for the main lake (StationID= 16 & 19) at `r eu_z` m.
 
 The following code is not run yet, we need a value for the primary production.
@@ -462,10 +482,36 @@ Use dresseinid mussels?
 
 # Trout-perch
 
+__Data:__  
+Data come from the bycatch data collected during trawling.
+
+## Sample locations for trout-perch data    
+Data for trout perch (`r nrow(byc$species=="trout-perch",])` observations) were collected and are summarized in the bycatch dataframe. Observations on `r length(summary(byc$site[byc$species=="trout-perch"]))` sites -- sites with higher number of observation are listed below.
+
+```{r where are trout perch found, echo=FALSE, message=FALSE, warning=FALSE}
+summ_tp <- summary(byc$site[byc$species=="trout-perch"])
+summ_tp[order(summ_tp, decreasing = T)][1:5]
+
+```
+
+
+```{r}
+#trout perch subset
+tps <- byc[byc$species=="trout-perch" & byc$site=="burlington bay",]
+tps$tote..fullness.[tps$tote..fullness.=="na"] <- NA
+tps$est_number[tps$est_number=="na"] <- NA
+tps$est_number <- as.numeric(paste(tps$est_number))
+length(tps$tote..fullness.[!is.na(tps$est_number)])
+length(tps$tote..fullness.[is.na(tps$est_number)])
+
+```
+
+
 # Smelt
 For fish in general, we need to get the a and b parameters of the $ W = a L^{b} $ equation.
 
-__Data:__ <br>
+__Data:__ 
+<br>
 The data was provided by Ellen Marsden. It contains 24,982 observations of smelt. Each row has some metadata associated (date and basin sampled) as well as individuals characteristics (length, weight, year class, condition).
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
@@ -1094,7 +1140,7 @@ p2
 
 Based on <a href=http://derekogle.com/fishR/examples/oldFishRVignettes/LengthWeight.pdf> this tutorial by Derek Ogle</a>, using FSA package.
 The relationship between length and weigth is not linear, because length is a linear measure and weight is related to volume
-```{r W ~ L plot for LT}
+```{r W by L plot for LT}
 par(mfrow=c(1,2))
 plot(LTcond$weight ~ LTcond$frozen.tl,xlab="total length (mm)",ylab="weight (g)",main="", pch=20)
 
@@ -1107,7 +1153,7 @@ fitPlot(lm1,xlab="log total length (mm)",ylab="log weight (g)",main="")
 ```
 
 The relationship is indeed not linear, but we can get the coefficients by log-transforming the data. The coefficients are given below:
-```{r summary W ~ L for LT}
+```{r summary W by L for LT}
 summary(lm1)
 ```
 
@@ -1306,12 +1352,12 @@ summ_by <- with(byc, tapply(rep(1,nrow(byc)),list("species#"=species,"Year#"=yea
 
 #### Target catch
 ```{r view target catch, echo=FALSE}
-as.data.frame(summ_tg)
+summ_tg
 ```
 
 #### Bycatch
 ```{r view bycatch, echo=FALSE}
-as.data.frame(summ_by)
+summ_by
 ```
 
 ### Look more in details at target catch data
