@@ -173,18 +173,18 @@ zoo$Month        <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%m"))
 zoo$yday         <- as.numeric(format(as.Date(zoo$VisitDate, "%Y-%m-%d"),"%j"))
 
 # Biomass values      <- old zoop counts  ug/m3    g/m3      g/km3        t/km3
-zoo$BOSMINA_biom      <- zoo$BOSMINA      *  1.337 / 1000000 * 1000000000 / 1000000
-zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 25.835 / 1000000 * 1000000000 / 1000000
-zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA *  2.975 / 1000000 * 1000000000 / 1000000
-zoo$LEPTO_biom        <- zoo$LEPTO        * 11.120 / 1000000 * 1000000000 / 1000000
-zoo$CYCLOP_biom       <- zoo$CYCLOP       * 11.943 / 1000000 * 1000000000 / 1000000
-zoo$CALANOID_biom     <- zoo$CALANOID     * 29.301 / 1000000 * 1000000000 / 1000000
-zoo$ROTIFER_biom      <- zoo$ROTIFER      *  0.824 / 1000000 * 1000000000 / 1000000 
-zoo$COPEPOD_biom      <- zoo$COPEPOD      *  2.113 / 1000000 * 1000000000 / 1000000
-zoo$PREDATOR_biom     <- zoo$PREDATOR     * 28.330 / 1000000 * 1000000000 / 1000000
-zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    *  2.390 / 1000000 * 1000000000 / 1000000
-zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 24.960 / 1000000 * 1000000000 / 1000000
-zoo$PARASITIC_biom    <- zoo$PARASITIC    *  4.000 / 1000000 * 1000000000 / 1000000
+zoo$BOSMINA_biom      <- zoo$BOSMINA      *  12.252 / 1000000 * 1000000000 / 1000000
+zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 195.881 / 1000000 * 1000000000 / 1000000
+zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA *  26.219 / 1000000 * 1000000000 / 1000000
+zoo$LEPTO_biom        <- zoo$LEPTO        * 163.714 / 1000000 * 1000000000 / 1000000
+zoo$CYCLOP_biom       <- zoo$CYCLOP       *  96.724 / 1000000 * 1000000000 / 1000000
+zoo$CALANOID_biom     <- zoo$CALANOID     * 229.355 / 1000000 * 1000000000 / 1000000
+zoo$ROTIFER_biom      <- zoo$ROTIFER      *   7.861 / 1000000 * 1000000000 / 1000000 
+zoo$COPEPOD_biom      <- zoo$COPEPOD      *  19.126 / 1000000 * 1000000000 / 1000000
+zoo$PREDATOR_biom     <- zoo$PREDATOR     * 213.582 / 1000000 * 1000000000 / 1000000
+zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    *  21.039 / 1000000 * 1000000000 / 1000000
+zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 187.096 / 1000000 * 1000000000 / 1000000
+zoo$PARASITIC_biom    <- zoo$PARASITIC    *  35.039 / 1000000 * 1000000000 / 1000000
 
 # Model species
 library(mgcv)
