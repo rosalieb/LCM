@@ -173,7 +173,7 @@ ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[, 100:107]))) +
 myplot_yr1 <- 
   function(year) {
     zoop_sub <- zoo[zoo$Year == year,]
-    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 100:107]))) +
+    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 100:107]))) +
       geom_bar(stat = "identity") +
       labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
   }
@@ -181,7 +181,7 @@ myplot_yr1 <-
 myplot_yr2 <- 
   function(year) {
     zoop_sub <- zoo[zoo$Year == year,]
-    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 84:91]))) +
+    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 84:91]))) +
       geom_bar(stat = "identity") +
       labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
   }
@@ -235,10 +235,10 @@ myplot_group2 <-
 ```
 
 ```{r}
-for (i in zoo[,84:95]) {
+for (i in 1:ncol(zoo[,84:95])) {
   # cat('\n')  
   # cat("####Counts for", "\n") 
-  myplot_group2(group = i)
+  myplot_group2(group = names(zoo[,84:95])[i])
   # cat('\n') 
 }
 ```
