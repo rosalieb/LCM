@@ -207,39 +207,30 @@ for (i in 1993:2013) {
 
 ```{r}
 myplot_group1 <- 
-  function(group) {
-    print(ggplot(data = zoo, mapping = aes(x = zoo$Month, y = group)) +
+  function(group, group_names) {
+    print(ggplot(data = zoo, mapping = aes(x = Month, y = group)) +
       geom_bar(stat = "identity") +
-      labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month", title = group))
+      labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
+  }
+
+myplot_group2 <- 
+  function(group, group_names) {
+    print(ggplot(data = zoo, mapping = aes(x = Year, y = group)) +
+      geom_bar(stat = "identity") +
+      labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Year"))
   }
 ```
 
 ```{r, results = 'asis'}
 # Can't figure out how to create headers for each of the graphs using the names of the columns 
-for (i in zoo[,84:95]) {
-  # cat('\n')  
-  # cat("####Counts for", "\n") 
-  print(paste0(colnames(i)))
-  myplot_group1(group = i)
-  # cat('\n') 
+for (i in 84:95) {
+  cat('\n')  
+  cat("####Counts for", names(zoo[i]), " by month \n")
+  myplot_group1(group = zoo[,i], group_names = names(zoo[i]))
+  cat('\n') 
+  cat('\n')  
+  cat("####Counts for", names(zoo[i]), " by year \n") 
+  myplot_group2(group = zoo[,i], group_names = names(zoo[i]))
+  cat('\n')
 }
 ```
-
-```{r}
-myplot_group2 <- 
-  function(group) {
-    print(ggplot(data = zoo, mapping = aes(x = zoo$Year, y = group)) +
-      geom_bar(stat = "identity") +
-      labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
-  }
-```
-
-```{r}
-for (i in 1:ncol(zoo[,84:95])) {
-  # cat('\n')  
-  # cat("####Counts for", "\n") 
-  myplot_group2(group = names(zoo[,84:95])[i])
-  # cat('\n') 
-}
-```
-
