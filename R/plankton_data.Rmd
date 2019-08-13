@@ -106,9 +106,7 @@ summary(which(rowSums(phyto[,-c(1,2)])!=0) %in% which(rowSums(zoo[,-c(1,2)])!=0)
 
 # Work on zooplankton
 
-The multiplied factor for the rotifer group comes from species in <a "https://www.researchgate.net/publication/279910395_Empirical_equations_for_biomass_calculation_of_planktonic_rotifers"> </a>. The multiplied factor for the calanoid group comes from <a "https://www.researchgate.net/publication/10674663_Culture_of_Harpacticoid_Copepods_Potential_as_Live_Feed_for_Rearing_Marine_Fish"> </a>.
-
-The biomass values for each zooplankton group represent grams of t/km3 of dry weight. 
+The biomass values for each zooplankton group represent grams of t/km3 of wet weight. Most data from literature provided weights in dry weight. The conversion from dry weight to wet weight values comes from the 12th equation in Table 2 in the following paper: <a href="https://spo.nmfs.noaa.gov/sites/default/files/pdf-content/1975/734/wiebe.pdf"> </a>. 
 
 ```{r group zoop species}
 # Group the data by at least genus
