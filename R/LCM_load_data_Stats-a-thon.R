@@ -53,40 +53,41 @@ for (i in 1:length(replicates)) {
     # If meaurements are taken at less than 2m difference, I'm also doing an average
     # There's lot of instance where depths documented are 2 and 1.8 for instance, they are basically the same sample
     # When only one out of two depths are given, it's impossible to know for sure whether we're looking at duplicates or different layers. Right now I'm calculating an average.
-    if(test1$Depth[1]==test1$Depth[2] | "COM" %in% test1$Depth | any(nchar(paste(test1$Depth ))<1)  | abs(as.numeric(as.character(test1$Depth[1]))-as.numeric(as.character(test1$Depth[2])))<2) {
+    if(test1$Depth[1]==test1$Depth[2] || "COM" %in% test1$Depth || any(nchar(paste(test1$Depth ))<1)  || abs(as.numeric(as.character(test1$Depth[1]))-as.numeric(as.character(test1$Depth[2])))<2) {
       test2 <- test1[1,]
       test2$Result <- mean(test1$Result, na.rm=T)
       test2$Depth <- "COM"
       test2$Stratum <- "duplicates"
       if(!identical(test1$Lab[1],test1$Lab[2])) test2$Lab <- "VT/NY"
       
+      if(nrow(test2)>1) stop(paste0("problem in the loop to transform row ",i," of 'replicates' dataframe. parameter: ",label))
+      # unique <- c(unique, test2) # Done!
       unique[[label]] <- test2 # Done!
     } else {
       # Second case (2/2), only two measurements, taken at two depths
-      test2 <- test1[order(as.numeric(as.character(test1$Depth)), decreasing = F),]
-      
+      if(any(!is.na(as.numeric(as.character(test1$Depth))))) test2 <- test1[order(as.numeric(as.character(test1$Depth)), decreasing = F),]
+      if(length(grep("E|H", test1$Stratum))>0)               test2 <- test1[order(test1$Stratum, decreasing = F),]
+        
       # Use the index E or H for Epi or Hypolimnion
-      # When Stratum has no information, use depth
-      if(identical(test1$Stratum[1],test1$Stratum[2])) {
-        test2$Test <- paste(test2$Test,c("E","H"), sep="_")
-        test2$Stratum <- c("E_infered","H_infered")
-      } else {
-        test2$Stratum <- "unique_data"
-      }
+      test2$Test <- paste(test2$Test,c("E","H"), sep="_")
+      test2$Stratum <- c("E_infered","H_infered")
+      
       test2 <- dlply(test2, .(StationID, VisitDate, Test))
       
       unique <- c(unique, test2) # Done!
     }
-  } else
+  } else {
     # B) More than two values
-  {
     # Here we have again two big categories:
     # (1/2) replicates for one or two depths 
     # (2/2) profile (e.g. for temperature)
     
     # 1) Replicates for one or two depths
     if(length(unique(test1$Depth))<=2) {
-      test1 <- test1[order(as.numeric(as.character(test1$Depth)), decreasing = F),]
+      # If depth is not COM or given, order the dataset
+      options(warn=-1)
+      if(any(!is.na(as.numeric(as.character(test1$Depth))))) test1 <- test1[order(as.numeric(as.character(test1$Depth)), decreasing = F),]
+      options(warn=0)
       test2 <- test1[1,]
       test2$Result <- mean(test1$Result[test1$Depth==unique(test1$Depth)[1]], na.rm=T)
       test2$Depth <- "COM"
@@ -109,7 +110,9 @@ for (i in 1:length(replicates)) {
       # 2) With more than 3 depths, we'll assess whether there's a significant changepoint
       # If there's a changepoint: we'll create 2 values, otherwise just one.
     {
-      test1 <- test1[order(as.numeric(as.character(test1$Depth)), decreasing = F),]
+      options(warn=-1)
+      if(any(!is.na(as.numeric(as.character(test1$Depth))))) test1 <- test1[order(as.numeric(as.character(test1$Depth)), decreasing = F),]
+      options(warn=0)
       mcpt <- cpts(cpt.mean(test1$Result, method="AMOC", class=T, param.estimates=T))
       # No changepoints detected, mcpt=numeric(0)
       if(identical(mcpt, numeric(0))) {
@@ -119,6 +122,8 @@ for (i in 1:length(replicates)) {
         test2$FieldID <- median(test1$FieldID, na.rm=T)
         test2$Stratum <- c("U_changepoints")
         
+        if(nrow(test2)>1) stop(paste0("problem in the loop to transform row ",i," of 'replicates' dataframe. parameter: ",label))
+        # unique <- c(unique, test2) # Done!
         unique[[label]] <- test2 # Done!
       } else
         # A changepoint was detected
@@ -139,18 +144,19 @@ for (i in 1:length(replicates)) {
         
         test2 <- dlply(test2, .(StationID, VisitDate, Test, Stratum))
         
+        if(any(sapply(test2,nrow)>1)) stop(paste0("problem in the loop to transform row ",i," of 'replicates' dataframe. parameter: ",label))
         unique <- c(unique, test2) # Done!
       }
     }
   }
-  if(!"list"%in%class(test2)&&nrow(test2)>1 | "list"%in%class(test2)&&any(sapply(test2,nrow))>1) stop(paste0("problem in the loop to transform row ",i," of 'replicates' dataframe. \n"))
+  if(sapply(unique[length(unique)], nrow)>1) stop(paste0("problem in the loop to transform row ",i," of 'replicates' dataframe. parameter: ",label))
   if (i==length(replicates)) cat("All done!\n")
 }
 
 length(unique)
 len<-sapply(unique,nrow)
-max(len)
-plot(len)
+max(unlist(len))
+plot(unlist(len))
 # max should be 1 if it worked.
 unique[[1]]
 # do.call() is very slow, but using unlist() I was losing some properties of the table
@@ -188,7 +194,8 @@ unique_dat_vertical$Day <- as.numeric(paste0(
   yday(as.Date(unique_dat_vertical$VisitDate, format="%d/%m/%Y"))))
 
 unique(unique_dat_vertical$StationID)
-# For some reasonI have on StationID saying "E_changepoints"
+# For some reason, I have on StationID saying "E_changepoints"
+# Note: not an issue anymore when re-running the script on 2019-08-14
 # I don't where it comes from at the moment, it correspond to the last row of the data frame
 # Getting read of that one...
 if(length(which(unique_dat_vertical$StationID=="E_changepoints"))>0)
@@ -235,55 +242,58 @@ if(file.exists(paste0(getpath4data(),"LCM_unique_param_step3.txt"))){
   if(answer=="Y") write.table(df_output, file = paste0(getpath4data(),"LCM_unique_param_step3.txt"), col.names = T, row.names = F, sep="\t")
 } else {write.table(df_output, file = paste0(getpath4data(),"LCM_unique_param_step3.txt"), col.names = T, row.names = F, sep="\t")}
 
-# Create a dataframe without all biological data  ####
-df_lc <- df_output
-bloom_thresh <- exp(5) # Set here our threshold for bloom
-df_lc$Bloom <- ifelse(is.na(df_lc$`Net phytoplankton, Cyanobacteria biovolume`),
-                          NA,ifelse(df_lc$`Net phytoplankton, Cyanobacteria biovolume`>=bloom_thresh, 1,0))
-summary(df_lc$Bloom)
-hist(log(df_lc$`Net phytoplankton, Cyanobacteria biovolume`+.1), main="", xlab="log(Net phytoplankton, Cyanobacteria biovolume)")
 
-df_lc_june <- df_lc[as.numeric(substr(df_lc$VisitDate,4,5))==6,]
+# Assign the same value to E and H when no distinction is done ####
+df_lc <- df_output
+grep("_E",x = names(df_lc))
+gsub("_E","", names(df_lc)[grep("_E",x = names(df_lc))])
+for (i in 1:length(grep("_E",x = names(df_lc)))) {
+  df_lc[is.na(df_lc[,grep("_E",x = names(df_lc))[i]]), grep("_E",x = names(df_lc))[i]] <- 
+    df_lc[is.na(df_lc[,grep("_E",x = names(df_lc))[i]]), gsub("_E","", names(df_lc)[grep("_E",x = names(df_lc))[i]])]
+}
+for (i in 1:length(grep("_H",x = names(df_lc)))) {
+  df_lc[is.na(df_lc[,grep("_H",x = names(df_lc))[i]]), grep("_H",x = names(df_lc))[i]] <- 
+    df_lc[is.na(df_lc[,grep("_H",x = names(df_lc))[i]]), gsub("_H","", names(df_lc)[grep("_H",x = names(df_lc))[i]])]
+  # remove the column with integrated value
+  df_lc <- df_lc[,-which(names(df_lc)==gsub("_H","", names(df_lc)[grep("_H",x = names(df_lc))[i]]))]
+}
+dim(df_output);dim(df_lc)
+
+#Save output
+if(file.exists(paste0(getpath4data(),"LCM_unique_param_step4.txt"))){
+  message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
+  answer <- readline()
+  if(answer=="Y") write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step4.txt"), col.names = T, row.names = F, sep="\t")
+} else write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step5.txt"), col.names = T, row.names = F, sep="\t")
+
+# Create a dataframe without all biological data  ####
+df_lc2 <- df_lc
+head(df_lc2)
+bloom_thresh <- exp(5) # Set here our threshold for bloom
+df_lc2$Bloom <- ifelse(is.na(df_lc2$`Net phytoplankton, Cyanobacteria biovolume`),
+                      NA,ifelse(df_lc2$`Net phytoplankton, Cyanobacteria biovolume`>=bloom_thresh, 1,0))
+summary(df_lc2$Bloom)
+hist(log(df_lc2$`Net phytoplankton, Cyanobacteria biovolume`+.1), main="", xlab="log(Net phytoplankton, Cyanobacteria biovolume)")
+
+df_lc_june <- df_lc2[as.numeric(substr(df_lc2$VisitDate,4,5))==6,]
 likelihood_bloom_june <-
   as.data.frame(with(df_lc_june, tapply(Bloom,list("Year"=as.factor(substr(df_lc_june$VisitDate,7,10)), "StationID"=StationID), sum, na.rm=T)))/
   as.data.frame(with(df_lc_june, tapply(rep(1,nrow(df_lc_june)),list("Year"=as.factor(substr(df_lc_june$VisitDate,7,10)), "StationID"=StationID), sum, na.rm=T)))
 likelihood_bloom_june <- likelihood_bloom_june[as.numeric(rownames(likelihood_bloom_june))>=2006,]  
 barplot(colSums(likelihood_bloom_june)/nrow(likelihood_bloom_june))
 
-todelete <- grep("phytoplankton|Day|Chlorophyll-a", names(df_lc))
-if(length(todelete)>0) df_lc <- df_lc[,-todelete]
-dim(df_output)
-dim(df_lc)
-if(file.exists(paste0(getpath4data(),"LCM_unique_param_step4.txt"))){
-  message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
-  answer <- readline()
-  if(answer=="Y") write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step4.txt"), col.names = T, row.names = F, sep="\t")
-} else write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step4.txt"), col.names = T, row.names = F, sep="\t")
-
-
-# Assign the same value to E and H when no distinction is done ####
-df_lc2 <- df_lc[,-which(names(df_lc)=="NA")]
-head(df_lc2)
-grep("_E",x = names(df_lc2))
-gsub("_E","", names(df_lc2)[grep("_E",x = names(df_lc2))])
-for (i in 1:length(grep("_E",x = names(df_lc2)))) {
-  df_lc2[is.na(df_lc2[,grep("_E",x = names(df_lc2))[i]]), grep("_E",x = names(df_lc2))[i]] <- 
-    df_lc2[is.na(df_lc2[,grep("_E",x = names(df_lc2))[i]]), gsub("_E","", names(df_lc2)[grep("_E",x = names(df_lc2))[i]])]
-}
-for (i in 1:length(grep("_H",x = names(df_lc2)))) {
-  df_lc2[is.na(df_lc2[,grep("_H",x = names(df_lc2))[i]]), grep("_H",x = names(df_lc2))[i]] <- 
-    df_lc2[is.na(df_lc2[,grep("_H",x = names(df_lc2))[i]]), gsub("_H","", names(df_lc2)[grep("_H",x = names(df_lc2))[i]])]
-  # remove the column with integrated value
-  df_lc2 <- df_lc2[,-which(names(df_lc2)==gsub("_H","", names(df_lc2)[grep("_H",x = names(df_lc2))[i]]))]
-}
+names(df_lc2)
+todelete <- grep("phytoplankton|Day|Chlorophyll-a", names(df_lc2))
+if(length(todelete)>0) df_lc2 <- df_lc2[,-todelete]
 dim(df_lc);dim(df_lc2)
 
-#Save output
+# Save output
 if(file.exists(paste0(getpath4data(),"LCM_unique_param_step5.txt"))){
   message("\nA file already exist in the folder. Do you want to replace it? (Y/N)")
   answer <- readline()
-  if(answer=="Y") write.table(df_lc, file = paste0(getpath4data(),"LCM_unique_param_step5.txt"), col.names = T, row.names = F, sep="\t")
+  if(answer=="Y") write.table(df_lc2, file = paste0(getpath4data(),"LCM_unique_param_step5.txt"), col.names = T, row.names = F, sep="\t")
 } else write.table(df_lc2, file = paste0(getpath4data(),"LCM_unique_param_step5.txt"), col.names = T, row.names = F, sep="\t")
+
 
 
 # Attemp model ####
@@ -297,31 +307,33 @@ myvec <- unique(myvec)
 # There's always at least one data missing, so I don't really know how to create models with the same number of observation at the moment
 
 library(nlme)
-names(df_lc) <- gsub(" ",".",names(df_lc))
-df_lc$StationID <- as.factor(df_lc$StationID)
-df_lc$Day <- as.numeric(paste0(year(as.Date(df_lc$VisitDate,format="%d/%m/%Y")),yday(as.Date(df_lc$VisitDate,format="%d/%m/%Y"))))
+names(df_lc2) <- gsub(" ",".",names(df_lc2))
+df_lc2$StationID <- as.factor(df_lc2$StationID)
+df_lc2$Day <- as.numeric(paste0(year(as.Date(df_lc2$VisitDate,format="%d/%m/%Y")),yday(as.Date(df_lc2$VisitDate,format="%d/%m/%Y"))))
 
-M0 <- gls(Bloom ~ Temperature, data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Bloom),])
+M0 <- gls(Bloom ~ Temperature_E, data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Bloom),])
 summary(M0)
-M1 <- gls(Bloom ~ Temperature + Total.Phosphorus, data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Bloom),])
+M1 <- gls(Bloom ~ Temperature_E + Total.Phosphorus_E, data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Bloom),])
 summary(M1)
-M2 <- gls(Bloom ~ Temperature + Total.Phosphorus + Total.Nitrogen, data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),])
+M2 <- gls(Bloom ~ Temperature_E + Total.Phosphorus_E + Total.Nitrogen_E, data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Total.Nitrogen_E)&!is.na(df_lc2$Bloom),])
 summary(M2)
 AIC(M0,M1,M2) # but models are not fitted to the same number of observations...
 
 library(mgcv)
-M3 <- gamm(Bloom ~ s(Temperature), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Bloom),])
+M3 <- gamm(Bloom ~ s(Temperature_E), data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Bloom),])
 summary(M3$lme)
-M4 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Bloom),])
+M4 <- gamm(Bloom ~ s(Temperature_E) + s(Total.Phosphorus_E), data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Bloom),])
 summary(M4$lme)
-M5 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),])
+par(mfrow=c(1,2));plot(M4$gam);par(mfrow=c(1,1))
+M5 <- gamm(Bloom ~ s(Temperature_E) + s(Total.Phosphorus_E) + s(Total.Nitrogen_E), data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Total.Nitrogen_E)&!is.na(df_lc2$Bloom),])
 summary(M5$lme)
-M6 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen) + factor(StationID), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),])
+par(mfrow=c(1,3));plot(M5$gam);par(mfrow=c(1,1))
+M6 <- gamm(Bloom ~ s(Temperature_E) + s(Total.Phosphorus_E) + s(Total.Nitrogen_E) + factor(StationID), data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Total.Nitrogen_E)&!is.na(df_lc2$Bloom),])
 summary(M6$lme)
 par(mfrow=c(1,3));plot(M6$gam);par(mfrow=c(1,1))
-# M7 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),],correlation = corAR1(form=~Day|StationID))
+# M7 <- gamm(Bloom ~ s(Temperature_E) + s(Total.Phosphorus_E) + s(Total.Nitrogen_E), data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Total.Nitrogen_E)&!is.na(df_lc2$Bloom),],correlation = corAR1(form=~Day|StationID))
 # summary(M7$lme)
-# M8 <- gamm(Bloom ~ s(Temperature) + s(Total.Phosphorus) + s(Total.Nitrogen) + factor(StationID), data=df_lc[!is.na(df_lc$Temperature)&!is.na(df_lc$Total.Phosphorus)&!is.na(df_lc$Total.Nitrogen)&!is.na(df_lc$Bloom),],correlation = corAR1(form=~Day))
+# M8 <- gamm(Bloom ~ s(Temperature_E) + s(Total.Phosphorus_E) + s(Total.Nitrogen_E) + factor(StationID), data=df_lc2[!is.na(df_lc2$Temperature_E)&!is.na(df_lc2$Total.Phosphorus_E)&!is.na(df_lc2$Total.Nitrogen_E)&!is.na(df_lc2$Bloom),],correlation = corAR1(form=~Day))
 # summary(M8$lme)
 
 logLik(M0)
@@ -333,18 +345,18 @@ logLik(M5$lme)
 logLik(M6$lme)
 
 ## Look at correlation between variables ####
-cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "complete.obs")
-cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "pairwise.complete.obs")
-cor(df_lc2$Total.Phosphorus, df_lc2$Total.Nitrogen, use = "na.or.complete")
+cor(df_lc2$Total.Phosphorus_E, df_lc2$Total.Nitrogen_E, use = "complete.obs")
+cor(df_lc2$Total.Phosphorus_E, df_lc2$Total.Nitrogen_E, use = "pairwise.complete.obs")
+cor(df_lc2$Total.Phosphorus_E, df_lc2$Total.Nitrogen_E, use = "na.or.complete")
 names(df_lc2)
-r <- as.data.frame(matrix(rep(NA,(ncol(df_lc2)-2)^2), ncol = (ncol(df_lc2)-2)))
-colnames(r) <- names(df_lc2)[3:ncol(df_lc2)]
-rownames(r) <- names(df_lc2)[3:ncol(df_lc2)]
+r <- as.data.frame(matrix(rep(NA,(ncol(df_lc2)-3)^2), ncol = (ncol(df_lc2)-3)))
+colnames(r) <- names(df_lc2)[3:(ncol(df_lc2)-1)]
+rownames(r) <- names(df_lc2)[3:(ncol(df_lc2)-1)]
 p <- r
 n <- r
 
-for (i in 3:(ncol(df_lc2))) {
-  for (j in 3:ncol(df_lc2)) {
+for (i in 3:(ncol(df_lc2)-1)) {
+  for (j in 3:(ncol(df_lc2)-1)) {
     z <- !is.na(df_lc2[!is.na(df_lc2[,j]),i])
     z <- length(z[z==TRUE])
     n[j-2,i-2] <- z
@@ -380,7 +392,7 @@ res$r2 <- res$r
 res$r2[is.na(res$r2)] <- 0
 
 # rename to inprove visibility
-colnames(res$r2) <-c("Alk_E","Alk_H","Ca", "Chl_E","Chl_H","Cond","DIC_E", "DIC_H","DOC_E","DOC_H","DO_E","DO_H","DP_E","DP_H","DSi_E" ,
+colnames(res$r2) <-c("Alk_E","Alk_H","Ca_E","Ca_H", "Chl_E","Chl_H","Cond_E","Cond_H","DIC_E", "DIC_H","DOC_E","DOC_H","DO_E","DO_H","DP_E","DP_H","DSi_E" ,
                      "DSi_H","Fe_E","Fe_H","Pb_E","Pb_H","Mg_E","Mg_H","OrtP_E","OrtP_H",  "pH_E", "pH_H","Pot_E","Pot_H","Secchi","Na_E",
                      "Na_H","T_E","T_H","NH3_E","NH3_H","TKN_E","TKN_H","NO23_E","NO23_H","N_E", "N_H","TOC_E","TOC_H","TP_E","TP_H","TSS_E","TSS_H","Bloom")
 rownames(res$r2) <- colnames(res$r2)
