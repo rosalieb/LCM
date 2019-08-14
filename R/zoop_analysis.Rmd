@@ -110,6 +110,7 @@ zoo$PARASITIC_biom    <- round(zoo$PARASITIC    *  35.039 / 1000000 * 1000000000
 ### Mean wet weight of each large group
 
 ```{r}
+# Prints the average wet weight for each of the large groups 
 for (i in unique(zoop_param$Large_group)) {
   print(paste0(i, ": ", round(mean(zoop_param$WW__g[zoop_param$Large_group == i], na.rm = TRUE), 3)))
 }
@@ -118,6 +119,7 @@ for (i in unique(zoop_param$Large_group)) {
 ### Mean wet weight of each small group
 
 ```{r}
+# Prints the wet weight for each of the small groups 
 for (i in unique(zoop_param$Small_group)) {
   print(paste0(i, ": ", (round(mean(zoop_param$WW__g[zoop_param$Small_group == i], na.rm = TRUE), 3))))
 }
@@ -130,12 +132,14 @@ for (i in unique(zoop_param$Small_group)) {
 Here, we're plotting two very similar plots. The first contains the zooplankton <i> Eurycercus spp. </i> which has an average wet weight of over 3,000 micrograms. The second does not contain this same data point so the viewer can better observe the majority of the data.
 
 ```{r}
+# Histogram of wet weight of all species (includes Eurycercus spp.)
 ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
   geom_histogram(bins = 30) +
   labs(x = expression(Wet~Weight~(mu*'g')), y = "Count")
 
 zoop_param <- zoop_param[zoop_param$WW__g < 2000,]
 
+# Histogram of wet weight all of species (does not include Eurycercus spp.)
 ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
   geom_histogram(bins = 30) +
   labs(x = expression(Wet~Weight~(mu*'g')), y = "Count")
@@ -143,94 +147,144 @@ ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
 zoop_param <- read.delim(paste0(getpath4data(), "zoop_parameters.txt"))
 ```
 
-### Distribution of the abundance and biomass of zooplankton 
-
-The first plot displays the total zooplankton count over time. The second plot displays the total zooplankton biomass over time. 
-
-```{r}
-for (i in unique(zoo$Year)) {
-  print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 84:91])), " zooplankton"))
-}
-
-ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[,84:91]))) +
-  geom_bar(stat = "identity") +
-  labs(y = "Total Zooplankton Count")
-
-for (i in unique(zoo$Year)) {
-  print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 100:107])), " t/km3"))
-}
-
-ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[, 100:107]))) +
-  geom_bar(stat = "identity") +
-  labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Year")
-```
-
 ## Intraannual changes
 
-### Intrannual changes in zooplankton biomass and counts
-
 ```{r}
-myplot_yr1 <- 
+# Function that plots the counts of zooplankton by each month across all years
+counts_all_month <- 
   function(year) {
     zoop_sub <- zoo[zoo$Year == year,]
-    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 100:107]))) +
+    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 84:95]))) +
+      geom_bar(stat = "identity") +
+      labs(y = "Total Zooplankton Count", x = "Month"))
+  }
+
+# Function that plots the biomass of zooplankton by each month across all years
+biom_all_month <- 
+  function(year) {
+    zoop_sub <- zoo[zoo$Year == year,]
+    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 100:111]))) +
       geom_bar(stat = "identity") +
       labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
   }
 
-myplot_yr2 <- 
-  function(year) {
-    zoop_sub <- zoo[zoo$Year == year,]
-    print(ggplot(data = zoop_sub, mapping = aes(x = zoop_sub$Month, y = rowSums(zoop_sub[, 84:91]))) +
+# Function that plots the counts of each zooplankton category by each month across all years
+counts_group_month <- 
+  function(group, group_names) {
+    print(ggplot(data = zoo, mapping = aes(x = Month, y = group)) +
       geom_bar(stat = "identity") +
-      labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
+      labs(y = "Total Zooplankton Count", x = "Month"))
   }
-```
 
-```{r, results = 'asis'}
-# Only 1993-2013 because 1992, 2014, and 2015 show empty plots
-for (i in 1993:2013) {
-  cat('\n')  
-  cat("####Biomass for", i, "\n") 
-  myplot_yr1(year=i)
-  cat('\n') 
-  cat('\n')  
-  cat("####Counts for", i, "\n") 
-  myplot_yr2(year=i)
-  cat('\n')
-}
-```
-
-## Interannual changes
-
-### Interannual changes for each zooplankton group/category
-
-```{r}
-myplot_group1 <- 
+# Function that plots the biomass of each zooplankton category by each month across all years 
+biom_group_month <- 
   function(group, group_names) {
     print(ggplot(data = zoo, mapping = aes(x = Month, y = group)) +
       geom_bar(stat = "identity") +
       labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Month"))
   }
+```
 
-myplot_group2 <- 
+### Counts and biomass for each year
+
+```{r, results = 'asis'}
+# Only 1993-2013 because 1992, 2014, and 2015 show empty plots
+for (i in 1993:2013) {
+  cat('\n')  
+  cat("####Counts for", i, "\n") 
+  counts_all_month(year=i)
+  cat('\n') 
+  cat('\n')  
+  cat("####Biomass for", i, "\n") 
+  biom_all_month(year=i)
+  cat('\n')
+}
+```
+
+### Counts by group
+
+```{r, results = 'asis'}
+for (i in 84:95) {
+  cat('\n')  
+  cat("####Counts for", names(zoo[i]), " by month \n")
+  counts_group_month(group = zoo[,i], group_names = names(zoo[i]))
+  cat('\n') 
+}
+```
+
+### Biomass by group
+
+```{r, results = 'asis'}
+for (i in 100:111) {
+  cat('\n')  
+  cat("####Biomass for", names(zoo[i]), " by month \n")
+  biom_group_month(group = zoo[,i], group_names = names(zoo[i]))
+  cat('\n') 
+  }
+```
+
+## Interannual changes
+
+### Counts and biomass over time 
+
+```{r}
+for (i in unique(zoo$Year)) {
+  print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 84:95])), " zooplankton"))
+}
+
+# Plots the zooplankton counts over time
+ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[,84:95]))) +
+  geom_bar(stat = "identity") +
+  labs(y = "Total Zooplankton Count")
+
+for (i in unique(zoo$Year)) {
+  print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 100:111])), " t/km3"))
+}
+
+# Plots the zooplankton biomass over time
+ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[, 100:111]))) +
+  geom_bar(stat = "identity") +
+  labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Year")
+```
+
+
+```{r}
+# Function that plots the counts of each category over time
+counts_group_year <- 
   function(group, group_names) {
     print(ggplot(data = zoo, mapping = aes(x = Year, y = group)) +
       geom_bar(stat = "identity") +
       labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Year"))
   }
+
+# Function that plots the biomass of each category over time
+biom_group_year <- 
+  function(group, group_names) {
+    print(ggplot(data = zoo, mapping = aes(x = Year, y = group)) +
+      geom_bar(stat = "identity") +
+      labs(y = "Total Zooplankton Count", x = "Year"))
+  }
 ```
 
+### Counts by group
+
 ```{r, results = 'asis'}
-# Can't figure out how to create headers for each of the graphs using the names of the columns 
 for (i in 84:95) {
   cat('\n')  
-  cat("####Counts for", names(zoo[i]), " by month \n")
-  myplot_group1(group = zoo[,i], group_names = names(zoo[i]))
-  cat('\n') 
-  cat('\n')  
   cat("####Counts for", names(zoo[i]), " by year \n") 
-  myplot_group2(group = zoo[,i], group_names = names(zoo[i]))
+  counts_group_year(group = zoo[,i], group_names = names(zoo[i]))
   cat('\n')
 }
 ```
+
+### Biomass by group
+
+```{r, results = 'asis'}
+for (i in 100:111) {
+  cat('\n')  
+  cat("####Biomass for", names(zoo[i]), " by year \n") 
+  group_year(group = zoo[,i], group_names = names(zoo[i]))
+  cat('\n')
+}
+```
+
