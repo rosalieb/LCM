@@ -109,6 +109,8 @@ zoo$PARASITIC_biom    <- round(zoo$PARASITIC    *  35.039 / 1000000 * 1000000000
 
 ### Mean wet weight of each large group
 
+<span style="color:red">Specify the unit, either in the title or with a sentence here.</span>
+
 ```{r}
 # Prints the average wet weight for each of the large groups 
 for (i in unique(zoop_param$Large_group)) {
@@ -131,6 +133,9 @@ for (i in unique(zoop_param$Small_group)) {
 
 Here, we're plotting two very similar plots. The first contains the zooplankton <i> Eurycercus spp. </i> which has an average wet weight of over 3,000 micrograms. The second does not contain this same data point so the viewer can better observe the majority of the data.
 
+<span style="color:red">Good idea to plot them with and without Eurycercus. A good way to look at the distribution would also to visualize <a href="http://www.sthda.com/english/wiki/wiki.php?title=ggplot2-density-easy-density-plot-using-ggplot2-and-r-statistical-software">dentsity plots</a>.</span>
+
+
 ```{r}
 # Histogram of wet weight of all species (includes Eurycercus spp.)
 ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
@@ -148,6 +153,8 @@ zoop_param <- read.delim(paste0(getpath4data(), "zoop_parameters.txt"))
 ```
 
 ## Intraannual changes
+
+<span style="color:red">Have a fixes x-axis (minimum is 5 I believe, max is 10? May-October?), it will ease comparison.</span>
 
 ```{r}
 # Function that plots the counts of zooplankton by each month across all years
@@ -227,6 +234,10 @@ for (i in 100:111) {
 
 ### Counts and biomass over time 
 
+<span style="color:red">Has the effort changed? Maybe it'd be usefull to add a section with some metadata at the beginning: sites that were sampled, how many times a year, etc. Also, see when they were sampled: since the abundance vary seasonally (your month plots above), maybe only compare august counts (we have august every year right?). <br>
+Another idea would be to add the 'station' as factor in the plot, and plot it with plotly (see example in the LTdiet.Rmd or stocking.Rmd). If we can select/unselect stations, we could compare the abundance at a single site. <br>
+If it varies, we'll have to standardize the rest of the data. </span>
+
 ```{r}
 for (i in unique(zoo$Year)) {
   print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 84:95])), " zooplankton"))
@@ -283,7 +294,7 @@ for (i in 84:95) {
 for (i in 100:111) {
   cat('\n')  
   cat("####Biomass for", names(zoo[i]), " by year \n") 
-  group_year(group = zoo[,i], group_names = names(zoo[i]))
+  biom_group_year(group = zoo[,i], group_names = names(zoo[i]))
   cat('\n')
 }
 ```
