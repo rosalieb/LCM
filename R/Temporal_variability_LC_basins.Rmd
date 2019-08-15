@@ -369,7 +369,7 @@ ggsave(paste0(getwd(),"/Output/Figures/1-descriptive/Map_",gsub(" ", "_",paramet
 
 ## Read data
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r read weather data, message=FALSE, warning=FALSE, include=FALSE}
 weather <- read.delim(paste0(getpath4data(), "Weather/allWeatherBTV_join.txt"))
 head(weather)
 

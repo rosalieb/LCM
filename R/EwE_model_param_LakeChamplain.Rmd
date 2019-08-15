@@ -484,6 +484,122 @@ Use dresseinid mussels?
 
 __Data:__  
 Data come from the bycatch data collected during trawling.
+Some data are also present in the FSA library by D. Ogle.
+
+## Data from Lake Michigan
+
+The assigned ages (by scales), total lengths (mm), and sexes of Troutperch (Percopsis omsicomaycus) captured in southeastern Lake Michigan, from the library _FSAdata_.
+
+```{r data trout perch from lake michigan }
+?TroutperchLM1
+head(TroutperchLM1)
+op <- par(mfrow=c(1,2),pch=19)
+plot(tl~age,data=TroutperchLM1,subset=sex=="f",main="female")
+plot(tl~age,data=TroutperchLM1,subset=sex=="m",main="male")
+par(op)
+?FSAdata
+```
+
+## Data from WFB 161 - Fall 2018
+
+```{r read data from WFB 161 fall 2018, message=FALSE, warning=FALSE, include=FALSE}
+# Read data
+data <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_data.txt", sep=""), header = T)
+metadata <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_metadata_2.txt", sep=""), header = T)
+
+length <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_length.txt", sep=""))
+length_sp <- length[1,]
+length <- length[-1,]
+indx <- sapply(length, is.factor)
+length[indx] <- lapply(length[indx], function(x) as.numeric(as.character(x)))
+
+str(length)
+
+
+troutperch <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_length_troutperch.txt", sep=""), header = T)
+alewife <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_length_alewife.txt", sep=""), header = T)
+
+```
+ 
+Trawl on September 17th (Monday lab) and 19th (Wednesday lab), 2018, as part of Fisheries Biology and Techniques (UVM/WFB 161). We met at 1pm with the first group, conducted 2 trawls, and then met at 3.30pm with the second group for the 2nd trip (2 more trawls). That makes a total of 8 trawls. Metadata collected are presented below: <br>
+
+`r metadata`
+
+Length were collected for 
+
+```{r}
+hist(troutperch$Length_trout_perch, breaks = c(seq(0,130,2)), col="grey")
+hist(troutperch$Length_trout_perch[troutperch$Trawl==1], breaks = c(seq(0,130,5)), col="grey", ylim = c(0,100))
+par(new=T)
+hist(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3), ylim = c(0,100), main='', xlab='length class (mm)')
+# par(new=T)
+# hist(troutperch$Length_trout_perch[troutperch$Trawl==4], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3))
+par(new=T)
+hist(troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8], breaks = c(seq(0,130,5)), col=adjustcolor(col = "red",alpha.f = .3), ylim = c(0,100), main='', xlab='')
+legend("topleft", legend = c("Trawls #1-3", "Trawls #5-8"), fill =c(adjustcolor(col = "blue",alpha.f = .3),adjustcolor(col = "red",alpha.f = .3)), bty='n')
+boxplot(troutperch$Length_trout_perch~troutperch$Trawl)
+
+t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$p.value
+
+hist(alewife$Alewife, breaks=15, col="grey")
+
+library(psych)
+describeBy(troutperch$Length_trout_perch, group = troutperch$Trawl)
+
+plot(1:8,colMeans(metadata[5:6,-1]), pch=20, ylim=c(min(metadata[5:6,-1]), max(metadata[5:6,-1])), xlab="# trawls", ylab="depth (m)")
+for (i in 1:8) {
+  lines(c(i,i),c(metadata[5,i+1], metadata[6,i+1]), col="grey")
+}
+points(1:8,metadata[5,-1], pch=20, col="grey", cex=.8)
+points(1:8,metadata[6,-1], pch=15, col="brown1")
+points(1:8,colMeans(metadata[5:6,-1]), cex=1.4, pch=20)
+legend("bottomrigh", legend = c("Start", "End", "Average depth"), pch=c(20,15,20), col=c("grey", "brown1","black"), bty='n')
+
+# resample data
+# independent 2-group t-test
+# Principle: t.test(y1,y2) # where y1 and y2 are numeric
+par(mfrow=c(1,2), mar=c(8.5,4.1,3.8,2.1))
+plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
+rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border=NA)
+mycol <- wes_palette("Darjeeling", 8, type="continuous")
+mtext("a. Mean comparison (independent\n     2-group t-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
+for (i in 1:8) {
+  for (j in seq(10,100,10)){
+    myttest <- NULL
+    for (k in 1:100) {
+      mysample <- sample(troutperch$Length_trout_perch[troutperch$Trawl==i],size = j, replace = F)
+      ttest <- t.test(mysample,troutperch$Length_trout_perch[troutperch$Trawl==i])
+      myttest <- c(myttest,ttest$p.value)
+    }
+    points(j, mean(myttest), pch=20, col=mycol[i])
+  }
+}
+
+plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
+rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border = NA)
+mycol <- wes_palette("Darjeeling", 8, type="continuous")
+mtext("b. Variance comparison (independent\n     2-group var-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
+for (i in 1:8) {
+  for (j in seq(10,100,10)){
+    myvartest <- NULL
+    for (k in 1:100) {
+      mysample <- sample(troutperch$Length_trout_perch[troutperch$Trawl==i],size = j, replace = F)
+      vartest <- var.test(mysample,troutperch$Length_trout_perch[troutperch$Trawl==i], alternative = "two.sided")
+      myvartest <- c(myvartest,vartest$p.value)
+    }
+    points(j, mean(myvartest), pch=20, col=mycol[i])
+  }
+}
+
+par(xpd=T)
+legend(x = -5, y=-.39, legend = paste("trawl", 1:3), col=mycol[1:3], pch=20, bty='n')
+legend(x = 30, y=-.39, legend = paste("trawl", 4:6), col=mycol[4:6], pch=20, bty='n')
+legend(x = 65, y=-.39, legend = paste("trawl", 7:8), col=mycol[7:8], pch=20, bty='n')
+par(xpd=F)
+par(mfrow=c(1,1), mar=c(5.1,4.1,4.1,2.1))
+
+```
+
 
 ## Sample locations for trout-perch data    
 Data for trout perch (`r nrow(byc$species=="trout-perch",])` observations) were collected and are summarized in the bycatch dataframe. Observations on `r length(summary(byc$site[byc$species=="trout-perch"]))` sites -- sites with higher number of observation are listed below.
@@ -495,16 +611,39 @@ summ_tp[order(summ_tp, decreasing = T)][1:5]
 ```
 
 
-```{r}
+```{r trout perch subset, echo=FALSE, message=FALSE, warning=FALSE}
 #trout perch subset
 tps <- byc[byc$species=="trout-perch" & byc$site=="burlington bay",]
 tps$tote..fullness.[tps$tote..fullness.=="na"] <- NA
 tps$est_number[tps$est_number=="na"] <- NA
 tps$est_number <- as.numeric(paste(tps$est_number))
-length(tps$tote..fullness.[!is.na(tps$est_number)])
-length(tps$tote..fullness.[is.na(tps$est_number)])
+
+# when info is given in tote..fullness., sometimes it says only the fraction, sometimes x/x tote full, sometimes x/x fish tote.
+# to qa/qc, remove all mention of tote, keep only the fraction
+tps$tote..fullness.[grep("tote", tps$tote..fullness.)] <- substr(tps$tote..fullness.[grep("tote", tps$tote..fullness.)],1,3)
+gsub(" ",NA,tps$tote..fullness.)
+
+#View(tps[,c("est_number","tote..fullness.")])
+#View(byc[,c("species","est_number","tote..fullness.")])
 
 ```
+
+Unfortunately, there's only one correspondance between 'tote fulness' and 'estimated number': 100 (est. number) = 1 layer.
+For the sake of getting a bit more estimates, trying to convert tote fullness into number.
+
+
+```{r how many layers of trout perch in 1/4 of a tote}
+# 1 layer = 100
+# It's easier (at least for me) to count layers over 1/4 of a fish tote
+# I'm assuming there's about 8 layers in 1/4 of a tote
+# Meaning that in a tote, there are
+# tote_troutperch = number in layer * number layer in 1/4 * bring back to 1/1
+( tote_troutperch =      100        *         8           *        4          )
+
+```
+
+
+
 
 
 # Smelt
@@ -512,13 +651,17 @@ For fish in general, we need to get the a and b parameters of the $ W = a L^{b} 
 
 __Data:__ 
 <br>
-The data was provided by Ellen Marsden. It contains 24,982 observations of smelt. Each row has some metadata associated (date and basin sampled) as well as individuals characteristics (length, weight, year class, condition).
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r read smelt data, message=FALSE, warning=FALSE, include=FALSE}
 smelt <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltBio1984-2015-2-24-16.csv"))
 smelt <- smelt[smelt$Species == "Rainbow Smelt",]
 smelt$Station <- gsub("-"," ",smelt$Station)
 head(smelt)
+```
+
+The data were provided by Ellen Marsden. It contains `r nrow(smelt)` observations of smelt. Each row has some metadata associated (date and basin sampled) as well as individuals characteristics (length, weight, year class, condition).
+
+```{r map smelt data origin, message=FALSE, warning=FALSE, include=FALSE}
 
 smelt_coord <- read.csv(file = paste0(getpath4data(), "smelt_coord.csv"))
 
