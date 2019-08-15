@@ -283,7 +283,7 @@ for (i in 84:95) {
 for (i in 100:111) {
   cat('\n')  
   cat("####Biomass for", names(zoo[i]), " by year \n") 
-  group_year(group = zoo[,i], group_names = names(zoo[i]))
+  biom_group_year(group = zoo[,i], group_names = names(zoo[i]))
   cat('\n')
 }
 ```
