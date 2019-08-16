@@ -149,7 +149,7 @@ Here, we're plotting two very similar plots. The first contains the zooplankton 
 ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
   # geom_histogram(bins = 30) +
   geom_density() +
-  labs(x = expression(Wet~Weight~(mu*'g')), y = "Count")
+  labs(x = expression(Wet~Weight~(mu*'g')))
 
 zoop_param <- zoop_param[zoop_param$WW__g < 2000,]
 
@@ -157,7 +157,7 @@ zoop_param <- zoop_param[zoop_param$WW__g < 2000,]
 ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
   # geom_histogram(bins = 30) +
   geom_density() +
-  labs(x = expression(Wet~Weight~(mu*'g')), y = "Count")
+  labs(x = expression(Wet~Weight~(mu*'g')))
 
 # Returns zoop_param to normal (including Eurycercus spp.)
 zoop_param <- read.delim(paste0(getpath4data(), "zoop_parameters.txt"))
@@ -238,7 +238,7 @@ for (i in unique(zoo$Year)) {
 # Plots the average zooplankton counts over time
 ggplotly(ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[,84:95]), fill = LocationID2)) +
   geom_bar(stat = "identity") +
-  labs(y = "Average Zooplankton Count", x = "Year"))
+  labs(y = "Total Zooplankton Count", x = "Year"))
 
 for (i in unique(zoo$Year)) {
   print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 100:111])), " t/km3"))
@@ -247,7 +247,7 @@ for (i in unique(zoo$Year)) {
 # Plots the average zooplankton biomass over time
 ggplotly(ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[, 100:111]), fill = LocationID2)) +
   geom_bar(stat = "identity") +
-  labs(y = "Average Zooplankton Biomass (tons per cubic kilometer)", x = "Year"))
+  labs(y = "Total Zooplankton Biomass (tons per cubic kilometer)", x = "Year"))
 ```
 
 ## Intraannual changes
@@ -349,7 +349,7 @@ biom_group_year <-
   function(group, group_names) {
     print(ggplot(data = zoo, mapping = aes(x = Year, y = group)) +
       geom_bar(stat = "summary", fun.y = "mean") +
-      labs(y = expression(Total~Zooplankton~Biomass~(t/km^3)), x = "Year"))
+      labs(y = expression(Average~Zooplankton~Biomass~(t/km^3)), x = "Year"))
   }
 
 # Function that plots the biomass of each category over time
@@ -357,7 +357,7 @@ counts_group_year <-
   function(group, group_names) {
     print(ggplot(data = zoo, mapping = aes(x = Year, y = group)) +
       geom_bar(stat = "summary", fun.y = "mean") +
-      labs(y = "Total Zooplankton Count", x = "Year"))
+      labs(y = "Average Zooplankton Count", x = "Year"))
   }
 ```
 
