@@ -119,7 +119,7 @@ zoo$PARASITIC_biom    <- round(zoo$PARASITIC    *  35.039 / 1000000 * 1000000000
 
 <span style="color:red">Specify the unit, either in the title or with a sentence here.</span>
 
-```{r}
+```{r, warning = F}
 # Prints the average wet weight for each of the large groups 
 for (i in unique(zoop_param$Large_group)) {
   print(paste0(i, ": ", round(mean(zoop_param$WW__g[zoop_param$Large_group == i], na.rm = TRUE), 3), " μg"))
@@ -128,7 +128,7 @@ for (i in unique(zoop_param$Large_group)) {
 
 ### Mean wet weight of each small group
 
-```{r}
+```{r, warning = F}
 # Prints the wet weight for each of the small groups 
 for (i in unique(zoop_param$Small_group)) {
   print(paste0(i, ": ", (round(mean(zoop_param$WW__g[zoop_param$Small_group == i], na.rm = TRUE), 3)), " μg"))
@@ -144,7 +144,7 @@ Here, we're plotting two very similar plots. The first contains the zooplankton 
 <span style="color:red">Good idea to plot them with and without Eurycercus. A good way to look at the distribution would also to visualize <a href="http://www.sthda.com/english/wiki/wiki.php?title=ggplot2-density-easy-density-plot-using-ggplot2-and-r-statistical-software">dentsity plots</a>.</span>
 
 
-```{r}
+```{r, warning = F}
 # Histogram of wet weight of all species (includes Eurycercus spp.)
 ggplot(data = zoop_param, mapping = aes(x = WW__g)) +
   # geom_histogram(bins = 30) +
@@ -167,7 +167,7 @@ zoop_param <- read.delim(paste0(getpath4data(), "zoop_parameters.txt"))
 
 #### Number of samples per year
 
-```{r, message = F, results = 'asis'}
+```{r, message = F, results = 'asis', warning = F}
 samples_yr <- as.data.frame(matrix(rep(NA, 2 * length(min(zoo$Year):max(zoo$Year))), ncol = 2))
 for (i in min(zoo$Year):max(zoo$Year)) {
   samples_yr[i-min(zoo$Year)+1,1] <- i
@@ -187,7 +187,7 @@ station_which_sampled[station_which_sampled > 0] <- 1
 
 #### Stations sampled/not sampled
 
-```{r, message = F, results = 'asis'}
+```{r, message = F, results = 'asis', warning = F}
 ht <- as_hux(station_which_sampled)
 ht <- set_background_color(ht, where(ht == 1), "pink")
 ht <- huxtable::add_colnames(ht, colnames = colnames(station_which_sampled))
@@ -199,7 +199,7 @@ ht
 
 #### Number of samples per year by station
 
-```{r, message = F, results = 'asis'}
+```{r, message = F, results = 'asis', warning = F}
 station_number_sampled <- as.data.frame(with(zoo, tapply(rep(1,nrow(zoo)), list("Year#"=Year, "station"=LocationID2), sum, na.rm = T)))
 station_number_sampled <- station_number_sampled[colSums(station_number_sampled, na.rm = T) > 0]
 station_number_sampled[is.na(station_number_sampled)] <- 0
@@ -208,7 +208,7 @@ kable(station_number_sampled)
 
 #### Average zooplankton count and biomass per sample
 
-```{r, message = F}
+```{r, message = F, warning = F}
 for (i in unique(zoo$Year)) {
   print(paste0(i, ": ", round(mean(rowSums(zoo[zoo$Year == i, 84:95]), na.rm = T), 0), " zooplankton"))
 }
@@ -230,7 +230,7 @@ ggplot(data = zoo, mapping = aes(x = zoo$Year, y = rowSums(zoo[, 100:111]))) +
 
 #### Total zooplankton count and biomass over time 
 
-```{r, message = F}
+```{r, message = F, warning = F}
 for (i in unique(zoo$Year)) {
   print(paste0(i, ": ", sum(rowSums(zoo[zoo$Year == i, 84:95])), " zooplankton"))
 }
@@ -256,7 +256,7 @@ Because the number of samples varied between years, all counts and biomass value
 
 <span style="color:red">Have a fixes x-axis (minimum is 5 I believe, max is 10? May-October?), it will ease comparison.</span>
 
-```{r}
+```{r, warning = F}
 # Function that plots the counts of zooplankton by each month across all years
 counts_all_month <- 
   function(year) {
@@ -326,7 +326,7 @@ for (i in 84:95) {
 
 ### Biomass by group
 
-```{r, results = 'asis'}
+```{r, results = 'asis', warning = F}
 for (i in 100:111) {
   cat('\n')  
   cat("####Average biomass for", names(zoo[i]), " by month \n")
@@ -343,7 +343,7 @@ Because the number of samples varied between years, all counts and biomass value
 Another idea would be to add the 'station' as factor in the plot, and plot it with plotly (see example in the LTdiet.Rmd or stocking.Rmd). If we can select/unselect stations, we could compare the abundance at a single site. <br>
 If it varies, we'll have to standardize the rest of the data. </span>
 
-```{r}
+```{r, warning = F}
 # Function that plots the counts of each category over time
 biom_group_year <- 
   function(group, group_names) {
@@ -363,7 +363,7 @@ counts_group_year <-
 
 ### Counts by group
 
-```{r, results = 'asis'}
+```{r, results = 'asis', warning = F}
 for (i in 84:95) {
   cat('\n')  
   cat("####Average counts for", names(zoo[i]), " by year \n") 
@@ -374,7 +374,7 @@ for (i in 84:95) {
 
 ### Biomass by group
 
-```{r, results = 'asis'}
+```{r, results = 'asis', warning = F}
 for (i in 100:111) {
   cat('\n')  
   cat("####Average biomass for", names(zoo[i]), " by year \n") 
