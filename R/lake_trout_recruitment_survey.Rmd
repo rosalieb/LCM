@@ -295,6 +295,7 @@ LTeff <- LTeff[order(LTeff$date),]
 
 
 LTeff <- LTeff[!is.na(LTeff$year),]
+#write.table(LTeff, paste0(getpath4data(), "data_from_Pascal/LTeff_compiled_RB.txt"), sep="\t")
 
 ggplot(LTeff, aes(x=year_hour, y=-yday, color=LTeff$AvDepth_m)) + 
   geom_point() +
@@ -312,7 +313,7 @@ panel.background = element_blank(), axis.line = element_line(colour = "black")) 
 ```
 
 ## Map trips
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r read useful file for map, message=FALSE, warning=FALSE, include=FALSE}
 bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
 lcgroupmap=c("lake",rep("island", 84562))
 bathy2 <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
