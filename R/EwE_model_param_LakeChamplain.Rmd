@@ -3,9 +3,9 @@ title: "Model parameter EwE Lake Champlain"
 author: "Rosalie Bruel"
 date: "11/07/2019"
 output: 
-  html_document: 
+  html_document:
     df_print: paged
-    fig_caption: yes
+    fig_caption: true
     toc: yes
     toc_depth: 3
     toc_float: true
@@ -19,6 +19,7 @@ fontsize: 11pt
 _Last update: `r Sys.Date()`_
 
 ```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = dirname(getwd()))
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(plotly)
@@ -38,12 +39,21 @@ library(RColorBrewer)
 library(gridExtra) # get two plots side by side
 library(knitr) # for kable
 library(stringr) # for str_replace()
+library(wesanderson) # colors
+
+# Captions with library captioner
+# https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
+# https://cran.r-project.org/web/packages/captioner/vignettes/using_captioner.html 
+fig_cap <- captioner::captioner()
+tab_cap <- captioner::captioner("Table")
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
   if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
   if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
 }
+
+
 ```
 
 The objective of this document is to gather all in one place the decisions made for the parameters of the model.
@@ -52,7 +62,7 @@ I'm starting this document on July 16th, 2019, having entered some parameters ov
 For the Lake Champlain monitoring data, I'm using the data I processed for the Stats-a-thon. The idea was to get something a bit homogeneous in term of depths (hypolimnion and epilimnion data when lake stratified, and hypolimnion=epilimnion when lake mixed).
 
 ```{r read data from LTM}
-dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step5.txt"))
+dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step4.txt"))
 names(dtlcm)
 
 ```
@@ -136,7 +146,7 @@ I'm calculating the depth of the euphotic zone based on the secchi depth.
 __Data__:  
 * Long-term monitoring dataset
 
-The secchi depth across all sites and years is ploted below.
+The secchi depth across all sites and years is ploted below (`r fig_cap("secchi", display="cite", levels=2)`).
 
 ```{r get secchi depth from LTM, echo=FALSE, message=FALSE, warning=FALSE}
 secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = Secchi.Depth, fill = as.factor(StationID))) +
@@ -149,6 +159,8 @@ secchi_depth_p
 
 eu_z = 4.9
 ```
+`r fig_cap("secchi", caption = "Secchi depths across all sites and years")`
+
 <br>
 We set the euphotic zone for the main lake (StationID= 16 & 19) at `r eu_z` m.
 
@@ -281,15 +293,18 @@ pzoo <- ggplot(zoo_summ, aes(VisitDate,value,color=variable)) + geom_point() +
 
 ggplotly(pzoo)
 ```
+`r fig_cap("zoop_evol", caption = "Evolution of zooplankton abundance in Lake Champlain")`
 
-
-```{r View abundance per station, echo=FALSE, message=FALSE, warning=FALSE}
+```{r View abundance per station, fig.cap = c(cap1,cap2,cap3),echo=FALSE, message=FALSE, warning=FALSE}
+cap1 = fig_cap("zoop_pred", caption = "Evolution of predators zooplankton abundance in Lake Champlain")
 ggplot(data = zoo, aes(x = VisitDate, y = PREDATOR)) + geom_point() +
   facet_wrap(~as.factor(zoo$StationID)) + ylim(0,20000)
 
+cap2=fig_cap("zoop_lrgraz", caption = "Evolution of large grazers zooplankton abundance in Lake Champlain")
 ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_lr)) + geom_point() +
   facet_wrap(~as.factor(zoo$StationID)) + ylim(0,100000)
 
+cap3=fig_cap("zoop_smgraz", caption = "Evolution of small grazers zooplankton abundance in Lake Champlain")
 ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_sm)) + geom_point() +
   facet_wrap(~as.factor(zoo$StationID)) + ylim(0,250000)
 
@@ -355,7 +370,7 @@ zoo19_month_Predator
 
 # Mysis
 
-
+`r tab_cap("mysis", caption = "Head of the table with mysis data")`
 ```{r load datasets, echo=FALSE, message=FALSE, warning=FALSE}
 mysis <- read.delim(paste0(getpath4data(), "data_from_Jason/mysis_long_term.txt"))
 mysis$Date <- parse_date_time(mysis$Date, orders = c("d/m/Y"))
@@ -388,10 +403,10 @@ mysis_summ_d <- data.frame(melt(mysis_summ_d), "Year"=rep(unique(mysis$Year), ti
 
 ggplot(mysis_summ_d, aes(variable, Year)) + geom_tile(aes(fill = value),colour = "white") + scale_fill_gradient(low = "white", high = "steelblue") + ggtitle("Total number of mysis per m2") + xlab("Average depth (rounded to 10 m)")
 
-
 ```
+`r fig_cap("mysis vs years", caption="Total number of mysis per m2")`
 
-
+`r tab_cap("mysis stats", caption="Average number and weight of mysis per year (with standard deviation)")`
 ```{r summary biomass per year, echo=FALSE, message=FALSE, warning=FALSE}
 mysis_summ <- data.frame(
   "Year"=unique(mysis$Year),
@@ -409,6 +424,7 @@ with (data=mysis_summ
       , expr = errbar(Year,mean,mean+sd/2,mean-sd/2, pch=16, cap=.01, xlab="Year",ylab="mean density (# mysis/m2)", cex=.8)
         )
 ```
+`r fig_cap("mysis abundance 1", caption="Average (and sd) mysis density per year")`
 
 ## Changepoint analysis
 
@@ -439,6 +455,8 @@ lines(mysis_summ$Year[-c(1:cpts(ans))], c(lm2$coefficients[1]+mysis_summ$Year[-c
 
 
 ```
+`r fig_cap("mysis abundance 2", caption="Average (and sd) mysis density per year. Linear regression for the two periods detected.")`
+
 
 ## Get biomass in grams
 Using mysis weight data from Chesapeake Bay (given by Rosie) to get an estimate of average/median weigth.
@@ -458,6 +476,8 @@ grid.arrange(p1,p2,nrow=1, widths=c(1,1.3))
 mysis_w_mean    = mean(mysis_w$Wet_wt, na.rm=T)
 mysis_w_median  = median(mysis_w$Wet_wt, na.rm=T)
 ```
+`r fig_cap("mysis dry and wet weigth", caption="Distribution of mysis dry and wet weigth")`
+
 
 The distribution is not normal, so median value should be chosen over mean. <br>
 * mean: `r mysis_w_mean` <br
@@ -472,7 +492,7 @@ with (data=mysis_summ
       , expr = errbar(Year,mean_w,mean_w+sd_w/2,mean_w-sd_w/2, pch=16, cap=.01, xlab="Year",ylab="mean biomass (mg mysis/m2)", cex=.8)
         )
 ```
-
+`r fig_cap("mysis biomass 1", caption="Average (and sd) mysis biomass per year")`
 
 # Benthic invertebrates
 
@@ -482,7 +502,8 @@ Use dresseinid mussels?
 
 # Trout-perch
 
-__Data:__  
+
+__ Data:__ <br> 
 Data come from the bycatch data collected during trawling.
 Some data are also present in the FSA library by D. Ogle.
 
@@ -504,10 +525,10 @@ par(op)
 
 ```{r read data from WFB 161 fall 2018, message=FALSE, warning=FALSE, include=FALSE}
 # Read data
-data <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_data.txt", sep=""), header = T)
-metadata <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_metadata_2.txt", sep=""), header = T)
+data <- read.delim("Input/WFB161_2018_Lab3_data.txt", header = T)
+metadata <- read.delim("Input/WFB161_2018_Lab3_metadata_2.txt", header = T)
 
-length <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_length.txt", sep=""))
+length <- read.delim("Input/WFB161_2018_Lab3_length.txt")
 length_sp <- length[1,]
 length <- length[-1,]
 indx <- sapply(length, is.factor)
@@ -515,9 +536,8 @@ length[indx] <- lapply(length[indx], function(x) as.numeric(as.character(x)))
 
 str(length)
 
-
-troutperch <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_length_troutperch.txt", sep=""), header = T)
-alewife <- read.delim(paste(getwd(),"/Input/WFB161_2018_Lab3_length_alewife.txt", sep=""), header = T)
+troutperch <- read.delim("Input/WFB161_2018_Lab3_length_troutperch.txt", header = T)
+alewife <- read.delim("Input/WFB161_2018_Lab3_length_alewife.txt", header = T)
 
 ```
  
@@ -525,27 +545,12 @@ Trawl on September 17th (Monday lab) and 19th (Wednesday lab), 2018, as part of 
 
 `r metadata`
 
-Length were collected for 
 
-```{r}
-hist(troutperch$Length_trout_perch, breaks = c(seq(0,130,2)), col="grey")
-hist(troutperch$Length_trout_perch[troutperch$Trawl==1], breaks = c(seq(0,130,5)), col="grey", ylim = c(0,100))
-par(new=T)
-hist(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3), ylim = c(0,100), main='', xlab='length class (mm)')
-# par(new=T)
-# hist(troutperch$Length_trout_perch[troutperch$Trawl==4], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3))
-par(new=T)
-hist(troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8], breaks = c(seq(0,130,5)), col=adjustcolor(col = "red",alpha.f = .3), ylim = c(0,100), main='', xlab='')
-legend("topleft", legend = c("Trawls #1-3", "Trawls #5-8"), fill =c(adjustcolor(col = "blue",alpha.f = .3),adjustcolor(col = "red",alpha.f = .3)), bty='n')
-boxplot(troutperch$Length_trout_perch~troutperch$Trawl)
+`r fig_cap("trout perch trawl", caption="Start and end depth of trawls conducted in 2018 for WFB 161.", display=FALSE)`
 
-t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$p.value
+Trawls were done deeper and deeper (`r fig_cap("trout perch trawl", display="cite")`).
 
-hist(alewife$Alewife, breaks=15, col="grey")
-
-library(psych)
-describeBy(troutperch$Length_trout_perch, group = troutperch$Trawl)
-
+```{r depth trawls wfb 161, echo=FALSE, message=FALSE, warning=FALSE}
 plot(1:8,colMeans(metadata[5:6,-1]), pch=20, ylim=c(min(metadata[5:6,-1]), max(metadata[5:6,-1])), xlab="# trawls", ylab="depth (m)")
 for (i in 1:8) {
   lines(c(i,i),c(metadata[5,i+1], metadata[6,i+1]), col="grey")
@@ -555,13 +560,49 @@ points(1:8,metadata[6,-1], pch=15, col="brown1")
 points(1:8,colMeans(metadata[5:6,-1]), cex=1.4, pch=20)
 legend("bottomrigh", legend = c("Start", "End", "Average depth"), pch=c(20,15,20), col=c("grey", "brown1","black"), bty='n')
 
+```
+`r fig_cap("trout perch trawl", display="full")`
+
+
+Length were collected for `r nrow(troutperch)` trout-perch (and `r nrow(alewife)` alewifes). Note that we collected more trout-prech for each trawl but stopped measuring after 115-125 individuals. Trawling locations show different size distribution.
+
+```{r histogram trout perch length, fig.cap=c(cap1,cap2,cap3), echo=FALSE, message=FALSE, warning=FALSE}
+cap1=fig_cap("size distrib trout perch 1", caption="size distribution of trout perch")
+hist(troutperch$Length_trout_perch, breaks = c(seq(0,130,2)), col="grey", xlab="length class (mm)", main="")
+# hist(troutperch$Length_trout_perch[troutperch$Trawl==1], breaks = c(seq(0,130,5)), col="grey", ylim = c(0,100))
+# par(new=T)
+cap2=fig_cap("size distrib trout perch 2", caption="size distribution of trout perch - shallower and deeper sites evidenced")
+hist(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3), ylim = c(0,100), main='', xlab='length class (mm)')
+# par(new=T)
+# hist(troutperch$Length_trout_perch[troutperch$Trawl==4], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3))
+par(new=T)
+hist(troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8], breaks = c(seq(0,130,5)), col=adjustcolor(col = "red",alpha.f = .3), ylim = c(0,100), main='', xlab='')
+legend("topleft", legend = c("Trawls #1-3", "Trawls #5-8"), fill =c(adjustcolor(col = "blue",alpha.f = .3),adjustcolor(col = "red",alpha.f = .3)), bty='n')
+cap3=fig_cap("size distrib trout perch 3", caption="size distribution of trout perch")
+boxplot(troutperch$Length_trout_perch~troutperch$Trawl , xlab="trawls", ylab="length (mm)")
+
+```
+
+Size between trout-perch caught in trawls 1-3 and trawls 5-8 is significantly different (t-test, t = `r t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$statistic`, p-value = `r t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$p.value`).
+
+Below is a more detailed characterisation of each trawl.
+
+```{r various stats of each trawl trout perch WFB161, message=FALSE, warning=FALSE}
+library(psych)
+describeBy(troutperch$Length_trout_perch, group = troutperch$Trawl)
+
+```
+
+We stopped measuring for each trawl after 115-125 individuals -- below is a code I used to show the students that if we had sample less fish, we would have still find the same mean for each trawl.
+
+```{r resample trout perch data, echo=FALSE, message=FALSE, warning=FALSE}
 # resample data
 # independent 2-group t-test
 # Principle: t.test(y1,y2) # where y1 and y2 are numeric
 par(mfrow=c(1,2), mar=c(8.5,4.1,3.8,2.1))
 plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
 rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border=NA)
-mycol <- wes_palette("Darjeeling", 8, type="continuous")
+mycol <- wes_palette("Darjeeling1", 8, type="continuous")
 mtext("a. Mean comparison (independent\n     2-group t-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
 for (i in 1:8) {
   for (j in seq(10,100,10)){
@@ -577,7 +618,7 @@ for (i in 1:8) {
 
 plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
 rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border = NA)
-mycol <- wes_palette("Darjeeling", 8, type="continuous")
+mycol <- wes_palette("Darjeeling1", 8, type="continuous")
 mtext("b. Variance comparison (independent\n     2-group var-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
 for (i in 1:8) {
   for (j in seq(10,100,10)){
@@ -599,10 +640,13 @@ par(xpd=F)
 par(mfrow=c(1,1), mar=c(5.1,4.1,4.1,2.1))
 
 ```
+`r fig_cap("trout perch sample size stats", caption="Testing robustness of our results by changing sample size")`
 
 
-## Sample locations for trout-perch data    
-Data for trout perch (`r nrow(byc$species=="trout-perch",])` observations) were collected and are summarized in the bycatch dataframe. Observations on `r length(summary(byc$site[byc$species=="trout-perch"]))` sites -- sites with higher number of observation are listed below.
+## Data from Ellen -- bycatch from the LT recruitment survey
+
+### Sample locations for trout-perch data 
+Data for trout perch (`r nrow(byc[byc$species=="trout-perch",])` observations) were collected and are summarized in the bycatch dataframe. Observations on `r length(summary(byc$site[byc$species=="trout-perch"]))` sites -- sites with higher number of observation are listed below.
 
 ```{r where are trout perch found, echo=FALSE, message=FALSE, warning=FALSE}
 summ_tp <- summary(byc$site[byc$species=="trout-perch"])
@@ -611,7 +655,7 @@ summ_tp[order(summ_tp, decreasing = T)][1:5]
 ```
 
 
-```{r trout perch subset, echo=FALSE, message=FALSE, warning=FALSE}
+```{r trout perch subset, message=FALSE, warning=FALSE, include=FALSE}
 #trout perch subset
 tps <- byc[byc$species=="trout-perch" & byc$site=="burlington bay",]
 tps$tote..fullness.[tps$tote..fullness.=="na"] <- NA
@@ -629,20 +673,60 @@ gsub(" ",NA,tps$tote..fullness.)
 ```
 
 Unfortunately, there's only one correspondance between 'tote fulness' and 'estimated number': 100 (est. number) = 1 layer.
+Talking to Ellen and Pascal, they told me it was too high. It's most likely there's only 40 or so. Talk to fisheries biologist working on other lakes maybe?
 For the sake of getting a bit more estimates, trying to convert tote fullness into number.
 
 
 ```{r how many layers of trout perch in 1/4 of a tote}
-# 1 layer = 100
+# 1 layer = 100? 35? how many? find out.
 # It's easier (at least for me) to count layers over 1/4 of a fish tote
 # I'm assuming there's about 8 layers in 1/4 of a tote
 # Meaning that in a tote, there are
 # tote_troutperch = number in layer * number layer in 1/4 * bring back to 1/1
-( tote_troutperch =      100        *         8           *        4          )
+( tote_troutperch =      40         *         8           *        4          )
 
 ```
 
 
+Now that we somewhat have an estimation of number per tote, convert that back and get an idea of the average abundance.
+
+
+
+It'd be easier to assign the GPS coordinates to each date to be sure there's not a big spot with / without trout-perch.
+
+```{r match gps coordinates trawls for trout perch surveys, message=FALSE, warning=FALSE, include=FALSE}
+# Read LTeff compiled
+melo_effort <- read.delim(paste0(getpath4data(),"data_from_Pascal/LTeff_compiled_RB.txt"))
+tps$start.lon.dd <- rep(NA, nrow(tps))
+tps$end.lon.dd <- rep(NA, nrow(tps))
+tps$start.lat.dd <- rep(NA, nrow(tps))
+tps$end.lat.dd <- rep(NA, nrow(tps))
+for (i in 1:nrow(tps)) {
+  if(i==1) {n1=0;n2=0;whichn1=NULL}
+  narrow2day <- melo_effort[as.character(melo_effort$date)==as.character(tps$date[i]),]
+  narrow2trawl <- narrow2day[as.numeric(paste(narrow2day$netID))==as.numeric(paste(tps$netID[i])),]
+  if(nrow(narrow2trawl)==1 & narrow2trawl$start.lat.dd != "#VALUE!" && as.numeric(paste(narrow2trawl$start.lat.dd)) >0) {
+    tps$start.lon.dd[i] <- as.numeric(paste(narrow2trawl$start.lon.dd))
+    tps$end.lon.dd[i]   <- as.numeric(paste(narrow2trawl$end.lon.dd))
+    tps$start.lat.dd[i] <- as.numeric(paste(narrow2trawl$start.lat.dd))
+    tps$end.lat.dd[i]   <- as.numeric(paste(narrow2trawl$end.lat.dd))
+    n1 <- n1+1 # for info message
+  } else {
+      n2 <- n2+1 # for info message
+      whichn1 <- c(whichn1,i)
+      }
+  # Info message
+  if(i==nrow(tps)) message(paste0(" ✓ Found matching GPS coordinates for ", n1," of the trawls","\n ✕ No or several potential GPS coordinates were found for ", n2, " of the trawls (call 'whichn1' in the console to know which rows of the dataframe were not matched, or find the rows with NAs)." ))
+}
+
+tps$avg.lon.dd <- (tps$start.lon.dd+tps$end.lon.dd)/2
+tps$avg.lat.dd <- (tps$start.lat.dd+tps$end.lat.dd)/2
+
+```
+
+```{r}
+tps
+```
 
 
 
@@ -1474,8 +1558,9 @@ byc$fyear <- byc$year
 byc$year <- as.numeric(paste(byc$year))
 byc$netID2 <- paste(byc$year,as.numeric(paste(byc$netID)),sep="_")
 
-date <- as.POSIXlt(byc$date, format = "%d/%m/%Y")
-byc$yday <- date$yday
+byc$date <- as.POSIXlt(byc$date, format = "%d/%m/%Y", tz = "")
+byc$yday <- byc$date$yday
+byc$date <- as.Date(byc$date )
 byc <- byc[order(date),]
 head(byc)
 
