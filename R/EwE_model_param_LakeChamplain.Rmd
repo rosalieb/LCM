@@ -120,6 +120,10 @@ tg <- read.delim(paste0(getpath4data(),"data_from_Pascal/target_catch_2016-2018.
 byc <- read.delim(paste0(getpath4data(),"data_from_Pascal/bycatch_2016-2018.txt"))
 #head(byc)
 
+# Convert date format to something we'll use more easily
+tg$date <- as.Date(tg$date, format = "%d/%m/%Y")
+byc$date <- as.Date(byc$date, format = "%d/%m/%Y")
+
 ```
 Here are also the number of observations collected for different species during the trawls (`r min(tg$year,na.rm=T)`-`r max(tg$year,na.rm=T)`).
 
@@ -146,7 +150,7 @@ I'm calculating the depth of the euphotic zone based on the secchi depth.
 __Data__:  
 * Long-term monitoring dataset
 
-The secchi depth across all sites and years is ploted below (`r fig_cap("secchi", display="cite", levels=2)`).
+The secchi depth across all sites and years is ploted below (`r fig_cap("secchi", display="cite")`).
 
 ```{r get secchi depth from LTM, echo=FALSE, message=FALSE, warning=FALSE}
 secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = Secchi.Depth, fill = as.factor(StationID))) +
@@ -658,6 +662,7 @@ summ_tp[order(summ_tp, decreasing = T)][1:5]
 ```{r trout perch subset, message=FALSE, warning=FALSE, include=FALSE}
 #trout perch subset
 tps <- byc[byc$species=="trout-perch" & byc$site=="burlington bay",]
+tps <- byc[byc$species=="trout-perch" ,]
 tps$tote..fullness.[tps$tote..fullness.=="na"] <- NA
 tps$est_number[tps$est_number=="na"] <- NA
 tps$est_number <- as.numeric(paste(tps$est_number))
@@ -669,6 +674,11 @@ gsub(" ",NA,tps$tote..fullness.)
 
 #View(tps[,c("est_number","tote..fullness.")])
 #View(byc[,c("species","est_number","tote..fullness.")])
+
+# Convert to character the 3 columns with fullness info to ease the cleaning process
+tps$tote..fullness. <- as.character(tps$tote..fullness.)
+tps$X..of.tote      <- as.character(tps$X..of.tote)
+tps$est_number      <- as.character(tps$est_number)
 
 ```
 
@@ -682,34 +692,126 @@ For the sake of getting a bit more estimates, trying to convert tote fullness in
 # It's easier (at least for me) to count layers over 1/4 of a fish tote
 # I'm assuming there's about 8 layers in 1/4 of a tote
 # Meaning that in a tote, there are
-# tote_troutperch = number in layer * number layer in 1/4 * bring back to 1/1
-( tote_troutperch =      40         *         8           *        4          )
-
+#                       number layer in 1/4  * bring back to 1/1
+layer_tote_troutperch = 8                    *        4
+# tote_troutperch = number in layer *  number layer tote
+( tote_troutperch =      40         * layer_tote_troutperch)
 ```
 
 
-Now that we somewhat have an estimation of number per tote, convert that back and get an idea of the average abundance.
+Now that we somewhat have an estimation of number per tote, convert that back and get an idea of the average abundance. <br>
 
+Note that right now, we are trusting __estimated number__ over __tote fullness__ over __percentage of tote__. <br>
 
+```{r convert percentage and fullness into number of fish}
+tps$fish_count <- rep(NA, nrow(tps))
 
-It'd be easier to assign the GPS coordinates to each date to be sure there's not a big spot with / without trout-perch.
+for (i in 1:nrow(tps)) {
+  # Turn all to false at the beginning of each loops
+  C1=F;C2=F;C3=F
+  if(i==1) {n1=0;n2=0;n3=0;nbis1=0;nbis2=0;nbis3=0}
+  
+  # Case 1: percentage is available
+  if(!is.na(tps$X..of.tote[i]) & tps$X..of.tote[i]!="na" & tps$X..of.tote[i]!="") {
+    n1=n1+1
+    C1=T
+    options(warn=-1)
+    tps$fish_count[i] = as.numeric(gsub("[\\%,]", "", tps$X..of.tote[i]))
+    options(warn=0)
+    # Sometimes there's some fraction in the percent column -- consider this as an error
+    if(is.na(tps$fish_count[i])) {n1=n1-1}
+  }
+  
+  # Case 2: tote fullness are available
+  if(!is.na(tps$tote..fullness.[i]) & tps$tote..fullness.[i]!="") {
+    n2=n2+1
+    C2=T
+    # This is the most complicated case, because sometimes it says layers, sometimes it's a fraction, sometimes it's just a multiplying of layers
+    if(tps$tote..fullness.[i]=="full") {
+      tps$fish_count[i] = tote_troutperch
+    } else {
+      if (any(c("layer","layers","single") %in% unlist(strsplit(tps$tote..fullness.[i]," ")))) {
+      # If there's a layer, we'll reuse or estimate of number of layers per tote
+      nb_layer = layer_tote_troutperch
+      tps$fish_count[i] = gsub("layer|layers", "", tps$tote..fullness.[i])
+      if ("single" %in% unlist(strsplit(tps$fish_count[i]," "))) {
+       tps$fish_count[i] = gsub("single ", "1", tps$fish_count[i])
+      }
+    } else {
+      # if no "layer" in the line, the fraction refers to the full tote, so we're defaulting nb_layer to 1
+      nb_layer = 1
+      tps$fish_count[i] = tps$tote..fullness.[i]
+    }
+      
+      # If there's a space at the beginning, it can mess up everything. 
+      # Removing all first spaces
+      while(unlist(strsplit(tps$fish_count[i],""))[1]==" ") tps$fish_count[i] = paste(unlist(strsplit(tps$fish_count[i],""))[-1], sep = "",collapse = "")
+      
+      # if it's a fraction, we'll have a "/"
+    if ("/" %in% unlist(strsplit(tps$fish_count[i],""))) {
+      if(" " %in% unlist(strsplit(tps$fish_count[i],split = ""))) {
+        tps$fish_count[i] = tote_troutperch *
+       as.numeric(unlist(strsplit(tps$fish_count[i],split = "/"))[1]) /
+       as.numeric(unlist(strsplit(unlist(strsplit(tps$fish_count[i],split = "/"))[2]," "))[1]) *
+       as.numeric(unlist(strsplit(unlist(strsplit(tps$fish_count[i],split = "/"))[2]," "))[2]) /
+       nb_layer
+      } else {
+                tps$fish_count[i] = tote_troutperch *
+       as.numeric(unlist(strsplit(tps$fish_count[i],split = "/"))[1]) /
+       as.numeric(unlist(strsplit(tps$fish_count[i],split = "/"))[2])  /
+       nb_layer
+      }
+    } else {
+      tps$fish_count[i] = tote_troutperch * as.numeric(tps$fish_count[i]) / nb_layer
+  }
+    }
+    
+    } 
+  
+  
+  # Case 3: estimated numbers are available
+  if(!is.na(tps$est_number[i])) {
+    n3=n3+1
+    C3=T
+    tps$fish_count[i] = tps$est_number[i]
+  }
+  
+  # Were indicators present twice?
+  if(C1&C2) nbis1 = nbis1 + 1
+  if(C1&C3) nbis2 = nbis2 + 1
+  if(C2&C3) nbis3 = nbis3 + 1
+  
+  if(all(is.na(tps$fish_count[i]) & any(C1|C2|C3))) stop(print(i))
+  
+  if(i==nrow(tps)) message(paste0(" ✓ There are ",n1," lines with info on percentage fullness. \n ✓ There are ",n2," lines with info on tote fullness. \n ✓ There are ",n3," lines with info on estimated number. \n ✕ There were ",nrow(tps)-n1-n2-n3, " lines with no info on how many fish are present.\n\n Note that:\n   - both percent and tote fullness were available for ",nbis1, " lines,\n   - both percent and est. number were available for ",nbis2, " lines,\n   - both est.number and tote fullness were available for ",nbis3, " lines."))
+}
 
-```{r match gps coordinates trawls for trout perch surveys, message=FALSE, warning=FALSE, include=FALSE}
+tps$fish_count <- as.numeric(tps$fish_count)
+```
+
+We now have estimated number of trout perch for `r length(which(!is.na(tps$fish_count)))` sampling event out of `r nrow(tps)` total events with trout perch collected (i.e., `r round(length(which(!is.na(tps$fish_count)))/nrow(tps)*100)`% of the events).
+
+It'd be easier to assign the GPS coordinates to each date to be sure there's not a big spot with / without trout-perch. <br>
+[Code hidden to save plot on the .html, go to .Rmd to see it]
+
+```{r match gps coordinates and duration trawls for trout perch surveys, message=FALSE, warning=FALSE, include=FALSE}
 # Read LTeff compiled
 melo_effort <- read.delim(paste0(getpath4data(),"data_from_Pascal/LTeff_compiled_RB.txt"))
 tps$start.lon.dd <- rep(NA, nrow(tps))
 tps$end.lon.dd <- rep(NA, nrow(tps))
 tps$start.lat.dd <- rep(NA, nrow(tps))
 tps$end.lat.dd <- rep(NA, nrow(tps))
+tps$duration <- rep(NA, nrow(tps))
 for (i in 1:nrow(tps)) {
   if(i==1) {n1=0;n2=0;whichn1=NULL}
   narrow2day <- melo_effort[as.character(melo_effort$date)==as.character(tps$date[i]),]
   narrow2trawl <- narrow2day[as.numeric(paste(narrow2day$netID))==as.numeric(paste(tps$netID[i])),]
-  if(nrow(narrow2trawl)==1 & narrow2trawl$start.lat.dd != "#VALUE!" && as.numeric(paste(narrow2trawl$start.lat.dd)) >0) {
+  if(nrow(narrow2trawl)==1 & narrow2trawl$start.lat.dd != "#VALUE!" && as.numeric(paste(narrow2trawl$start.lat.dd)) > 0) {
     tps$start.lon.dd[i] <- as.numeric(paste(narrow2trawl$start.lon.dd))
     tps$end.lon.dd[i]   <- as.numeric(paste(narrow2trawl$end.lon.dd))
     tps$start.lat.dd[i] <- as.numeric(paste(narrow2trawl$start.lat.dd))
     tps$end.lat.dd[i]   <- as.numeric(paste(narrow2trawl$end.lat.dd))
+    tps$duration[i]     <- substr(narrow2trawl$duration,4,5)
     n1 <- n1+1 # for info message
   } else {
       n2 <- n2+1 # for info message
@@ -724,10 +826,63 @@ tps$avg.lat.dd <- (tps$start.lat.dd+tps$end.lat.dd)/2
 
 ```
 
-```{r}
-tps
+
+`r fig_cap("troutperch number lake", caption="Circle size shows the number of trout-perch collected per sampling event. Colour scale refers to day of the year. Rectangle identify Burlington Bay.")`
+
+`r fig_cap("troutperch number lake", display="cite")` shows the number of trout perch collected against the center location of the trawl. The radius show the number of fish captured. Note that we have CPUE (1 unit effort = 1 minute of trawling).
+
+```{r get CPUE trout perch}
+tps$fish_count_CPUE <- tps$fish_count/as.numeric(tps$duration)
 ```
 
+
+```{r map the number of trout perch caught per lake location, echo=FALSE, message=FALSE, warning=FALSE}
+# p1 <- ggplot(tps[!is.na(tps$fish_count) & tps$site=="burlington bay",], aes(x = avg.lon.dd, y = avg.lat.dd, size = fish_count, colour=yday)) + geom_point() + labs(x="Longitude", y="Latitude")
+# 
+# ggplotly(p1)
+
+# create color palette and shapes
+colfunc <- colorRampPalette(c("yellow", "red"))
+pal <- colfunc(max(tps$yday)-min(tps$yday))
+
+addLegendCustom <- function(map, colors, labels, sizes, opacity = 0.5){
+      colorAdditions <- paste0(colors, "; width:", sizes, "px; height:", sizes, "px")
+      labelAdditions <- paste0("<div style='display: inline-block;height: ", sizes, "px;margin-top: 4px;line-height: ", sizes, "px;'>", labels, "</div>")
+
+      return(addLegend(map, colors = colorAdditions, labels = labelAdditions, opacity = opacity))
+    }
+
+troutperch_map <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  setView(lng = -73.255, lat = 44.465, zoom = 12) %>% 
+  addCircleMarkers(
+    lng = tps$avg.lon.dd,
+    lat=tps$avg.lat.dd,
+    radius = ifelse(!is.na(tps$fish_count_CPUE),as.numeric(tps$fish_count_CPUE)/5, 2),
+    color = pal[as.numeric(tps$yday)-min(tps$yday)],
+    stroke = FALSE, fillOpacity = 0.5
+  )  %>%
+  addRectangles(
+    lng1=-73.290, lat1=44.45,
+    lng2=-73.231, lat2=44.48,
+    fillColor = "transparent"
+  ) %>%
+  addLegend("topright", title = "Day of the year",colors = pal[seq(1,(max(tps$yday)-min(tps$yday)),by = 30)],values = seq(1,(max(tps$yday)-min(tps$yday)),by = 30),
+            labels=(min(tps$yday):(max(tps$yday)))[seq(1,(max(tps$yday)-min(tps$yday)),by = 30)]) 
+
+troutperch_map
+
+plot(tps$fish_count ~ tps$yday)
+
+```
+`r fig_cap("troutperch number lake", display="full")`
+
+__ is the effort less important in summer cause the work focuss on LT? __
+
+```{r}
+plot(tps$fish_count ~ tps$yday)
+
+```
 
 
 # Smelt
