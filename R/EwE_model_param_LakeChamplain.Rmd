@@ -40,6 +40,9 @@ library(gridExtra) # get two plots side by side
 library(knitr) # for kable
 library(stringr) # for str_replace()
 library(wesanderson) # colors
+library(ggraph) # for nodes plot
+library(igraph) # probably better for nodes graph because can also assign weigth
+library(tidygraph) # to transform dataframe in node datasets
 
 # Captions with library captioner
 # https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
@@ -59,12 +62,149 @@ getpath4data <- function() {
 The objective of this document is to gather all in one place the decisions made for the parameters of the model.
 I'm starting this document on July 16th, 2019, having entered some parameters over the past 4 months and realizing I already forgot where I got them from... Hopefully I'll find my notes back, otherwise, having everything in one place might be easier.
 
+The model and connection we're assuming in a first place are represented below.
+
+```{r plot foodweb with nodes, echo=FALSE, message=FALSE, warning=FALSE}
+foodweb <- data.frame(
+  "predator" = c("Sea Lamprey","Sea Lamprey","Sea Lamprey","AtSalmon","AtSalmon","LT",  "LT",  "LT",  "LT",     "Cisco","Cisco","Cisco","Cisco","Whitefish","Whitefish", "Trout Perch","ALW", "ALW", "ALW", "Smelt", "Smelt", "Smelt","Sculpin",           "Sculpin",  "MYS", "MYS", "ZOO"),
+  "prey"     = c("Burbot", "LT",     "AtSalmon","ALW",     "Smelt",   "MYS","ALW", "Smelt","Sculpin","ALW","Smelt","ZOO","BcCp",   "BcCp","Benthic Invertebrates", "ZOO"  , "MYS", "ZOO", "BcCp", "MYS", "ZOO", "BcCp",    "Benthic Invertebrates", "MYS","PHY", "Detritus","PHY")
+)
+
+foodweb$level <- rep(1, nrow(foodweb))
+foodweb$level <- rep(NA, nrow(foodweb))
+for (i in 1:nrow(foodweb)) {
+  if (foodweb$predator[i] %in% c("Detritus")) foodweb$level[i] = 0.5
+  if (foodweb$predator[i] %in% c("PHY","Benthic Invertebrates")) foodweb$level[i] = 1
+  if (foodweb$predator[i] %in% c("ZOO","MYS")) foodweb$level[i] = 2
+  if (foodweb$predator[i] %in% c("BcCp")) foodweb$level[i] = 3
+  if (foodweb$predator[i] %in% c("Sculpin","Trout Perch", "Alewife","Smelt")) foodweb$level[i] = 4
+  if (foodweb$predator[i] %in% c("Burbot","AtSalmon", "LT","Cisco","Whitefish")) foodweb$level[i] = 5
+  if (foodweb$predator[i] %in% c("Sea Lamprey")) foodweb$level[i] = 6
+}
+
+graph <- as_tbl_graph(foodweb)
+ggraph(graph, "grid") + 
+  geom_edge_link() + 
+  geom_node_point() +
+  geom_node_label(aes(label = names(graph[1])), repel = TRUE)
+
+```
+<br>`r fig_cap("node plot1", caption="Lake Champlain food web – species of interest")`
+
+```{r plot food web with igraph}
+ewediet <- read.delim(paste0(getpath4data(),"EwE_params/EwE_diet.txt"))
+ewediet$predator <- gsub("Lamprey", "Sea Lamprey", ewediet$predator)
+colnames(ewediet)[-c(1:2)] <- as.character(ewediet$predator[1:c(ncol(ewediet)-2)])
+rownames(ewediet) <- as.character(ewediet$predator)
+ewediet <- ewediet[1:c(ncol(ewediet)),-c(1)]
+
+ewediet2 <- melt(ewediet)
+colnames(ewediet2) <- c("prey","predator","weigth")
+#ewediet2 <- ewediet2[,c("predator","prey","weigth")]
+ewediet2 <- rbind(ewediet2,c("Smelt","Smelt",0.1))
+
+ewediet2 <- ewediet2[ewediet2[,3]>0,]
+
+ewediet2$prey <- as.character(ewediet2$prey)
+ewediet2$predator <- as.character(ewediet2$predator)
+
+ewediet_nodes <- data.frame(
+  "id"=as.character(rownames(ewediet)),
+  "data_source"=as.character(c("VTFWS", "VTFWS/UVM","VTFWS/UVM","VTFWS/NYFWS","NA","NA","NA","UVM","UVM","UVM","UVM","UVM","UVM","VTDEC","VTDEC","VTDEC","UVM","VTDEC","calculated")),
+  "level"=c(-2,0,3,3.5,0,0,0,1,0,5,4,2,5,7,6,7,6.5,8,9)
+)
+
+ewediet_nodes <- ewediet_nodes[order(ewediet_nodes$level),]
+
+net <- graph_from_data_frame(d=ewediet2, vertices=ewediet_nodes, directed=T) 
+
+#set colors
+colrs <- wes_palette("Darjeeling1", n=length(unique(V(net)$level)), type="continuous")
+V(net)$color <- colrs[V(net)$level+6]
+colrs <- wes_palette("Darjeeling1", n=length(V(net)$name), type="continuous")
+V(net)$color <- colrs
+
+edge.start <- ends(net, es=E(net), names=F)[,2]
+edge.col <- V(net)$color[edge.start]
+
+E(net)$weight <- as.numeric(paste(ewediet2$weigth))
+E(net)$width <- as.numeric(paste(E(net)$weight))*10
+
+
+# par(mfrow=c(1,1), mar=c(1,12,1,1))
+# plot(net, edge.color=edge.col, edge.curved=.1, layout=do.call("layout_in_circle", list(net))) 
+# par(xpd=T)
+# legend(x=-2, y=1.1, c(V(net)$name), pch=21,col="#777777", pt.bg=colrs, pt.cex=2, cex=.8, bty="n", ncol=1)
+# par(xpd=F)
+
+
+# mylayout should have 2 columns, x and y, and number of rows of the number of groups: length(V(net)$name) == 18
+
+mylayout <- ewediet_nodes %>% mutate(
+  x = case_when(id == "Sea Lamprey"      ~ 0,
+                id == "Adult lake trout" ~ 0,
+                id == "Atlantic salmon"  ~ 2,
+                id == "Burbot"           ~ 4,
+                id == "Walleye"          ~ -4,
+                id == "Whitefish"        ~ -2,
+                id == "Cisco"            ~ -1,
+                id == "Alewife"          ~ 1,
+                id == "Smelt"            ~ 4,
+                id == "Juvenile lake trout" ~ -3,
+                id == "Stocked lake trout" ~ -4,
+                id == "Trout-perch"      ~  2,
+                id == "Sculpin"          ~  4,
+                id == "Zoo predators"    ~  -1,
+                id == "Mysis"            ~  -3,
+                id == "Benthic invertebrates" ~ 2,
+                id == "Zoo grazers"      ~ 0,
+                id == "Phytoplankton"    ~ -2,
+                id == "Detritus"         ~ 0),
+  x2 = case_when(id == "Sea Lamprey"     ~ 3,
+                id == "Adult lake trout" ~ 3,
+                id == "Atlantic salmon"  ~ 3,
+                id == "Burbot"           ~ 3,
+                id == "Walleye"          ~ 3,
+                id == "Whitefish"        ~ 3,
+                id == "Cisco"            ~ 3,
+                id == "Alewife"          ~ 3,
+                id == "Smelt"            ~ 2,
+                id == "Juvenile lake trout" ~ 3,
+                id == "Stocked lake trout" ~ 4,
+                id == "Trout-perch"      ~  3,
+                id == "Sculpin"          ~  2,
+                id == "Zoo predators"    ~  3,
+                id == "Mysis"            ~  4,
+                id == "Benthic invertebrates" ~ 2,
+                id == "Zoo grazers"      ~ 1,
+                id == "Phytoplankton"    ~ 4,
+                id == "Detritus"         ~ 1))
+mylayout <- matrix(c(mylayout$x,mylayout$level,mylayout$x2),ncol=3)
+
+E(net)$label <- paste0(round(as.numeric(paste(E(net)$weight)),2), "\n")
+E(net)$label <- NA
+
+V(net)$label <- paste0(ewediet_nodes$id,"\n")
+V(net)$label <- NA
+
+pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_interaction4.pdf"),width = 8, height = 8)
+par(mar=c(0,4,0,7))
+plot.igraph(net,edge.color=adjustcolor(edge.col,alpha.f = .8), edge.curved=.1,
+                  layout=-as.matrix(mylayout)[,1:2])
+par(xpd=T)
+TeachingDemos::shadowtext(-norm_coords(mylayout[,1:2], -1, 1, -1, 1), label=gsub("Zoo","Zoo.",ewediet_nodes$id),pos=mylayout[,3], offset=1.3, col="black",bg = "white",  theta = (1:8/4)*pi, r1 = 0.06, r2 = 0.04)
+par(xpd=F)
+dev.off()
+
+```
+
+
 For the Lake Champlain monitoring data, I'm using the data I processed for the Stats-a-thon. The idea was to get something a bit homogeneous in term of depths (hypolimnion and epilimnion data when lake stratified, and hypolimnion=epilimnion when lake mixed).
 
 ```{r read data from LTM}
 dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step4.txt"))
 names(dtlcm)
-
+dtlcm$Year <- as.numeric(paste(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))))
 ```
 
 
@@ -153,18 +293,104 @@ __Data__:
 The secchi depth across all sites and years is ploted below (`r fig_cap("secchi", display="cite")`).
 
 ```{r get secchi depth from LTM, echo=FALSE, message=FALSE, warning=FALSE}
-secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = Secchi.Depth, fill = as.factor(StationID))) +
+secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = -Secchi.Depth, fill = as.factor(StationID))) +
   geom_boxplot() +
   xlab("Station ID") +
   ylab("Secchi depth (m)") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ggtitle(paste0("Secchi depths across all sites and years"))
+  ggtitle(paste0("Secchi depths across all sites and years")) +
+  scale_fill_discrete(name = "Stations")
 secchi_depth_p
+```
+<br>`r fig_cap("secchi", caption = "Secchi depths across all sites and years")`
 
+It would seems like years 2000 have generally deeper secchi depths. There's also some kind of oscillations: ± 2 m in secchi depth. Teleconnections with some ocean cycles?
+```{r plot secchi depth per sites with facet wrap, echo=FALSE, message=FALSE, warning=FALSE}
+secchi_depth_p2 <- dtlcm %>% ggplot(mapping = aes(x = as.factor(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))), y = -Secchi.Depth, fill = as.factor(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))))) +
+  geom_boxplot() +
+  facet_wrap(~as.factor(StationID)) + 
+  xlab("Station ID") +
+  ylab("Secchi depth (m)") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+  ggtitle(paste0("Evolution of secchi depths per site and years (",min(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))),"-",max(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))),")")) +
+  scale_fill_discrete(name = "Stations")
+secchi_depth_p2
+
+```
+<br>`r fig_cap("secchi2", caption = "Evolution of sechi depths across all sites and years (see Hilt et al 2010 were secchi depths suddenly change).")`
+
+The study of Gaiser _et al_ (2009, _Limnology and Oceanography_) shows some teleconnection between Lake Annie transparency and AMO index. Does Lake Champlain also exhibit teleconnection with AMO or ENSO?
+
+Multivariate ENSO Index version 2 (MEI) data retrieved from NOAA (<a href="https://www.esrl.noaa.gov/psd/enso/mei/">Source for MEI.v2 Values</a>), and compare them with our secchi depths (i.e., reproduce Fig. 3 in Gaiser _et al_, 2009).
+
+```{r meiv index with secchi, echo=FALSE, message=FALSE, warning=FALSE}
+meiv <- read.delim(paste0(getpath4data(),"meiv2.data.txt"))
+dtlcm_secchi <- dtlcm[,c("StationID", "VisitDate", "Secchi.Depth")]
+dtlcm_secchi$VisitDate <- as.Date(dtlcm_secchi$VisitDate, format="%d/%m/%Y")
+dtlcm_secchi <- dtlcm_secchi[complete.cases(dtlcm_secchi),]
+dtlcm_secchi$Year <- year(dtlcm_secchi$VisitDate)
+
+dtlcm_secchi_summ <- as.data.frame(
+  with(dtlcm_secchi, tapply(dtlcm_secchi$Secchi.Depth
+  ,list("Year"=as.factor(Year),"StationID"=as.factor(StationID)), mean, na.rm=T))
+  )
+dtlcm_secchi_summ2 <- data.frame(melt(dtlcm_secchi_summ), "Year"=as.numeric(paste(rep(rownames(dtlcm_secchi_summ), times=ncol(dtlcm_secchi_summ)))))
+
+dtlcm_secchi_summ2$meiv_summer <- rep(NA, nrow(dtlcm_secchi_summ2))
+dtlcm_secchi_summ2$meiv_winter <- rep(NA, nrow(dtlcm_secchi_summ2))
+
+for (i in min(dtlcm_secchi_summ2$Year):max(dtlcm_secchi_summ2$Year)) {
+  dtlcm_secchi_summ2$meiv_summer[dtlcm_secchi_summ2$Year==i] <- rowMeans(meiv[meiv$YEAR==i,7:11])
+  dtlcm_secchi_summ2$meiv_winter[dtlcm_secchi_summ2$Year==i] <- rowMeans(meiv[meiv$YEAR==i,2:5])
+}
+
+# dtlcm_secchi <- dtlcm_secchi %>%
+#   mutate(meiv = case_when(VisitDate == 2000 ~ rowMeans(meiv[,-1])[meiv$YEAR==2000]))
+
+p1 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=meiv_summer, y=value, col=Year)) +
+  geom_point() + stat_smooth(method = "lm") +
+  #geom_point(aes(x=meiv_min, y=value, col="min meiv"))+
+  #geom_point(aes(x=meiv_max, y=value, col="max meiv"))+
+  facet_wrap(~as.factor(variable)) + ggtitle("Summer ENSO index (direct)")
+
+p2 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=meiv_winter, y=value, col=Year)) +
+  geom_point() + stat_smooth(method = "lm") +
+  facet_wrap(~as.factor(variable)) + ggtitle("Winter ENSO index (legacy)")
+
+grid.arrange(p1,p2,nrow=1)
+
+```
+<br>`r fig_cap("secchi3", caption = "Secchi depth against Multivariate ENSO Index for each monitoring station.")`
+
+Same but with the Atlantic Multidecadal Oscillation (AMO, <a href="https://www.esrl.noaa.gov/psd/data/timeseries/AMO/"> data source NOAA</a>).
+
+```{r AMO index}
+amo <- read.delim(paste0(getpath4data(),"AMO_index.txt"))
+
+dtlcm_secchi_summ2$amo_summer <- rep(NA, nrow(dtlcm_secchi_summ2))
+dtlcm_secchi_summ2$amo_winter <- rep(NA, nrow(dtlcm_secchi_summ2))
+
+for (i in min(dtlcm_secchi_summ2$Year):max(dtlcm_secchi_summ2$Year[dtlcm_secchi_summ2$Year %in% amo$YEAR])) {
+  dtlcm_secchi_summ2$amo_summer[dtlcm_secchi_summ2$Year==i] <- rowMeans(amo[amo$YEAR==i,6:10])
+  dtlcm_secchi_summ2$amo_winter[dtlcm_secchi_summ2$Year==i] <- rowMeans(amo[amo$YEAR==i,2:5])
+}
+
+p3 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=amo_summer, y=value, col=Year)) +
+  geom_point() + stat_smooth(method = "lm") +
+  facet_wrap(~as.factor(variable)) + ggtitle("Summer AMO index (direct)")
+
+p4 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=amo_winter, y=value, col=Year)) +
+  geom_point() + stat_smooth(method = "lm") +
+  facet_wrap(~as.factor(variable)) + ggtitle("Winter AMO index (legacy)")
+
+grid.arrange(p3,p4,nrow=1)
+```
+
+
+## Setting the euphotic zone
+```{r set euphtotic zone}
 eu_z = 4.9
 ```
-`r fig_cap("secchi", caption = "Secchi depths across all sites and years")`
-
 <br>
 We set the euphotic zone for the main lake (StationID= 16 & 19) at `r eu_z` m.
 
@@ -174,6 +400,7 @@ The following code is not run yet, we need a value for the primary production.
 D = 10^(0.954 * log10(PP) + 0.863 * log10(eu_z) - 2.41)
 D
 ```
+
 
 # Phytoplankton
 
@@ -408,6 +635,7 @@ mysis_summ_d <- data.frame(melt(mysis_summ_d), "Year"=rep(unique(mysis$Year), ti
 ggplot(mysis_summ_d, aes(variable, Year)) + geom_tile(aes(fill = value),colour = "white") + scale_fill_gradient(low = "white", high = "steelblue") + ggtitle("Total number of mysis per m2") + xlab("Average depth (rounded to 10 m)")
 
 ```
+<br>
 `r fig_cap("mysis vs years", caption="Total number of mysis per m2")`
 
 `r tab_cap("mysis stats", caption="Average number and weight of mysis per year (with standard deviation)")`
@@ -428,6 +656,7 @@ with (data=mysis_summ
       , expr = errbar(Year,mean,mean+sd/2,mean-sd/2, pch=16, cap=.01, xlab="Year",ylab="mean density (# mysis/m2)", cex=.8)
         )
 ```
+<br>
 `r fig_cap("mysis abundance 1", caption="Average (and sd) mysis density per year")`
 
 ## Changepoint analysis
@@ -459,6 +688,7 @@ lines(mysis_summ$Year[-c(1:cpts(ans))], c(lm2$coefficients[1]+mysis_summ$Year[-c
 
 
 ```
+<br>
 `r fig_cap("mysis abundance 2", caption="Average (and sd) mysis density per year. Linear regression for the two periods detected.")`
 
 
@@ -500,151 +730,63 @@ with (data=mysis_summ
 
 # Benthic invertebrates
 
-Use dresseinid mussels?
+__Data:__ <br>
+  * Monitoring data initiated during the initial colonization
+
+From the <a href="https://dec.vermont.gov/watershed/lakes-ponds/aquatic-invasives/monitoring/zebra-mussels">VTDEC website</a>:
+"The Vermont Department of Environmental Conservation (VTDEC), in cooperation with the Lake Champlain Basin Program, initiated the Lake Champlain Zebra Mussel Monitoring Program in 1994 to track the zebra mussel's distribution through the lake. Reports are provided annually.
+
+The efficient combination of the Zebra Mussel Monitoring Program with the Long-term Water Quality and Biological Monitoring Program provides a nationally unique lake database. Information on veliger and juvenile densities monitored consistently since the initial colonization is obtained concurrently with comprehensive water quality data. This information is critical to determining the effects of zebra mussels on the Lake Champlain ecosystem and the potential risk and impact of zebra mussel colonization of other water bodies.
+
+Zebra mussel monitoring includes veliger (larvae), settled veliger (juvenile), and adult life stages at open-water and nearshore lake stations, lake tributaries and inland lakes. Greater emphasis is placed on veliger monitoring, as it is in their pelagic stage that zebra mussels are most easily spread and sampled in Lake Champlain.
+
+Zebra mussels in Lake Champlain continued to reproduce and settle successfully during 2018. The range expansion in the Northeast Lake is now complete.  Zebra mussel adults have been well established in the South, Central, and Northwest Lake since 1996. Season settling plates retrieved at nearshore stations in these areas in 2018 confirm continued reproductive success, and similar growth rates as in years past. 
+"
+
+__Other resources:__ <br
+  * <a href="https://dec.vermont.gov/sites/dec/files/wsm/lakes/images/lp_zm-sitemap.gif">Map of sampling locations<a>
+  
+__STA19__ in the veligers dataset is the station in the Main Lake. I'm going to extract these density to start with (veligers/m3)
+
+```{r read ZM data from state, message=FALSE, warning=FALSE, include=FALSE}
+ZMjuv <- read.delim(paste0(getpath4data(),"VTDEC_zebra_mussel/Juvenile_ZM.txt"))
+ZMvel <- read.delim(paste0(getpath4data(),"VTDEC_zebra_mussel/Veliger_ZM.txt"))
+ZMjuv$Date <- as.Date(ZMjuv$Date, format="%d/%m/%Y")
+ZMvel$Date <- as.Date(ZMvel$Date, format="%d/%m/%Y")
+head(ZMjuv)
+tail(ZMvel)
+unique(ZMjuv$Lake.Sta)
+unique(ZMvel$LakeSta)
+
+
+```
+
+```{r get summary per year veligers station 19}
+ZMvel_summ <- as.data.frame(with(ZMvel, tapply(ZMvel[,"Density"],
+  list("Year"=Expr1,"station"=LakeSta), mean, na.rm=T)))
+ZMvel_summ <- ZMvel_summ[,colSums(ZMvel_summ,na.rm=T)>0]
+
+plot(rownames(ZMvel_summ),ZMvel_summ$STA19, xlab="Year", ylab="Seasonal mean density (veligers/m3)", type="l")
+
+#Data extracted from the graph using WebPlotDigitizer on Google Chrome because excel is missing some lines
+#Source plot:
+# https://dec.vermont.gov/sites/dec/files/wsm/lakes/ans/images/1994-2018%20NE%20Seasnly-int%20graphs1.pdf
+#log scale
+ZMvel_STA19 <- data.frame("Year"=c(1994:2005,2011:2018), "Density"=c(0,167,4734,4973,12056,11477,20713,19718,6359,7017,8133,17871,2051,7750,1953,2623,5487,8974,10926,7371))
+#lines(ZMvel_STA19$Year,ZMvel_STA19$Density, col="pink")
+#==> not exactly the same data, what's wrong? Ask Pete Stangel maybe
+
+```
+
+
 
 # Sculpin
 
 # Trout-perch
 
-
-__ Data:__ <br> 
-Data come from the bycatch data collected during trawling.
-Some data are also present in the FSA library by D. Ogle.
-
-## Data from Lake Michigan
-
-The assigned ages (by scales), total lengths (mm), and sexes of Troutperch (Percopsis omsicomaycus) captured in southeastern Lake Michigan, from the library _FSAdata_.
-
-```{r data trout perch from lake michigan }
-?TroutperchLM1
-head(TroutperchLM1)
-op <- par(mfrow=c(1,2),pch=19)
-plot(tl~age,data=TroutperchLM1,subset=sex=="f",main="female")
-plot(tl~age,data=TroutperchLM1,subset=sex=="m",main="male")
-par(op)
-?FSAdata
-```
-
-## Data from WFB 161 - Fall 2018
-
-```{r read data from WFB 161 fall 2018, message=FALSE, warning=FALSE, include=FALSE}
-# Read data
-data <- read.delim("Input/WFB161_2018_Lab3_data.txt", header = T)
-metadata <- read.delim("Input/WFB161_2018_Lab3_metadata_2.txt", header = T)
-
-length <- read.delim("Input/WFB161_2018_Lab3_length.txt")
-length_sp <- length[1,]
-length <- length[-1,]
-indx <- sapply(length, is.factor)
-length[indx] <- lapply(length[indx], function(x) as.numeric(as.character(x)))
-
-str(length)
-
-troutperch <- read.delim("Input/WFB161_2018_Lab3_length_troutperch.txt", header = T)
-alewife <- read.delim("Input/WFB161_2018_Lab3_length_alewife.txt", header = T)
-
-```
- 
-Trawl on September 17th (Monday lab) and 19th (Wednesday lab), 2018, as part of Fisheries Biology and Techniques (UVM/WFB 161). We met at 1pm with the first group, conducted 2 trawls, and then met at 3.30pm with the second group for the 2nd trip (2 more trawls). That makes a total of 8 trawls. Metadata collected are presented below: <br>
-
-`r metadata`
-
-
-`r fig_cap("trout perch trawl", caption="Start and end depth of trawls conducted in 2018 for WFB 161.", display=FALSE)`
-
-Trawls were done deeper and deeper (`r fig_cap("trout perch trawl", display="cite")`).
-
-```{r depth trawls wfb 161, echo=FALSE, message=FALSE, warning=FALSE}
-plot(1:8,colMeans(metadata[5:6,-1]), pch=20, ylim=c(min(metadata[5:6,-1]), max(metadata[5:6,-1])), xlab="# trawls", ylab="depth (m)")
-for (i in 1:8) {
-  lines(c(i,i),c(metadata[5,i+1], metadata[6,i+1]), col="grey")
-}
-points(1:8,metadata[5,-1], pch=20, col="grey", cex=.8)
-points(1:8,metadata[6,-1], pch=15, col="brown1")
-points(1:8,colMeans(metadata[5:6,-1]), cex=1.4, pch=20)
-legend("bottomrigh", legend = c("Start", "End", "Average depth"), pch=c(20,15,20), col=c("grey", "brown1","black"), bty='n')
-
-```
-`r fig_cap("trout perch trawl", display="full")`
-
-
-Length were collected for `r nrow(troutperch)` trout-perch (and `r nrow(alewife)` alewifes). Note that we collected more trout-prech for each trawl but stopped measuring after 115-125 individuals. Trawling locations show different size distribution.
-
-```{r histogram trout perch length, fig.cap=c(cap1,cap2,cap3), echo=FALSE, message=FALSE, warning=FALSE}
-cap1=fig_cap("size distrib trout perch 1", caption="size distribution of trout perch")
-hist(troutperch$Length_trout_perch, breaks = c(seq(0,130,2)), col="grey", xlab="length class (mm)", main="")
-# hist(troutperch$Length_trout_perch[troutperch$Trawl==1], breaks = c(seq(0,130,5)), col="grey", ylim = c(0,100))
-# par(new=T)
-cap2=fig_cap("size distrib trout perch 2", caption="size distribution of trout perch - shallower and deeper sites evidenced")
-hist(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3), ylim = c(0,100), main='', xlab='length class (mm)')
-# par(new=T)
-# hist(troutperch$Length_trout_perch[troutperch$Trawl==4], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3))
-par(new=T)
-hist(troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8], breaks = c(seq(0,130,5)), col=adjustcolor(col = "red",alpha.f = .3), ylim = c(0,100), main='', xlab='')
-legend("topleft", legend = c("Trawls #1-3", "Trawls #5-8"), fill =c(adjustcolor(col = "blue",alpha.f = .3),adjustcolor(col = "red",alpha.f = .3)), bty='n')
-cap3=fig_cap("size distrib trout perch 3", caption="size distribution of trout perch")
-boxplot(troutperch$Length_trout_perch~troutperch$Trawl , xlab="trawls", ylab="length (mm)")
-
-```
-
-Size between trout-perch caught in trawls 1-3 and trawls 5-8 is significantly different (t-test, t = `r t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$statistic`, p-value = `r t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$p.value`).
-
-Below is a more detailed characterisation of each trawl.
-
-```{r various stats of each trawl trout perch WFB161, message=FALSE, warning=FALSE}
-library(psych)
-describeBy(troutperch$Length_trout_perch, group = troutperch$Trawl)
-
-```
-
-We stopped measuring for each trawl after 115-125 individuals -- below is a code I used to show the students that if we had sample less fish, we would have still find the same mean for each trawl.
-
-```{r resample trout perch data, echo=FALSE, message=FALSE, warning=FALSE}
-# resample data
-# independent 2-group t-test
-# Principle: t.test(y1,y2) # where y1 and y2 are numeric
-par(mfrow=c(1,2), mar=c(8.5,4.1,3.8,2.1))
-plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
-rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border=NA)
-mycol <- wes_palette("Darjeeling1", 8, type="continuous")
-mtext("a. Mean comparison (independent\n     2-group t-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
-for (i in 1:8) {
-  for (j in seq(10,100,10)){
-    myttest <- NULL
-    for (k in 1:100) {
-      mysample <- sample(troutperch$Length_trout_perch[troutperch$Trawl==i],size = j, replace = F)
-      ttest <- t.test(mysample,troutperch$Length_trout_perch[troutperch$Trawl==i])
-      myttest <- c(myttest,ttest$p.value)
-    }
-    points(j, mean(myttest), pch=20, col=mycol[i])
-  }
-}
-
-plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
-rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border = NA)
-mycol <- wes_palette("Darjeeling1", 8, type="continuous")
-mtext("b. Variance comparison (independent\n     2-group var-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
-for (i in 1:8) {
-  for (j in seq(10,100,10)){
-    myvartest <- NULL
-    for (k in 1:100) {
-      mysample <- sample(troutperch$Length_trout_perch[troutperch$Trawl==i],size = j, replace = F)
-      vartest <- var.test(mysample,troutperch$Length_trout_perch[troutperch$Trawl==i], alternative = "two.sided")
-      myvartest <- c(myvartest,vartest$p.value)
-    }
-    points(j, mean(myvartest), pch=20, col=mycol[i])
-  }
-}
-
-par(xpd=T)
-legend(x = -5, y=-.39, legend = paste("trawl", 1:3), col=mycol[1:3], pch=20, bty='n')
-legend(x = 30, y=-.39, legend = paste("trawl", 4:6), col=mycol[4:6], pch=20, bty='n')
-legend(x = 65, y=-.39, legend = paste("trawl", 7:8), col=mycol[7:8], pch=20, bty='n')
-par(xpd=F)
-par(mfrow=c(1,1), mar=c(5.1,4.1,4.1,2.1))
-
-```
-`r fig_cap("trout perch sample size stats", caption="Testing robustness of our results by changing sample size")`
+__Data: __
+<br> 
+We can calculate CPUE from trawling (bycatch data, 2016-2018). A length distribution for trout perch collected in Lake Champlain is available from measurements collected during the WFB 161 lab (fall 2018). Finally, total length for fish aged `r paste0(min(TroutperchLM1$age),"-",max(TroutperchLM1$age))` (fish aged using scales) is available through the FSAdata library (D. Ogle).
 
 
 ## Data from Ellen -- bycatch from the LT recruitment survey
@@ -827,7 +969,7 @@ tps$avg.lat.dd <- (tps$start.lat.dd+tps$end.lat.dd)/2
 ```
 
 
-`r fig_cap("troutperch number lake", caption="Circle size shows the number of trout-perch collected per sampling event. Colour scale refers to day of the year. Rectangle identify Burlington Bay.")`
+`r fig_cap("troutperch number lake", caption="Circle size shows the number of trout-perch collected per sampling event. Colour scale refers to day of the year. Rectangle identify Burlington Bay. [you can zoom and unzoom on the map if you're reading the html version]", display = FALSE)`
 
 `r fig_cap("troutperch number lake", display="cite")` shows the number of trout perch collected against the center location of the trawl. The radius show the number of fish captured. Note that we have CPUE (1 unit effort = 1 minute of trawling).
 
@@ -872,17 +1014,185 @@ troutperch_map <- leaflet() %>%
 
 troutperch_map
 
-plot(tps$fish_count ~ tps$yday)
+```
+<br>`r fig_cap("troutperch number lake", display="full")`
+
+
+`r fig_cap("troutperch per yday", caption="(a) Trout-perch CPUE across the year, (b) number of sampling events per day of the year and (c) number of sampling events with CPUE reported.", display = FALSE)`
+
+__Question for Ellen__: CPUE are always lower during summer (see `r fig_cap("troutperch per yday", display="cite")`), could it be because there's more work with Lake Trout, so data are only recorded when CPUEs are low? 
+
+```{r trout perch count vs. day, echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(tps, aes(yday, fish_count_CPUE )) + geom_point() + ggtitle("a. CPUE per day of the year") + xlab("Day of the year") + ylab("CPUE (UE= 1 minute of bottom trawling)")
+p2 <- ggplot() + geom_histogram(data=tps, aes(yday,fill="All sampling events")) + stat_bin(bins = 30) + geom_histogram(data=tps[!is.na(tps$fish_count_CPUE),], aes(yday, fill="Sampling events with \nCPUE data reported")) + stat_bin(bins = 30) + ggtitle("b. Sampling events per day of the year") + theme(legend.title = element_blank())  + xlab("Day of the year") + ylab("Number of sampling events")
+grid.arrange(p1,p2,nrow=1, widths=c(2.5,4))
+```
+<br>`r fig_cap("troutperch per yday", display="full")`
+
+## Data from WFB 161 - Fall 2018
+
+```{r read data from WFB 161 fall 2018, message=FALSE, warning=FALSE, include=FALSE}
+# Read data
+data <- read.delim("Input/WFB161_2018_Lab3_data.txt", header = T)
+metadata <- read.delim("Input/WFB161_2018_Lab3_metadata_2.txt", header = T)
+
+length <- read.delim("Input/WFB161_2018_Lab3_length.txt")
+length_sp <- length[1,]
+length <- length[-1,]
+indx <- sapply(length, is.factor)
+length[indx] <- lapply(length[indx], function(x) as.numeric(as.character(x)))
+
+str(length)
+
+troutperch <- read.delim("Input/WFB161_2018_Lab3_length_troutperch.txt", header = T)
+alewife <- read.delim("Input/WFB161_2018_Lab3_length_alewife.txt", header = T)
 
 ```
-`r fig_cap("troutperch number lake", display="full")`
+ 
+Trawl on September 17th (Monday lab) and 19th (Wednesday lab), 2018, as part of Fisheries Biology and Techniques (UVM/WFB 161). We met at 1pm with the first group, conducted 2 trawls, and then met at 3.30pm with the second group for the 2nd trip (2 more trawls). That makes a total of 8 trawls (4 trawls per afternoon). Metadata collected are presented below: <br>
 
-__ is the effort less important in summer cause the work focuss on LT? __
+`r metadata`
 
-```{r}
-plot(tps$fish_count ~ tps$yday)
+
+`r fig_cap("trout perch trawl", caption="Start and end depth of trawls conducted in 2018 for WFB 161.", display=FALSE)`
+
+Trawls were done deeper and deeper (`r fig_cap("trout perch trawl", display="cite")`).
+
+```{r depth trawls wfb 161, echo=FALSE, message=FALSE, warning=FALSE}
+plot(1:8,colMeans(metadata[5:6,-1]), pch=20, ylim=c(min(metadata[5:6,-1]), max(metadata[5:6,-1])), xlab="# trawls", ylab="depth (m)")
+for (i in 1:8) {
+  lines(c(i,i),c(metadata[5,i+1], metadata[6,i+1]), col="grey")
+}
+points(1:8,metadata[5,-1], pch=20, col="grey", cex=.8)
+points(1:8,metadata[6,-1], pch=15, col="brown1")
+points(1:8,colMeans(metadata[5:6,-1]), cex=1.4, pch=20)
+legend("bottomrigh", legend = c("Start", "End", "Average depth"), pch=c(20,15,20), col=c("grey", "brown1","black"), bty='n')
 
 ```
+<br>
+`r fig_cap("trout perch trawl", display="full")`
+
+
+Length were collected for `r nrow(troutperch)` trout-perch (and `r nrow(alewife)` alewifes). Note that we collected more trout-prech for each trawl but stopped measuring after 115-125 individuals. Trawling locations show different size distribution.
+
+```{r histogram trout perch length, fig.cap=c(cap1,cap2,cap3), echo=FALSE, message=FALSE, warning=FALSE}
+cap1=fig_cap("size distrib trout perch 1", caption="size distribution of trout perch")
+hist(troutperch$Length_trout_perch, breaks = c(seq(0,130,2)), col="grey", xlab="length class (mm)", main="")
+# hist(troutperch$Length_trout_perch[troutperch$Trawl==1], breaks = c(seq(0,130,5)), col="grey", ylim = c(0,100))
+# par(new=T)
+cap2=fig_cap("size distrib trout perch 2", caption="size distribution of trout perch - shallower and deeper sites evidenced")
+hist(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3), ylim = c(0,100), main='', xlab='length class (mm)')
+# par(new=T)
+# hist(troutperch$Length_trout_perch[troutperch$Trawl==4], breaks = c(seq(0,130,5)), col=adjustcolor(col = "blue",alpha.f = .3))
+par(new=T)
+hist(troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8], breaks = c(seq(0,130,5)), col=adjustcolor(col = "red",alpha.f = .3), ylim = c(0,100), main='', xlab='')
+legend("topleft", legend = c("Trawls #1-3", "Trawls #5-8"), fill =c(adjustcolor(col = "blue",alpha.f = .3),adjustcolor(col = "red",alpha.f = .3)), bty='n')
+cap3=fig_cap("size distrib trout perch 3", caption="size distribution of trout perch")
+boxplot(troutperch$Length_trout_perch~troutperch$Trawl , xlab="trawls", ylab="length (mm)")
+
+```
+
+Size between trout-perch caught in trawls 1-3 and trawls 5-8 is significantly different (t-test, t = `r t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$statistic`, p-value = `r t.test(troutperch$Length_trout_perch[troutperch$Trawl==1|troutperch$Trawl==2|troutperch$Trawl==3|troutperch$Trawl==4],troutperch$Length_trout_perch[troutperch$Trawl==5|troutperch$Trawl==6|troutperch$Trawl==7|troutperch$Trawl==8])$p.value`).
+
+Below is a more detailed characterisation of each trawl.
+
+```{r various stats of each trawl trout perch WFB161, message=FALSE, warning=FALSE}
+library(psych)
+describeBy(troutperch$Length_trout_perch, group = troutperch$Trawl)
+
+```
+
+We stopped measuring for each trawl after 115-125 individuals -- below is a code I used to show the students that if we had sample less fish, we would have still find the same mean for each trawl.
+
+```{r resample trout perch data, echo=FALSE, message=FALSE, warning=FALSE}
+# resample data
+# independent 2-group t-test
+# Principle: t.test(y1,y2) # where y1 and y2 are numeric
+par(mfrow=c(1,2), mar=c(8.5,4.1,3.8,2.1))
+plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
+rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border=NA)
+mycol <- wes_palette("Darjeeling1", 8, type="continuous")
+mtext("a. Mean comparison (independent\n     2-group t-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
+for (i in 1:8) {
+  for (j in seq(10,100,10)){
+    myttest <- NULL
+    for (k in 1:100) {
+      mysample <- sample(troutperch$Length_trout_perch[troutperch$Trawl==i],size = j, replace = F)
+      ttest <- t.test(mysample,troutperch$Length_trout_perch[troutperch$Trawl==i])
+      myttest <- c(myttest,ttest$p.value)
+    }
+    points(j, mean(myttest), pch=20, col=mycol[i])
+  }
+}
+
+plot(c(10,100), c(0,1), xlab="number of individuals measured", ylab="p-value", pch=NA)
+rect(xleft = 0,ybottom = -0.1,xright = 120,ytop = 0.05, col=adjustcolor("grey", alpha.f = .5), border = NA)
+mycol <- wes_palette("Darjeeling1", 8, type="continuous")
+mtext("b. Variance comparison (independent\n     2-group var-test)", font=2, side = 3, line = .8, at = 5, adj = 0)
+for (i in 1:8) {
+  for (j in seq(10,100,10)){
+    myvartest <- NULL
+    for (k in 1:100) {
+      mysample <- sample(troutperch$Length_trout_perch[troutperch$Trawl==i],size = j, replace = F)
+      vartest <- var.test(mysample,troutperch$Length_trout_perch[troutperch$Trawl==i], alternative = "two.sided")
+      myvartest <- c(myvartest,vartest$p.value)
+    }
+    points(j, mean(myvartest), pch=20, col=mycol[i])
+  }
+}
+
+par(xpd=T)
+legend(x = -5, y=-.39, legend = paste("trawl", 1:3), col=mycol[1:3], pch=20, bty='n')
+legend(x = 30, y=-.39, legend = paste("trawl", 4:6), col=mycol[4:6], pch=20, bty='n')
+legend(x = 65, y=-.39, legend = paste("trawl", 7:8), col=mycol[7:8], pch=20, bty='n')
+par(xpd=F)
+par(mfrow=c(1,1), mar=c(5.1,4.1,4.1,2.1))
+
+```
+<br>
+`r fig_cap("trout perch sample size stats", caption="Testing robustness of our results by changing sample size")`
+
+## Data from Lake Michigan
+
+The assigned ages (by scales), total lengths (mm), and sexes of Troutperch (Percopsis omsicomaycus) captured in southeastern Lake Michigan, from the library _FSAdata_.
+
+```{r data trout perch from lake michigan }
+?TroutperchLM1
+head(TroutperchLM1)
+```
+
+
+```{r plot data trout perch from lake michigan, echo=FALSE, message=FALSE, warning=FALSE}
+# make the plot average into a function so I don't have to repeat the code twice
+plot_mean_WFB_troutperch <- function() {
+  polygon(x=c(-2,12,12,-2), y=  quantile(troutperch$Length_trout_perch[troutperch$Trawl<4], c(.25, .25, .75, .75)), col=adjustcolor("cadetblue",alpha=.2), border = NA)
+  abline(h=mean(troutperch$Length_trout_perch[troutperch$Trawl<4]), lty=2, col="cadetblue")
+  polygon(x=c(-2,12,12,-2), y=  quantile(troutperch$Length_trout_perch[troutperch$Trawl>=4], c(.25, .25, .75, .75)), col=adjustcolor("coral2",alpha=.2), border = NA)
+  abline(h=mean(troutperch$Length_trout_perch[troutperch$Trawl>=4]), lty=2, col="coral2")
+  legend("bottomright", title = "Trout-perch average length \n(and 25-75th percentiles)", legend = c("in trawls 1-3","in trawls 4-8"), lty=2,col=c("cadetblue","coral2"), cex=.8, bty='n')
+}
+
+# Actual plot
+op <- par(mfrow=c(1,2),pch=19)
+plot(tl~age,data=TroutperchLM1,subset=sex=="f",main="female", ylim=c(min(TroutperchLM1$tl), max(TroutperchLM1$tl)))
+plot_mean_WFB_troutperch()
+plot(tl~age,data=TroutperchLM1,subset=sex=="m",main="male", ylim=c(min(TroutperchLM1$tl), max(TroutperchLM1$tl)))
+plot_mean_WFB_troutperch()
+par(op)
+?FSAdata
+```
+<br>
+`r fig_cap("trout perch data FSA package", caption="Trout-perch total length per age class from the FSA package (Lake Michigan, House and Wells, 1973). Average length of trout-perch collected as part of the WFB 161 lab (fall 2018) is represented.")`
+
+`r fig_cap("trout perch data FSA package", display="cite")` suggests that the trawls conducted during the lab mainly caught 2 years-old fish.
+
+
+## Get an average biomass
+
+Get average CPUE: `r round(mean(tps$fish_count_CPUE, na.rm=T))`/trout-perch/minute trawled. A trout-perch weight on average 
+What is the average volume sampled per minute of trawl? __Ask Steve__.
+
+According to fish base, a and b parameters are respectively: 0.00398 and 3.15
 
 
 # Smelt
@@ -930,7 +1240,7 @@ coord_map
 
 Note that there are no data for 1986, 1988, and 1989.
 
-```{r number smelt caught per yr, echo=FALSE, message=FALSE, warning=FALSE}
+```{r number smelt caught per yr, echo=FALSE, message=FALSE, warning=FALSE, fig.cap=c(cap1,cap2)}
 # Data frame which includes the number of fish sampled per year
 summ_smelt_catches1 <- as.data.frame(summary(as.factor(smelt$Year)))
 summ_smelt_catches1 <- cbind(rownames(summ_smelt_catches1), summ_smelt_catches1)
@@ -942,11 +1252,13 @@ ggplot(data = summ_smelt_catches1, mapping = aes(x = Year, y = num_fish)) +
   geom_bar(stat = "summary") + 
   labs(x = "Year", y = "Number of Fish Sampled") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+cap1 <- fig_cap("number smelt sampled per year", caption="Number of rainbow smelt sampled per year.")
 
 # Table which displays the number of fish sampled each year at each station 
 station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
 station_number_sampled[is.na(station_number_sampled)] <- 0
+cap2 <- tab_cap("number smelt sampled per year per station", caption="Number of rainbow smelt sampled per year and per station.")
 kable(station_number_sampled)
 ```
 
@@ -954,11 +1266,11 @@ kable(station_number_sampled)
 
 The table of 0's and 1's indicates whether or not a station was sampled for a particular year.
 
-```{r stations sampled per yr, echo=FALSE, message=FALSE, warning=FALSE}
+```{r stations sampled per yr, echo=FALSE, message=FALSE, warning=FALSE, fig.cap=c(cap1)}
 # Data frame which includes the years, list of the stations sampled during that year, and number of stations sampled that year
 summ_smelt_catches2 <- smelt %>% 
   group_by(Year) %>% 
-  summarise(list_stations = list(unique(Station)), num_stations = length(list_stations))
+  summarise(list_stations = list(unique(Station)), num_stations = length(unlist(list_stations)))
 
 # Bar plot showing the number of stations sampled per year
 ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_stations)) +
@@ -966,6 +1278,7 @@ ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_st
   labs(x = "Year", y = "Number of Stations Sampled") + 
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+cap1 <- fig_cap("number station sampled smelt per year", caption = "Number of stations sampled for rainbow smelt per year.")
 
 # Table which displays which stations were sampled when
 station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
@@ -1005,6 +1318,8 @@ p2 <- ggplot(aes(y=Weight, x=Length), data=smelt )+
 
 grid.arrange(p1,p2,nrow=1)
 ```
+<br>
+`r fig_cap("WL relationship smelt", caption="Smelt Weigth/length relationship by monitoring station.")`
 
 ### Condition of rainbow smelt over time by lake station 
 
@@ -1019,6 +1334,9 @@ ggplot(aes(y=condition, x=Year), data=smelt )+
   geom_smooth(method="gam", formula = y ~ s(x)) +
   facet_wrap(~Station)
 ```
+<br>
+`r fig_cap("smelt condition over year", caption="Evolution of smelt condition in Lake Champlain, by monitoring station.")`
+
 
 ### Rainbow smelt per year class in Lake Champlain
 
@@ -1035,6 +1353,8 @@ ggplot(data = summ_smelt_ageclass[3:12,], aes(x = year_class, y = num_fish)) +
   geom_bar(stat = "summary") + 
   labs(x = "Year Class", y = "Number of Fish")
 ```
+<br>
+`r fig_cap("number of smelt per year class", caption="Number of smelt per year class in our sample.")`
 
 ## Exploring growth parameters for rainbow smelt
 
@@ -1291,10 +1611,74 @@ a_and_b_summary <- data.frame(age_group, a, b)
 kable(a_and_b_summary)
 ```
 
+## Get smelt biomass evolution
+
+First, select fish sampled in the main lake. Juniper Island is a location with consistent sampling. The site is 70-90 m deep. In deeper sites, trawl was lowered to approximately 35 m depth. The net was towed at the maximum depth for 10 minutes, allowing it to stabilize. The net was then raised about 3 m and towed for an additional 5 minutes. This step is repeated until the net was 10 m below the surface, and then it is hauled back to the boat. Thus, in deep-water sites such as Juniper Island, each trawl consisted of nine steps and lasted for 55 minutes. Four trawls per night were conducted at each sites. <br>
+CPUE is expressed in terms of catch per 55-minutes of trawling (catch X 55 min/actual trawling time). A sample of 50 fish was randomly selected for each haul and frozen for later otolith extraction. In the laboratory, smelt were thawed, measured, weighed, and otoliths were extracted. 
+
+```{r smelt subset main lake}
+smelt_sub <- smelt[smelt$Station=="Juniper Island",]
+smelt_sub_summ<-as.data.frame(with(smelt_sub, tapply(rep(1,nrow(smelt_sub)),list("Year#"=Year), sum)))
+colnames(smelt_sub_summ) = "CPUE"
+smelt_sub_summ$Year <- as.numeric(paste(rownames(smelt_sub_summ)))
+
+ggplot(smelt_sub_summ, aes(Year, CPUE)) + geom_point() + geom_line()
+```
+
+
+
+# Alewife
+
+
+```{r read alewife data, message=FALSE, warning=FALSE, include=FALSE}
+alewife <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltBio1984-2015-2-24-16.csv"))
+alewife <- alewife[alewife$Species == "Alewife",]
+alewife$Station <- gsub("-"," ",alewife$Station)
+head(alewife)
+```
+
+The data were provided by Ellen Marsden. It contains `r nrow(alewife)` observations of smelt for years `r paste(unique(alewife$Year), sep="", collapse="-")`. In fact, most data are for 2012. Each row has some metadata associated (date and basin sampled) as well as individuals characteristics (length, weight, year class, condition).
+
+
+## Get alewife biomass evolution
+
+Same logic, but if we select alewife && Juniper Island here, we only have data for 2012
+
+```{r alewife subset main lake}
+alwf_sub <- alewife[alewife$Station=="Juniper Island",]
+alwf_sub_summ<-as.data.frame(with(alwf_sub, tapply(rep(1,nrow(alwf_sub)),list("Year#"=Year), sum)))
+colnames(alwf_sub_summ) = "CPUE"
+alwf_sub_summ$Year <- as.numeric(paste(rownames(alwf_sub_summ)))
+
+ggplot(alwf_sub_summ, aes(Year, CPUE)) + geom_point() + geom_line()
+```
+
+
+
 # Whitefish
 
 
 # Cisco
+CiscoTL dataset as part of the FSAdata
+
+CPUE (catch per 55 minutes trawl) of cisco collected, 1999-2014. Data from the VTFWS 2015 annual report (see doc given by Ellen).
+
+Note that in Valcour Island (2013) and in Mallets Bay (2000,2002,2008), CPUE reported are in fact <1.
+
+```{r extract data from VTFWS 2015 report table 12}
+cisco <- data.frame("Year"=1999:2014)
+cisco$BarberPoint   <- c(15,7,12,6,15,16,11,4,2,4,2,1,1,3,0,0)
+cisco$JuniperIsland <- c(2,2,3,24,11,9,8,3,0,3,2,2,4,2,0,0)
+cisco$ValcourIsland <- c(4,4,19,35,15,NA,8,4,7,2,3,5,9,3,1,0)
+cisco$MalletsBay    <- c(1,1,1,1,0,0,1,0,0,1,0,0,0,0,0,0)
+```
+
+```{r}
+cisco2 <- cbind(melt(cisco[,-1]), "Year"=rep(cisco$Year,4))
+colnames(cisco2) <- c("Station","CPUE","Year")
+ggplot(cisco2, aes(Year,CPUE,col=Station)) + geom_point() + geom_line()
+```
+<br> `r fig_cap("cisco CPUE", "CPUE (catch per 55 minutes trawl) of cisco collected, 1999-2014")`
 
 
 # Lake Trout
@@ -2151,8 +2535,366 @@ ggplotly(barplot_MainLake)
 
 # Lamprey
 
-Waiting on Brad Young data to figure out a plan
+```{r read sea lamprey data, include=FALSE}
+trap <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_trapping_data.txt"))
+wound <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/wounding_LAT_LAS.txt"))
+
+```
+
+## Wounding 
+Lake Champlain salmonids presented a high rate of woundings which motivated the long-term sea lamprey control program, operated by VTFWS. The figure below shows the evolution of wounding per 100 fish.
+```{r}
+p <- ggplot(melt(wound, id.vars='Year'), aes(Year, value, fill=variable)) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_text(aes(label=value), vjust=1.6, hjust=c(rep(1.3,16), rep(-0.3,16)), color="black", size=2.7) + 
+  ylab("Sea Lamprey wounds per 100 fish") + 
+  scale_fill_manual(values=c('#999999','#5ab4ac'),name = "Species",  labels = c("Lake Trout \n(533-633 mm)", "Atlantic Salmon \n(432-533 mm)")) +
+  theme_bw() +
+  scale_x_continuous("Year", labels = as.character(wound$Year), breaks = wound$Year)
+
+p + 
+  geom_hline(aes(yintercept = 25, colour = "Lake Trout goal"), color='black', lty=2,show.legend = F) + 
+  geom_hline(aes(yintercept = 15, colour = "Atlantic Salmon goal"), color='black', lty=3,show.legend = F) +
+  geom_text(aes(x=2003,y=25, label="Lake Trout goal"),hjust = 0, vjust=1.2) +
+  geom_text(aes(x=2003,y=15, label="Atlantic Salmon goal"),hjust = 0, vjust=1.2)
+
+```
+<br>`r fig_cap("woundings per salmonid", "Lake Champlain Sea Lamprey Wounds per 100 fish")`
+
+## Management of sea lamprey population
+Work on trapping data.
+```{r working on trapping data}
+trap$Date <- as.Date(trap$Date, format="%d-%b-%Y")
+summary(trap)
+
+trap_summ <- as.data.frame(with(trap, tapply(rep(1,nrow(trap)),list("Year"=Year, "River"=River), sum, na.rm=T)))
+
+
+trap_summ2 <- data.frame("Total.catch"=colSums(trap_summ,na.rm = T)[order(colSums(trap_summ,na.rm = T), decreasing = T)])
+
+ggplot(trap_summ2, aes(rownames(trap_summ2),Total.catch)) +
+  geom_bar(stat="identity", position=position_dodge()) + ylab("Number lamprey caught") + xlab("Stations")
+
+```
 
 
 
+# Stocking
+
+## VTFWS
+
+### Data
+
+Right now I'm including just data from VT. Work more on all the stocking Rmd before including it to this synthesis.
+
+Stocking data were obtained from the <a href= https://vtfishandwildlife.com/fishvt>VTFWD website</a> by clicking on the link 'Trout Stocking Report'.
+
+```{r read stocking data VTFWD, include=FALSE}
+stkvt <- read.delim(paste0(getpath4data(),'Stocking/VTFWD_Stocking_2009-2019.txt'))
+nrow(stkvt)
+length(stkvt$ACTUAL.NUMBER.STOCKED[!is.na(stkvt$ACTUAL.NUMBER.STOCKED)])
+names(stkvt)
+
+stkvt$DATE.STOCKED <- parse_date_time(x = stkvt$DATE.STOCKED,orders = c("m/d/y", "m/d/Y"))
+```
+
+Over the `r min(stkvt$Year)`-`r max(stkvt$Year)` period, `r nrow(stkvt)` stocking events were scheduled, and `r length(stkvt$ACTUAL.NUMBER.STOCKED[!is.na(stkvt$ACTUAL.NUMBER.STOCKED)])` stocking events took place.
+
+```{r create summary data vtfws, echo=FALSE, message=FALSE, warning=FALSE}
+
+summ_stkvt <- stkvt %>% group_by(as.factor(Year)) %>%
+  summarise(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            scheduled=length(ACTUAL.NUMBER.STOCKED),
+            went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
+            percent_done=went_through/scheduled)
+summ_stkvt <- as.data.frame(summ_stkvt)
+
+p1 <- ggplot(data=summ_stkvt, aes(x=summ_stkvt[,1],y=as.numeric(summ_stkvt[,2]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("mean # stocked") 
+
+p2 <- ggplot(data=summ_stkvt, aes(x=summ_stkvt[,1],y=as.numeric(summ_stkvt[,3]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("sum # stocked") 
+
+## convert plots to gtable objects
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g <- rbind(g1, g2, size="first") # stack the two plots
+g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
+# center the legend vertically
+g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
+grid.newpage()
+grid.draw(g)
+
+colnames(summ_stkvt) <- c("Year","Mean #fish stocked", "Total #fish stocked", "Schedule events", "Stocking that went through", "% stocking done")
+summ_stkvt
+
+```
+<br>`r fig_cap("vtfws species stocked number", caption = "Mean and total number of fish stocked by VTFWS from 2009 to 2019.")`
+
+
+In 2019, there are still many stocking events that were not carried out. We're removing this year from the analysis.
+
+```{r remove 2019 from the dataframe}
+stkvt <- stkvt[stkvt$Year!=2019,]
+```
+
+### Species stocked
+
+What are the species stocked by VTFWD? We're only looking at the effective stocking now.
+
+```{r look at the species stocked by vtfws, echo=FALSE, message=FALSE, warning=FALSE}
+
+sp_stkvt <- stkvt %>% group_by(as.factor(SPECIES)) %>%
+  summarize(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
+            scheduled=length(ACTUAL.NUMBER.STOCKED),
+            went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
+            percent_done=went_through/scheduled)
+
+ggplot(data=stkvt, aes(x=SPECIES,y=ACTUAL.NUMBER.STOCKED, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("All Vermont")
+
+ggplot(data=stkvt[grep("Champ",stkvt$WATER),], aes(x=SPECIES,y=ACTUAL.NUMBER.STOCKED, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("Lake Champlain waters")
+
+
+
+```
+<br>`r fig_cap("vtfws species stocked", caption = "Species stocked in Lake Champlain waters by VTFWS.")`
+
+## NYDEC
+
+### Read data and basic stats
+
+Stocking data were obtained from the <a href= "https://data.ny.gov/Recreation/Fish-Stocking-Lists-Actual-Beginning-2011/9hpx-asd8">NYDEC website</a>.
+
+```{r read the stocking data from nydec, include=FALSE}
+stkny <- read.delim(paste0(getpath4data(),"Stocking/NYDEC_Stocking_2011-2019.txt"))
+nrow(stkny)
+names(stkny)
+
+#QAQC some data
+stkny$Town[stkny$Town=="plattsburgh"] <- "Plattsburgh"
+
+```
+
+Over the `r min(stkny$Year)`-`r max(stkny$Year)` period, `r nrow(stkny)` stocking events took place.
+
+```{r summary stocking data nydec, echo=FALSE, message=FALSE, warning=FALSE}
+
+summ_stkny <- stkny %>% group_by(as.factor(Year)) %>%
+  summarise(mean=mean(Number, na.rm=T),
+            sum=sum(Number, na.rm=T),
+            went_through=length(Number))
+summ_stkny <- as.data.frame(summ_stkny)
+
+p1 <- ggplot(data=summ_stkny, aes(x=summ_stkny[,1],y=as.numeric(summ_stkny[,2]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("mean # stocked") 
+
+p2 <- ggplot(data=summ_stkny, aes(x=summ_stkny[,1],y=as.numeric(summ_stkny[,3]))) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("sum # stocked") 
+
+## convert plots to gtable objects
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g <- rbind(g1, g2, size="first") # stack the two plots
+g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
+# center the legend vertically
+g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
+grid.newpage()
+grid.draw(g)
+
+colnames(summ_stkny) <- c("Year","Mean #fish stocked", "Total #fish stocked", "Stocking events")
+summ_stkny
+
+```
+
+
+### Species stocked
+
+What are the species stocked by VTFWD? We're only looking at the effective stocking now.
+
+```{r look at the species stocked by nydec, echo=FALSE, message=FALSE, warning=FALSE}
+
+sp_stkny <- stkny %>% group_by(as.factor(Species)) %>%
+  summarize(mean=mean(Number, na.rm=T),
+            sum=sum(Number, na.rm=T),
+            went_through=length(Number))
+
+ggplot(data=stkny, aes(x=Species,y=Number, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("All NY")
+
+ggplot(data=stkny[grep("Champ",stkny$Waterbody),], aes(x=Species,y=Number, fill=as.factor(Year))) +
+  geom_bar(stat="identity") + xlab("Species") + ylab("total # stocked") +
+  labs(fill="Year") + ggtitle("Lake Champlain waters")
+
+
+```
+
+
+# Summary
+
+The plot below summarizes which data are available, for which period for Lake Champlain.
+
+```{r coarse summary of data availability, echo=FALSE, message=FALSE, warning=FALSE}
+summary_data <- as.data.frame(matrix(
+  c(
+c("Phytoplankton",        min(year(phyto$VisitDate)), max(year(phyto$VisitDate)), "VTDEC"),
+c("Zooplankton",          min(year(zoo$VisitDate)), max(year(zoo$VisitDate)), "VTDEC"),
+c("Mysis",                min(mysis$Year), max(mysis$Year), "Stockwell et al."),
+c("Benthic invertebrates",NA,NA,NA),
+c("Sculpin",              NA,NA,NA),
+c("Trout-perch",          min(tps$year), max(tps$year), "Lake trout recruitment survey"),
+c("Smelt",                min(smelt$Year), max(smelt$Year), "Forage fish survey"),
+c("Whitefish",            min(tps$year), max(tps$year), "Lake trout recruitment survey"),
+c("Cisco",                NA,NA,NA),
+c("Lake Trout",           min(tps$year), max(tps$year), "Lake trout recruitment survey"),
+c("Atlantic Salmon",      NA,NA,NA),
+c("Burbot",               NA,NA,"Great Lakes data?"),
+c("Sea lamprey",          NA,NA,"VTFWS")
+), ncol=4, byrow = T))
+
+colnames(summary_data) <- c("Species","MinYear","MaxYear","Source")
+summary_data$MaxYear <- as.numeric(paste(summary_data$MaxYear))
+summary_data$MinYear <- as.numeric(paste(summary_data$MinYear))
+
+# color palette
+mycol <- wes_palette("Darjeeling1", length(unique(summary_data$Source[!is.na(summary_data$Source)])), type="continuous")
+source_data <- unique(summary_data$Source[!is.na(summary_data$Source)])
+
+par(mar=c(5,6,2,2))
+plot(c(min(summary_data$MinYear, na.rm = T),max(summary_data$MinYear, na.rm = T)), c(1,length(unique(summary_data$Species))), pch=NA, xlab="Year", ylab="", axes=F, main="Not updated since 09/09/19 - see next plot instead \n (colors refer to different data collection program)")
+axis(1, at=1970:2020, labels=NA, lwd = .5); axis(1,at=1970:2020, labels=NA, lwd.ticks = 0)
+axis(1)
+for (i in 1:length(unique(summary_data$Species))) {
+  msubset = summary_data[summary_data$Species==unique(summary_data$Species)[i],]
+  for (j in 1:nrow(msubset)) {
+    lines(msubset[,c("MinYear","MaxYear")],
+        rep(c(i+(j/100)),2), col=mycol[source_data==msubset$Source], lwd=3)
+  }
+  par(xpd=T)
+  text(x=min(summary_data$MinYear, na.rm = T),y=i,msubset$Species[1],pos=2)
+  par(xpd=F)
+}
+
+
+```
+
+<br>`r fig_cap("summary biomass coarse", caption = "Data availability -- stopped working on this plot, because at the moment I think the option below conveys more information.")`
+
+```{r better summary of data availability, echo=FALSE, message=FALSE, warning=FALSE}
+summary_ls <- list(
+  "Phytoplankton" = data.frame("Year"=c(min(dtlcm$Year):max(dtlcm$Year)),"Biovolume" = as.vector(with(dtlcm, tapply(Net.phytoplankton..total.biovolume,list("Year"=year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))), mean, na.rm=T)))),
+  "Zooplankton" = data.frame("Year"=zoo19_month_Predator$Year, "Biomass"=rowSums(zoo19_month_Predator[,-1], na.rm = T) + rowSums(zoo19_month_Grazer_sm[,-1], na.rm = T) +rowSums(zoo19_month_Grazer_lr[,-1], na.rm = T)),
+  "Mysis" = mysis_summ[,c("Year","mean_w")],
+  "Zebra Mussel" = data.frame("Year"=rownames(ZMvel_summ), "Densities"=ZMvel_summ$STA19),
+  "Sculpin" = NA,
+  "Trout-perch" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(2016:2018))),
+  "Smelt" = data.frame("Year"=smelt_sub_summ$Year, "CPUE"=smelt_sub_summ$CPUE),
+  "Whitefish" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
+  "Cisco" = data.frame("Year"=cisco$Year,"CPUE"=cisco$JuniperIsland),
+  "Alewife" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(c(2016:2018)))),
+  "Walleye" = NA,
+  "stocked lake trout" = data.frame("Year"=c(1973:2008,as.numeric(paste(summ_stkvt$Year))), "Stocked"=c(rep(max(summ_stkvt$`Total #fish stocked`),length(c(1973:2008))),summ_stkvt$`Total #fish stocked`)),
+  "Lake Trout" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
+  "Atlantic Salmon" = NA,
+  "Burbot" = data.frame("Year"=c(1982:1998),"Density"=rep(0.5,length(c(1982:1998)))),
+  "Sea Lamprey" = data.frame("Year"=c(1990:2018),"Density"=rep(0.5,length(1990:2018)))
+)
+
+# Replacing NA of phytoplankton by 0.5 because we have the data -- just no estimate of biomass right now
+summary_ls$Phytoplankton[is.na(summary_ls$Phytoplankton$Biovolume),2] <- max(summary_ls$Phytoplankton$Biovolume,na.rm=T)
+
+pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_biomass2.pdf"),width = 12, height = 6)
+layout(matrix(c(1,2), nrow=1), widths=c(3.5,1))
+par(mar=c(5,7,4,0.5))
+plot(c(1973,2019), c(1,length(summary_ls)), pch=NA, xlab="Year", ylab="", axes=F)
+axis(1, at=1960:2020, labels=NA, lwd = .5); axis(1,at=1960:2020, labels=NA, lwd.ticks = 0)
+axis(1)
+
+axis(3, at=1960:2020, labels=NA, lwd = .5); axis(3,at=1960:2020, labels=NA, lwd.ticks = 0)
+axis(3)
+
+for (i in 1:length(summary_ls)) {
+  abline(h=i,lty=2, col=adjustcolor("grey", alpha.f = .4))
+  msubset = summary_ls[[i]]
+  if(any(!is.na(msubset))) {
+    # Set which year we actually have all data
+    #default
+    whichyear= msubset[,1]
+    if(names(summary_ls[i])=="Phytoplankton") whichyear= msubset$Year[msubset$Year %in% 2006:2015]
+    if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake Trout", "Sea Lamprey","Burbot")) whichyear= NULL
+    if(names(summary_ls[i])=="Smelt") whichyear= msubset$Year[msubset$Year %in% 1998:2015]
+    if(names(summary_ls[i])=="stocked lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
+    
+    msubset[,1] <- as.numeric(paste(msubset[,1]))
+    msubset[,2] <- as.numeric(paste(msubset[,2]))
+    # Add rows without data to visualize on the plot
+    # If data are continuous already, msubset_2 will just be a copy of msubset
+    msubset_2 <- rbind(data.frame("x" = msubset[,1],
+                                  "y" = msubset[,2]),
+                       data.frame("x" = c(min(msubset[,1]):max(msubset[,1]))[!min(msubset[,1]):max(msubset[,1])%in%msubset[,1]],
+                                  "y" = rep(NA,length(which(!min(msubset[,1]):max(msubset[,1])%in%msubset[,1])))))
+    msubset_2 <- msubset_2[order(msubset_2$x),]
+    lines(msubset_2[,1],ifelse(!is.na(msubset_2[,2]),i,NA), col="grey", lwd=1.5)
+    x <- msubset_2[,1]
+    w <- msubset_2[,2]/max(msubset_2[,2], na.rm=T)
+    w[is.na(w)] <- 0
+    polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("grey", alpha.f = .4))
+    if(names(summary_ls[i])=="Burbot") TeachingDemos::shadowtext(mean(1982:1998),i, labels = "uncertainties about \ndata availability", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9)
+    x <- msubset_2[msubset_2[,1] %in% whichyear,1]
+    w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
+    w[is.na(w)] <- 0
+    if(names(summary_ls[i])%in%c("Alewife", "Zebra Mussel")) {
+      polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = "black", col=adjustcolor("pink", alpha.f = .6))
+    } else {
+      polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8))
+    }
+    if(names(summary_ls[i])=="Smelt") {
+     for (w in 1:2) {
+       if (w==1) whichyear = 1990:1996
+       if (w==2) whichyear = 1984:1985
+    x <- msubset_2[msubset_2[,1] %in% whichyear,1]
+    w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
+    w[is.na(w)] <- 0
+     polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8)) 
+     }
+    }
+
+  }
+  par(xpd=T)
+  #text(x=min(summary_data$MinYear, na.rm = T),y=i,names(summary_ls[i]),pos=2)
+  TeachingDemos::shadowtext(x=1973,y=i, labels = names(summary_ls[i]), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=2)
+  par(xpd=F)
+  
+  # Add a different point if invasion
+  if(names(summary_ls[i])=="Alewife") points(2003,i,pch=17, col="red")
+  if(names(summary_ls[i])=="Zebra Mussel") points(1993,i,pch=17, col="red")
+  if(names(summary_ls[i])=="Zooplankton") points(c(2014,2018),rep(i,2),pch=17, col="red")
+  
+  # Add comment
+  if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
+  
+  # Add a different point if work still in progress
+  if(names(summary_ls[i])%in%c("Burbot","Atlantic Salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
+}
+rect(2000,0.7,2002,i+0.3, lty=2, lwd=.5)
+
+par(mar=c(5,0,2,1))
+plot(c(1,10),c(1,10),axes=F,xlab="",ylab="", pch=NA)
+legend(x=1,y=9.5, legend = c("Relative biomass","Biomass still \nbeing estimated","Invasive species"),
+       fill=c("black",adjustcolor("grey", alpha.f = .4), adjustcolor("pink", alpha.f = .6)), bty="n", border = NULL)
+legend(x=1,y=7, legend = c("Species invasion", "No data yet", "Period chosen for \nmodel initialization"),
+       pch=c(17,4,NA), lty=c(NA,NA,2), col=c("red","red","black"), bty="n", border = NULL)
+
+dev.off()
+par(mfrow=c(1,1))
+
+
+```
+<br>`r fig_cap("summary biomass", caption = "Species selected for the initial model, and relative evolution of their biomass (width of polygon). We are still collecting data for some species (Burbot, Atlantic Salmon, Sculpin), and converting survey data to biomass (e.g., phytoplankton counts to biovolume before biovolumes started being reported by the state). Asterisks indicate invasive species, and triangles on the timeline indicates the time of invasion.")`
 
