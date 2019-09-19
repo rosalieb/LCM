@@ -73,7 +73,7 @@ Over the `r min(stkvt$Year)`-`r max(stkvt$Year)` period, `r nrow(stkvt)` stockin
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 summ_stkvt <- stkvt %>% group_by(as.factor(Year)) %>%
-  summarize(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+  summarise(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
             sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
             scheduled=length(ACTUAL.NUMBER.STOCKED),
             went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
@@ -114,7 +114,7 @@ What are the species stocked by VTFWD? We're only looking at the effective stock
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 sp_stkvt <- stkvt %>% group_by(as.factor(SPECIES)) %>%
-  summarize(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+  summarise(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
             sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
             scheduled=length(ACTUAL.NUMBER.STOCKED),
             went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
@@ -282,7 +282,7 @@ Over the `r min(stkny$Year)`-`r max(stkny$Year)` period, `r nrow(stkny)` stockin
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 summ_stkny <- stkny %>% group_by(as.factor(Year)) %>%
-  summarize(mean=mean(Number, na.rm=T),
+  summarise(mean=mean(Number, na.rm=T),
             sum=sum(Number, na.rm=T),
             went_through=length(Number))
 summ_stkny <- as.data.frame(summ_stkny)
@@ -316,7 +316,7 @@ What are the species stocked by VTFWD? We're only looking at the effective stock
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 sp_stkny <- stkny %>% group_by(as.factor(Species)) %>%
-  summarize(mean=mean(Number, na.rm=T),
+  summarise(mean=mean(Number, na.rm=T),
             sum=sum(Number, na.rm=T),
             went_through=length(Number))
 
@@ -344,7 +344,7 @@ stkvtlc <- stkvt[grep("Champ",stkvt$WATER),]
 #head(stkvtlc)
 
 stkvtsites <- stkvtlc %>% group_by(TOWN) %>%
-  summarize(meanFishStocked=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+  summarise(meanFishStocked=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
             sumFishStocked=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
             sumFishStockedPerYear=sum(ACTUAL.NUMBER.STOCKED, na.rm=T)/10,
             NumberStockingEvents=length(ACTUAL.NUMBER.STOCKED))
@@ -362,7 +362,7 @@ stkvtsites[order(stkvtsites$sumFishStocked, decreasing = T),]
 stknylc <- stkny[grep("hampl",stkny$Waterbody),]
 
 stknylcsites <- stknylc %>% group_by(Town) %>%
-  summarize(meanFishStocked=mean(Number, na.rm=T),
+  summarise(meanFishStocked=mean(Number, na.rm=T),
             sumFishStocked=sum(Number, na.rm=T),
             sumFishStockedPerYear=sum(Number, na.rm=T)/7,
             NumberStockingEvents=length(Number))
@@ -447,8 +447,7 @@ grid.draw(gp)
 
 ```
 
-
-The dataframe below gives the average lentgh of fish released this year. The average length of fish changed over the season, so I balanced the length by the proportion released on that month vs. fish from the same specie release over the year.
+NYDEC includes the average size of fish released by stocking event. The dataframe below summarizes the average lentgh of fish released per year, in Lake Champlain. The average release length changes over the season, so I balanced the length by the proportion released on that month vs. fish from the same specie release over the year.
 
 ```{r details on species stocked by NY, echo=FALSE, message=FALSE, warning=FALSE}
 stknylc$Size_pondere <- rep(NA, nrow(stknylc))
@@ -464,7 +463,7 @@ summ_sp_yr_ny
 
 ```
 
-Using growth parameters, we can calculate the potential biomass.
+Using growth parameters (a and b), we can calculate the potential biomass released.
 
 
 
