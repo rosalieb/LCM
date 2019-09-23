@@ -20,7 +20,9 @@ fontsize: 11pt
 knitr::opts_chunk$set(
   comment = '#>',
   collapse = T)
-#library(Rpath); library(data.table)
+devtools::install_github("NOAA-EDAB/Rpath", dependencies = T)
+devtools::install_github('NOAA-EDAB/Rpath', build_vignettes = TRUE)
+library(Rpath); library(data.table)
 ```
 
 # General documentation about Rpath
@@ -288,4 +290,31 @@ webplot(REco, labels = T)
 webplot(REco, fleets = T, highlight = 'AduRoundfish1')
 ```
 
-# Setting up for Lake Champlain
+# Lake Champlain
+
+## Setting up parameters for Lake Champlain
+
+### Parameter file generation
+
+```{r parameter file generation lake champlain}
+groups <- c('Sea Lamprey', 'Adult lake trout', 'Juvenile lake trout', 'Stocked lake trout', 'Atlantic salmon', 'Burbot', 'Walleye', 'Whitefish', 'Cisco', 'Smelt', 'Alewife', 'Trout-perch', 'Sculpin', 'Zoo predators', 'Mysis', 'Benthic invertebrates', 'Zoo grazers', 'Phytoplankton', 'Detritus')
+# type 1= primary producer
+# type 2= detritus
+# type 3= fleet
+# type 0= consumer (the rest)
+types  <- c(rep(0, length(groups)-2), 1, 2)
+
+stgroups <- c(rep(NA, 1), rep('LakeTrout', 3), rep(NA, 15))
+
+#REco.params <- create.rpath.params(group = groups, type = types, stgroup = stgroups)
+```
+
+### Model parameters
+Not run at the moment -- still need to get Rpath first.
+
+```{r eval=FALSE, include=TRUE}
+knitr::kable(REco.params$model, caption = 'Example of the model list created using the `create.rpath.param` function')
+```
+
+
+
