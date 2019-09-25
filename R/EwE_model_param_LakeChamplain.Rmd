@@ -2089,7 +2089,7 @@ Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, out
     p2 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (log-transformed) (n=", length(bin_limits)-1, ")"),
         x ="log(length)", y = "log(weight)") + theme_bw() 
     p3 <- ggplot() + labs(title=paste0("Fulton's factor K (n=", length(bin_limits)-1, ")"),
-        x ="Length (mm)", y = "K") + theme_bw() 
+        x ="Length (cm)", y = "K") + theme_bw() 
     
     
     # Beginning of the loop to calculate Fulton's K per size class
@@ -2099,7 +2099,6 @@ Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, out
       if (any(outliers %in% which_in_bin)) which_in_bin <- which_in_bin[-which(which_in_bin %in% outliers)]
       if (length(which_in_bin)>1) {
         lm_temp = lm(log10(pop_weight[which_in_bin])~log10(pop_length[which_in_bin]))
-      # fitPlot(lm1,xlab="log total length (mm)",ylab="log weight (g)",main="")
       a_temp = 10^(lm_temp$coefficients[1])
       b_temp = lm_temp$coefficients[2]
       
@@ -2114,7 +2113,7 @@ Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, out
       
       # Add points to plot
       p1 <- p1 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=pop_weight), colour=colrs[i-1])
-      p2 <- p2 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=log(pop_length), y=log(pop_weight)), colour=colrs[i-1])
+      p2 <- p2 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=log10(pop_length), y=log10(pop_weight)), colour=colrs[i-1])
       p3 <- p3 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=FultonK), colour=colrs[i-1], alpha=.4) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour="white", lwd=1.5) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour=colrs[i-1])
       
       # Save output
@@ -2129,8 +2128,8 @@ Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, out
     list_out$plot_WL_log <- p2
     list_out$plot_KL <- p3
      
-    aplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, a)) + geom_point() + stat_smooth() +xlab("Average size (mm)")
-    bplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, b)) + geom_point() + stat_smooth() +xlab("Average size (mm)")
+    aplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, a)) + geom_point() + stat_smooth() +xlab("Average size (cm)")
+    bplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, b)) + geom_point() + stat_smooth() +xlab("Average size (cm)")
     list_out$plot_param_a <- aplot
     list_out$plot_param_b <- bplot
     
@@ -2139,94 +2138,177 @@ Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, out
 
 ```
 
-Below, I wrote a function to compute relative condition factor.
+I also wrote a function to compute relative condition factor.
 $K_n = W/W'$
 W' is the predicted weight for a population (using a and b factors). It compensates for allometric growth. The average for a given species is 1.0.
 
 The function is called ```RelCond_Fisheries``` and require the following arguments: `r args(RelCond_Fisheries)`
 
 ```{r function calculate relative fulton factor for different bin size, message=FALSE, warning=FALSE, include=FALSE}
-RelCond_Fisheries <- function(pop_ID=NULL, pop_length, pop_weight, size_limits, outliers = NULL) {
+RelCond_Fisheries <- function(pop_ID=NULL, pop_length, pop_weight, size_limits=NULL, outliers = NULL) {
      # Create list to save outputs
     list_out <- list()
-    
-    # Color output
-    require(wesanderson)
-    colrs <- wes_palette("Darjeeling1", length(bin_limits)-1, type="continuous")
     
     # Make sure we're working with numeric variables
     pop_weight = as.numeric(paste(pop_weight))
     pop_length = as.numeric(paste(pop_length))
     
-    list_out$Data <- data.frame(pop_ID, pop_length,pop_weight)
     
-    # Order bins
-    bin_limits <- bin_limits[order(bin_limits, decreasing = F)]
+    # Edit size_limits if entered in a wrong format
+    if(length(size_limits)%%2 != 0) size_limits=NULL
+    if(is.null(size_limits)) size_limits = c(min(pop_length, na.rm=T), max(pop_length, na.rm=T))
+    size_limits <- size_limits[order(size_limits, decreasing = F)]
+    which_size_limits <- which(pop_length>=which_size_limits[1] & pop_length<=which_size_limits[2])
     
     # warning message if wrong length of input vector
     if (length(pop_weight) != length(pop_length)) stop("\n You do not have the same number of observations for weight and length. Review your data and run the function again.")
     if (!is.null(pop_ID) | length(pop_weight) != length(pop_ID)) pop_ID=1:length(pop_weight)
     
-    # create empty column in the dataset for the k of the size class
-    list_out$Data$size_group <- rep(NA, nrow(list_out$Data))
-    list_out$Data$FultonK <- rep(NA, nrow(list_out$Data))
-    list_out$Data$delta_to_K <- rep(NA, nrow(list_out$Data))
     
-    # create empty matrix to save output
-    param <- as.data.frame(matrix(rep(NA,(length(bin_limits)-1)*6), ncol=6))
-    colnames(param) = c("Min_size", "Max_size", "a", "b", "meanK", "slopeK")
-    
-    # create empty plot to see the points for different bins
-    p1 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (n=", length(bin_limits)-1, ")"),
-        x ="Length (mm)", y = "Weigth (g)") + theme_bw() 
-    p2 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (log-transformed) (n=", length(bin_limits)-1, ")"),
-        x ="log(length)", y = "log(weight)") + theme_bw() 
-    p3 <- ggplot() + labs(title=paste0("Fulton's factor K (n=", length(bin_limits)-1, ")"),
-        x ="Length (mm)", y = "K") + theme_bw() 
-    
-    
-    # Beginning of the loop to calculate Fulton's K per size class
-    # We're going to generate a and b for each size class, then calculate the average condition from that.
-    for (i in 2:length(bin_limits)) {
-      which_in_bin <- which(pop_length>bin_limits[i-1] & pop_length<=bin_limits[i])
-      if (any(outliers %in% which_in_bin)) which_in_bin <- which_in_bin[-which(which_in_bin %in% outliers)]
-      if (length(which_in_bin)>1) {
-        lm_temp = lm(log10(pop_weight[which_in_bin])~log10(pop_length[which_in_bin]))
-      # fitPlot(lm1,xlab="log total length (mm)",ylab="log weight (g)",main="")
-      a_temp = 10^(lm_temp$coefficients[1])
-      b_temp = lm_temp$coefficients[2]
-      
-      # Now that we have and b, compute the fulton factor
-      list_out$Data[which_in_bin,"size_group"] <- LETTERS[i-1]
-      list_out$Data[which_in_bin,"FultonK"]    <- (list_out$Data$pop_weight/((list_out$Data$pop_length/10)^3) * a_temp)[which_in_bin]
-      # Normalizing
-      list_out$Data[which_in_bin,"FultonK"] <- (list_out$Data[which_in_bin,"FultonK"]-min(list_out$Data[which_in_bin,"FultonK"]))/(max(list_out$Data[which_in_bin,"FultonK"])-min(list_out$Data[which_in_bin,"FultonK"]))+0.5
-      K_temp <- mean(list_out$Data[which_in_bin,"FultonK"])
-      # Delta to mean K
-       list_out$Data[which_in_bin,"delta_to_K"] <- list_out$Data[which_in_bin,"FultonK"] - K_temp
-      
-      # Add points to plot
-      p1 <- p1 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=pop_weight), colour=colrs[i-1])
-      p2 <- p2 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=log(pop_length), y=log(pop_weight)), colour=colrs[i-1])
-      p3 <- p3 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=FultonK), colour=colrs[i-1], alpha=.4) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour="white", lwd=1.5) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour=colrs[i-1])
-      
-      # Save output
-      lm_temp <- lm(FultonK ~ pop_length,data=list_out$Data[which_in_bin,])
-      param[i-1,] <- c(bin_limits[i-1], bin_limits[i], a_temp, b_temp, K_temp, lm_temp$coefficients[2])  
-      } else { param[i-1,] <- c(bin_limits[i-1], bin_limits[i], NA,NA,NA,NA) }
-      
-      
+    # Remove outliers, then create output dataframe
+    if(!is.null(outliers) & is.numeric(outliers)) {
+      pop_ID     <- pop_ID[-outliers]
+      pop_length <- pop_length[-outliers]
+      pop_weight <- pop_weight[-outliers]
     }
-    list_out$Growth_parameters <- param[!is.na(param[,3]),]
-    list_out$plot_WL <- p1
-    list_out$plot_WL_log <- p2
-    list_out$plot_KL <- p3
-     
-    aplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, a)) + geom_point() + stat_smooth() +xlab("Average size (mm)")
-    bplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, b)) + geom_point() + stat_smooth() +xlab("Average size (mm)")
-    list_out$plot_param_a <- aplot
-    list_out$plot_param_b <- bplot
     
+      pop_ID     <- pop_ID[which_size_limits]
+      pop_length <- pop_length[which_size_limits]
+      pop_weight <- pop_weight[which_size_limits]
+      
+    list_out$Data <- data.frame(pop_ID, pop_length,pop_weight)
+    
+
+    # Compute optimal weight for population
+    lm_temp = lm(log10(pop_weight)~log10(pop_length))
+    a_temp = 10^(lm_temp$coefficients[1])
+    b_temp = lm_temp$coefficients[2]
+    
+    # Save output parameters
+    list_out$a <- a_temp
+    list_out$b <- b_temp
+    
+    # Compute Kn= W/W'
+    list_out$Data$Wprim <- a_temp*list_out$Data$pop_length^b_temp
+    list_out$Data$Kn <- list_out$Data$pop_weight / list_out$Data$Wprim
+    
+    # create plot from which a and b parameter were extracted
+    p0 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + 
+      geom_point() +
+      labs(title="Weight:length relationship",
+           x ="Length (cm))", y = "Weight (g)") +
+    stat_smooth() + 
+      theme_bw()
+    
+    # create plot from which a and b parameter were extracted
+    p1 <- ggplot(list_out$Data, aes(log10(pop_length),log10(pop_weight))) + 
+      geom_point() +
+      labs(title="weight:length relationship (log10 scale)",
+           subtitle = paste0("For this sample, a= ",signif(a_temp,3), ", b= ", signif(b_temp,3)),
+           x ="log10(length)", y = "log10(weight)") +
+    stat_smooth(method="lm") + 
+      theme_bw()
+    
+    # create plot of Kn vs. length
+    p2 <- ggplot(list_out$Data, aes(pop_length,Kn)) + 
+      geom_point() +
+      labs(title="Relative condition factor Kn",
+           subtitle = bquote(K[n]*"=W/W', with W'=a"*L^b),
+           x ="Length (cm)", y = "Kn") +
+    geom_hline(yintercept=1) + 
+      theme_bw()
+   
+    list_out$plot_WL <- p0
+    list_out$plot_WL_log <- p1
+    list_out$plot_KnL <- p2
+
+    return(list_out)
+}
+
+```
+
+Below, I wrote a function to compute relative weight.
+$Wr = W/Ws * 100$
+Ws is a species-specific standard based on W = aLb
+
+The function is called ```RelWeight_Fisheries``` and require the following arguments: `r args(RelWeight_Fisheries)`. The argument *size_limits* allows to calculate the factor only for a range of the population (user must enter a vector of 2 values).
+
+```{r function calculate relative fulton factor for different bin size, message=FALSE, warning=FALSE, include=FALSE}
+RelWeight_Fisheries <- function(pop_ID=NULL, pop_length, pop_weight, a, b, size_limits=NULL, outliers = NULL, source_data=NULL) {
+     # Create list to save outputs
+    list_out <- list()
+    
+    # Make sure we're working with numeric variables
+    pop_weight = as.numeric(paste(pop_weight))
+    pop_length = as.numeric(paste(pop_length))
+    
+    
+    # Edit size_limits if entered in a wrong format
+    if(length(size_limits)%%2 != 0) size_limits=NULL
+    if(is.null(size_limits)) size_limits = c(min(pop_length, na.rm=T), max(pop_length, na.rm=T))
+    size_limits <- size_limits[order(size_limits, decreasing = F)]
+    which_size_limits <- which(pop_length>=size_limits[1] & pop_length<=size_limits[2])
+    
+    # warning message if wrong length of input vector
+    if (length(pop_weight) != length(pop_length)) stop("\n You do not have the same number of observations for weight and length. Review your data and run the function again.")
+    if (!is.null(pop_ID) | length(pop_weight) != length(pop_ID)) pop_ID=1:length(pop_weight)
+    if(is.null(a)|is.null(b)|!is.numeric(a)|!is.numeric(b)) stop("\n Make sure you entered numeric values for a and b. The function needs a and b values to compute relative weight. Find origin of a and b in Murphy et al (1990, 1991), and parameters on fishbase or other online repositories.")
+    
+    
+    # Remove outliers, then create output dataframe
+    if(!is.null(outliers) & is.numeric(outliers)) {
+      pop_ID     <- pop_ID[-outliers]
+      pop_length <- pop_length[-outliers]
+      pop_weight <- pop_weight[-outliers]
+    }
+    
+      pop_ID     <- pop_ID[which_size_limits]
+      pop_length <- pop_length[which_size_limits]
+      pop_weight <- pop_weight[which_size_limits]
+      
+    list_out$Data <- data.frame(pop_ID, pop_length,pop_weight)
+    
+
+    # Save output parameters
+    list_out$a <- a
+    list_out$b <- b
+    list_out$source_a_b_param <- source_data
+    
+    # Compute Wr=W/Ws*100
+    list_out$Data$Ws <- a*(list_out$Data$pop_length^b)
+    list_out$Data$Wr <- list_out$Data$pop_weight / list_out$Data$Ws #*100
+    # no longer multiplying by 100 because it brings my ratio to 100? Shoudn't it be close to 1?
+    
+    # create plot from which a and b parameter were extracted
+    p0 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + 
+      geom_point() +
+      labs(title="Weight:length relationship",
+           x ="Length (cm))", y = "Weight (g)") +
+    stat_smooth() + 
+      theme_bw()
+    
+    # create plot from which a and b parameter were extracted
+    p1 <- ggplot(list_out$Data, aes(log10(pop_length),log10(pop_weight))) + 
+      geom_point() +
+      labs(title="weight:length relationship (log10 scale)",
+           subtitle = paste0("For this sample, a= ",signif(a_temp,3), ", b= ", signif(b_temp,3)),
+           x ="log10(length)", y = "log10(weight)") +
+    stat_smooth(method="lm") + 
+      theme_bw()
+    
+    # create plot of Kn vs. length
+    p2 <- ggplot(list_out$Data, aes(pop_length,Wr)) + 
+      geom_point() +
+      labs(title="Relative weight Wr",
+           subtitle = bquote(W[r]*"=W/"*W[s]*", with "*W[s]*"=a"*L^b*",a and b calculated with RPL method (Murphy et al, 1991)"),
+           x ="Length (cm)", y = "Wr") +
+    geom_hline(yintercept=1) + 
+      theme_bw()
+   
+    list_out$plot_WL <- p0
+    list_out$plot_WL_log <- p1
+    list_out$plot_WrL <- p2
+
     return(list_out)
 }
 
@@ -2236,42 +2318,38 @@ RelCond_Fisheries <- function(pop_ID=NULL, pop_length, pop_weight, size_limits, 
 
 ```{r use function Compute_FultonK, echo=FALSE, message=FALSE, warning=FALSE}
 
-
 Fult1 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id,
                 pop_weight = LTcond$weight,
-                pop_length = LTcond$tl.mm,
+                pop_length = LTcond$tl.mm/10,
                 bin_limits = seq(0,800, by = 100))
-Fult1$plot_KL
 Fult2 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id,
                 pop_weight = LTcond$weight,
-                pop_length = LTcond$tl.mm,
+                pop_length = LTcond$tl.mm/10,
                 bin_limits = seq(0,800, by = 800))
-Fult2$plot_KL
 Fult3 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id,
                 pop_weight = LTcond$weight,
-                pop_length = LTcond$tl.mm,
+                pop_length = LTcond$tl.mm/10,
                 bin_limits = seq(0,800, by = 400))
-Fult3$plot_KL
-mean(Fult3$Data$delta_to_K, na.rm=T)
-Fult4 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
-                pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
-                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
-                bin_limits = seq(0,800, by = 20))
-Fult4$plot_KL
-Fult4$Growth_parameters
+grid.arrange(Fult1$plot_KL,Fult2$plot_KL,Fult3$plot_KL, nrow=1)
+# Fult4 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+#                 pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+#                 pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)]/10,
+#                 bin_limits = seq(0,800, by = 20))
+# Fult4$plot_KL
+# Fult4$Growth_parameters
 Fult5 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
                 pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
-                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)]/10,
                 bin_limits = seq(0,800, by =800), 
                 outliers = 1865)
-Fult5$plot_KL
+#Fult5$plot_KL
 Fult6 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
                 pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
-                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)]/10,
 #                bin_limits = c(100,120,150, 190,280,400), 
                 bin_limits = c(100,120,150, 220,280,400), 
                 outliers = 1865)
-Fult6$plot_KL
+#Fult6$plot_KL
 #Fult6$plot_WL
 grid.arrange(
   Fult5$plot_WL,
@@ -2279,8 +2357,7 @@ grid.arrange(
   Fult5$plot_KL,
   Fult6$plot_WL,
   Fult6$plot_WL_log,
-  Fult6$plot_KL, ncol=3)
-
+  Fult6$plot_KL, ncol=3,widths=c(1,1,1.5))
 
 # grid.arrange(
 #   Fult5$plot_WL,
@@ -2288,22 +2365,37 @@ grid.arrange(
 #   Fult6$plot_WL,
 #   Fult6$plot_KL, ncol=2)
 
-ggplot(list_out$Data, aes(pop_length,FultonK, fill=size_group)) + geom_point()
-  xlab("Length (mm)") + ylab("K")
-
-
-
-
-
-
-
-LTcond$Condition
-plot(LTcond$Condition ~ LTcond$frozen.tl,xlab="total length (mm)",ylab="K",main="", pch=20)
-lm3 <- lm(LTcond$Condition ~ as.numeric(paste(LTcond$frozen.tl)),data=LTcond)
-abline(lm3, col="red", lwd=1.5)
-mtext("a. Slope ≠ 0", side = 3, line=1.5)
 
 ```
+
+Get relative condition factor:
+```{r}
+RelCondLT <- RelCond_Fisheries(pop_ID = LTcond$Trawl.Id,
+                pop_weight = LTcond$weight,
+                pop_length = LTcond$tl.mm/10)
+grid.arrange(RelCondLT$plot_WL_log, RelCondLT$plot_KnL, ncol=2, widths=c(1,1.5))
+
+RelCondLT$Data[which(RelCondLT$Data$Kn>1.6),]
+RelCondLT$a
+RelCondLT$b
+
+```
+<br>`r fig_cap("relative cond LT", "Weight:length relationship (log10 scale) and relative condition factor for lake trout collected in Lake Champlain, over the 2016-2018 field seasons")`<br>
+
+Get relative weight:
+```{r}
+RelWeightLT <- RelWeight_Fisheries(pop_ID = LTcond$Trawl.Id,
+                pop_weight = LTcond$weight,
+                pop_length = LTcond$tl.mm/10,
+                a=0.00741,
+                b=3.04,
+                source="https://www.fishbase.se/Summary/SpeciesSummary.php?ID=248&AT=lake+trout")
+RelWeightLT$plot_WrL + geom_hline(yintercept = mean(RelWeightLT$Data$Wr), colour="coral", lty=2) 
+
+```
+<br>`r fig_cap("relative weight LT", "Relative weigth for lake trout collected in Lake Champlain, over the 2016-2018 field seasons, compared to growth parameters reported on fishbase for Salvelinus namaycush in North America.")`
+
+a and b parameters have been collected on fishbase, <a href="`r RelWeightLT$source_a_b_param`">link</a>.
 
 
 ## Target catch and bycatch
