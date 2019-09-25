@@ -43,6 +43,7 @@ library(wesanderson) # colors
 library(ggraph) # for nodes plot
 library(igraph) # probably better for nodes graph because can also assign weigth
 library(tidygraph) # to transform dataframe in node datasets
+library(scales) # Get full number in x/y scales with scale_x_continuous(labels = comma)/scale_y_continuous(labels = comma) instead of 1.00e09 for example
 
 # Captions with library captioner
 # https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
@@ -93,7 +94,6 @@ ggraph(graph, "grid") +
 
 ```{r plot food web with igraph}
 ewediet <- read.delim(paste0(getpath4data(),"EwE_params/EwE_diet.txt"))
-ewediet$predator <- gsub("Lamprey", "Sea Lamprey", ewediet$predator)
 colnames(ewediet)[-c(1:2)] <- as.character(ewediet$predator[1:c(ncol(ewediet)-2)])
 rownames(ewediet) <- as.character(ewediet$predator)
 ewediet <- ewediet[1:c(ncol(ewediet)),-c(1)]
@@ -110,8 +110,8 @@ ewediet2$predator <- as.character(ewediet2$predator)
 
 ewediet_nodes <- data.frame(
   "id"=as.character(rownames(ewediet)),
-  "data_source"=as.character(c("VTFWS", "VTFWS/UVM","VTFWS/UVM","VTFWS/NYFWS","NA","NA","NA","UVM","UVM","UVM","UVM","UVM","UVM","VTDEC","VTDEC","VTDEC","UVM","VTDEC","calculated")),
-  "level"=c(-2,0,3,3.5,0,0,0,1,0,5,4,2,5,7,6,7,6.5,8,9)
+  "data_source"=as.character(c("VTFWS", "VTFWS/UVM","VTFWS/UVM","NA","NA","NA","UVM","UVM","UVM","UVM","UVM","UVM","VTDEC","VTDEC","VTDEC","UVM","VTDEC","calculated")),
+  "level"=c(-2,0,3,0,0,0,1,0,5,4,2,5,7,6,7,6.5,8,9)
 )
 
 ewediet_nodes <- ewediet_nodes[order(ewediet_nodes$level),]
@@ -141,7 +141,7 @@ E(net)$width <- as.numeric(paste(E(net)$weight))*10
 # mylayout should have 2 columns, x and y, and number of rows of the number of groups: length(V(net)$name) == 18
 
 mylayout <- ewediet_nodes %>% mutate(
-  x = case_when(id == "Sea Lamprey"      ~ 0,
+  x = case_when(id == "Sea lamprey"      ~ 0,
                 id == "Adult lake trout" ~ 0,
                 id == "Atlantic salmon"  ~ 2,
                 id == "Burbot"           ~ 4,
@@ -151,16 +151,15 @@ mylayout <- ewediet_nodes %>% mutate(
                 id == "Alewife"          ~ 1,
                 id == "Smelt"            ~ 4,
                 id == "Juvenile lake trout" ~ -3,
-                id == "Stocked lake trout" ~ -4,
                 id == "Trout-perch"      ~  2,
                 id == "Sculpin"          ~  4,
-                id == "Zoo predators"    ~  -1,
+                id == "Zooplankton (predacious)"    ~  -1,
                 id == "Mysis"            ~  -3,
                 id == "Benthic invertebrates" ~ 2,
-                id == "Zoo grazers"      ~ 0,
+                id == "Zooplankton (grazers)"      ~ 0,
                 id == "Phytoplankton"    ~ -2,
                 id == "Detritus"         ~ 0),
-  x2 = case_when(id == "Sea Lamprey"     ~ 3,
+  x2 = case_when(id == "Sea lamprey"     ~ 3,
                 id == "Adult lake trout" ~ 3,
                 id == "Atlantic salmon"  ~ 3,
                 id == "Burbot"           ~ 3,
@@ -170,13 +169,12 @@ mylayout <- ewediet_nodes %>% mutate(
                 id == "Alewife"          ~ 3,
                 id == "Smelt"            ~ 2,
                 id == "Juvenile lake trout" ~ 3,
-                id == "Stocked lake trout" ~ 4,
                 id == "Trout-perch"      ~  3,
                 id == "Sculpin"          ~  2,
-                id == "Zoo predators"    ~  3,
+                id == "Zooplankton (predacious)"    ~  3,
                 id == "Mysis"            ~  4,
                 id == "Benthic invertebrates" ~ 2,
-                id == "Zoo grazers"      ~ 1,
+                id == "Zooplankton (grazers)"      ~ 1,
                 id == "Phytoplankton"    ~ 4,
                 id == "Detritus"         ~ 1))
 mylayout <- matrix(c(mylayout$x,mylayout$level,mylayout$x2),ncol=3)
@@ -192,7 +190,7 @@ par(mar=c(0,4,0,7))
 plot.igraph(net,edge.color=adjustcolor(edge.col,alpha.f = .8), edge.curved=.1,
                   layout=-as.matrix(mylayout)[,1:2])
 par(xpd=T)
-TeachingDemos::shadowtext(-norm_coords(mylayout[,1:2], -1, 1, -1, 1), label=gsub("Zoo","Zoo.",ewediet_nodes$id),pos=mylayout[,3], offset=1.3, col="black",bg = "white",  theta = (1:8/4)*pi, r1 = 0.06, r2 = 0.04)
+TeachingDemos::shadowtext(-norm_coords(mylayout[,1:2], -1, 1, -1, 1), label=ewediet_nodes$id,pos=mylayout[,3], offset=1.3, col="black",bg = "white",  theta = (1:8/4)*pi, r1 = 0.06, r2 = 0.04)
 par(xpd=F)
 dev.off()
 
@@ -648,6 +646,7 @@ mysis_summ <- data.frame(
   ,list("Year"=Year), sd, na.rm=T))))
 
 mysis_summ
+
 ```
 
 
@@ -1688,6 +1687,8 @@ Data for 2016-2018 field seasons provided by Pascal Wilkins.
 Displaying some summary data, including number of wild vs. stocked fish per year and basins, and number of fish collected per year (lot more in 2018 than the previous years).
 ```{r read data LT, include=FALSE}
 LTcond <- read.delim(paste0(getpath4data(),"data_from_Pascal/LT_ConditionOverall.txt"))
+LTcond <- LTcond[-c(2065),] # outlier detected by fultons
+
 #head(LTcond)
 with(LTcond, tapply(rep(1,nrow(LTcond)),list("Year#"=Year, "Clipped#"=Clipped), sum))
 with(LTcond, tapply(rep(1,nrow(LTcond)),list("Site"=Local, "Clipped#"=Clipped), sum))
@@ -1915,6 +1916,8 @@ LTcond$logL <- log(LTcond$frozen.tl)
 
 lm1 <- lm(logW~logL,data=LTcond)
 fitPlot(lm1,xlab="log total length (mm)",ylab="log weight (g)",main="")
+abline(h=0, lwd=.5)
+text(x=min(LTcond$logL), y=max(LTcond$logW)*.9, pos=4, label=paste0("y = ", round(lm1$coefficients[1],1)," + x * ", round(lm1$coefficients[2],1)))
 
 ```
 
@@ -2039,6 +2042,167 @@ To convert them to the initial equation W = aL<sup>b</sup>:
 ```
 
 Year and sites were significant when we tested for interaction: I should probably use parameter for one year and one site? Or on the contrary, we're aware there's some differences but it's more relevant to average them out by using several years.
+
+## Calculate Fulton's factor K
+
+Because of assumed isometric growth, comparisons should be limited to fish of similar length (small size range) so slope is zero 
+(in other words, condition does not increase with age)
+
+It means we should calculate a and b for smaller bin sizes, get the K for the ideal fish (K=1), then compare fish from the same bin sizes to that K
+
+Below, I wrote a function to compute Fulton's factor for different bin sizes. The function is called ```Compute_FultonK``` and require the following arguments: `r args(Compute_FultonK)`
+
+```{r function calculate relative fulton factor for different bin size, message=FALSE, warning=FALSE, include=FALSE}
+Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, outliers = NULL) {
+     # Create list to save outputs
+    list_out <- list()
+    
+    # Color output
+    require(wesanderson)
+    colrs <- wes_palette("Darjeeling1", length(bin_limits)-1, type="continuous")
+    
+    # Make sure we're working with numeric variables
+    pop_weight = as.numeric(paste(pop_weight))
+    pop_length = as.numeric(paste(pop_length))
+    
+    list_out$Data <- data.frame("row_nb"=1:length(pop_length),pop_ID, pop_length,pop_weight)
+    
+    # Order bins
+    bin_limits <- bin_limits[order(bin_limits, decreasing = F)]
+    
+    # warning message if wrong length of input vector
+    if (length(pop_weight) != length(pop_length)) stop("\n You do not have the same number of observations for weight and length. Review your data and run the function again.")
+    if (!is.null(pop_ID) | length(pop_weight) != length(pop_ID)) pop_ID=1:length(pop_weight)
+    
+    # create empty column in the dataset for the k of the size class
+    list_out$Data$size_group <- rep(NA, nrow(list_out$Data))
+    list_out$Data$FultonK <- rep(NA, nrow(list_out$Data))
+    list_out$Data$delta_to_K <- rep(NA, nrow(list_out$Data))
+    
+    # create empty matrix to save output
+    param <- as.data.frame(matrix(rep(NA,(length(bin_limits)-1)*6), ncol=6))
+    colnames(param) = c("Min_size", "Max_size", "a", "b", "meanK", "slopeK")
+    
+    # create empty plot to see the points for different bins
+    p1 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (n=", length(bin_limits)-1, ")"),
+        x ="Length (mm)", y = "Weigth (g)") + theme_bw() 
+    p2 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (log-transformed) (n=", length(bin_limits)-1, ")"),
+        x ="log(length)", y = "log(weight)") + theme_bw() 
+    p3 <- ggplot() + labs(title=paste0("Fulton's factor K (n=", length(bin_limits)-1, ")"),
+        x ="Length (mm)", y = "K") + theme_bw() 
+    
+    
+    # Beginning of the loop
+    # We're going to generate a and b for each size class, then calculate the average condition from that.
+    for (i in 2:length(bin_limits)) {
+      which_in_bin <- which(pop_length>bin_limits[i-1] & pop_length<=bin_limits[i])
+      if (any(outliers %in% which_in_bin)) which_in_bin <- which_in_bin[-which(which_in_bin %in% outliers)]
+      if (length(which_in_bin)>1) {
+        lm_temp = lm(log(pop_weight[which_in_bin])~log(pop_length[which_in_bin]))
+      # fitPlot(lm1,xlab="log total length (mm)",ylab="log weight (g)",main="")
+      a_temp = exp(lm_temp$coefficients[1])
+      b_temp = lm_temp$coefficients[2]
+      
+      # Now that we have and b, compute the fulton factor
+      list_out$Data[which_in_bin,"size_group"] <- LETTERS[i-1]
+      list_out$Data[which_in_bin,"FultonK"]    <- (list_out$Data$pop_weight/((list_out$Data$pop_length/10)^3) * a_temp)[which_in_bin]
+      # Normalizing
+      list_out$Data[which_in_bin,"FultonK"] <- (list_out$Data[which_in_bin,"FultonK"]-min(list_out$Data[which_in_bin,"FultonK"]))/(max(list_out$Data[which_in_bin,"FultonK"])-min(list_out$Data[which_in_bin,"FultonK"]))+0.5
+      K_temp <- mean(list_out$Data[which_in_bin,"FultonK"])
+      # Delta to mean K
+       list_out$Data[which_in_bin,"delta_to_K"] <- list_out$Data[which_in_bin,"FultonK"] - K_temp
+      
+      # Add points to plot
+      p1 <- p1 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=pop_weight), colour=colrs[i-1])
+      p2 <- p2 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=log(pop_length), y=log(pop_weight)), colour=colrs[i-1])
+      p3 <- p3 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=FultonK), colour=colrs[i-1], alpha=.4) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour="white", lwd=1.5) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour=colrs[i-1])
+      
+      # Save output
+      lm_temp <- lm(FultonK ~ pop_length,data=list_out$Data[which_in_bin,])
+      param[i-1,] <- c(bin_limits[i-1], bin_limits[i], a_temp, b_temp, K_temp, lm_temp$coefficients[2])  
+      } else { param[i-1,] <- c(bin_limits[i-1], bin_limits[i], NA,NA,NA,NA) }
+      
+      
+    }
+    list_out$Growth_parameters <- param[!is.na(param[,3]),]
+    list_out$plot_WL <- p1
+    list_out$plot_WL_log <- p2
+    list_out$plot_KL <- p3
+     
+    aplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, a)) + geom_point() + stat_smooth() +xlab("Average size (mm)")
+    bplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, b)) + geom_point() + stat_smooth() +xlab("Average size (mm)")
+    list_out$plot_param_a <- aplot
+    list_out$plot_param_b <- bplot
+    
+    return(list_out)
+}
+
+```
+
+```{r use function Compute_FultonK, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+Fult1 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id,
+                pop_weight = LTcond$weight,
+                pop_length = LTcond$tl.mm,
+                bin_limits = seq(0,800, by = 100))
+Fult1$plot_KL
+Fult2 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id,
+                pop_weight = LTcond$weight,
+                pop_length = LTcond$tl.mm,
+                bin_limits = seq(0,800, by = 800))
+Fult2$plot_KL
+Fult3 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id,
+                pop_weight = LTcond$weight,
+                pop_length = LTcond$tl.mm,
+                bin_limits = seq(0,800, by = 400))
+Fult3$plot_KL
+mean(Fult3$Data$delta_to_K, na.rm=T)
+Fult4 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                bin_limits = seq(0,800, by = 20))
+Fult4$plot_KL
+Fult4$Growth_parameters
+Fult5 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                bin_limits = seq(0,800, by =800), 
+                outliers = 1865)
+Fult5$plot_KL
+Fult6 <- Compute_FultonK(pop_ID = LTcond$Trawl.Id[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_weight = LTcond$weight[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+                pop_length = LTcond$tl.mm[which(LTcond$tl.mm>100 & LTcond$tl.mm <400)],
+#                bin_limits = c(100,120,150, 190,280,400), 
+                bin_limits = c(100,120,150, 220,280,400), 
+                outliers = 1865)
+Fult6$plot_KL
+#Fult6$plot_WL
+
+grid.arrange(
+  Fult5$plot_WL,
+  Fult5$plot_WL_log,
+  Fult5$plot_KL,
+  Fult6$plot_WL,
+  Fult6$plot_WL_log,
+  Fult6$plot_KL, ncol=3)
+
+ggplot(list_out$Data, aes(pop_length,FultonK, fill=size_group)) + geom_point()
+  xlab("Length (mm)") + ylab("K")
+
+
+
+
+
+
+
+LTcond$Condition
+plot(LTcond$Condition ~ LTcond$frozen.tl,xlab="total length (mm)",ylab="K",main="", pch=20)
+lm3 <- lm(LTcond$Condition ~ as.numeric(paste(LTcond$frozen.tl)),data=LTcond)
+abline(lm3, col="red", lwd=1.5)
+mtext("a. Slope ≠ 0", side = 3, line=1.5)
+
+```
 
 
 ## Target catch and bycatch
@@ -2537,6 +2701,7 @@ ggplotly(barplot_MainLake)
 
 ```{r read sea lamprey data, include=FALSE}
 trap <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_trapping_data.txt"))
+trap_annual_summ <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/annual_trapping_summary.txt"))
 wound <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/wounding_LAT_LAS.txt"))
 
 ```
@@ -2581,7 +2746,31 @@ ggplot(trap_summ2, aes(rownames(trap_summ2),Total.catch)) +
 
 # Stocking
 
-## VTFWS
+## VTFWS long-term data 
+Data communicated by Ellen on September 23rd, 2019. She presents them in Marsden et al (2018)^[].
+
+```{r read long term stocking data VT, include=FALSE}
+stklkt <- read.delim(paste0(getpath4data(),"data_from_Ellen/LC_LKT_stocking_history_1972_2018.txt"))
+head(stklkt)
+
+# create a summary
+stklkt_summ <- as.data.frame(with(stklkt, tapply(NB_EQUIV,list("Stocking_site"=STOCKING_SITE, "Year"=YEAR), sum, na.rm=T)))
+stklkt_summ$TOTAL <- rowSums(stklkt_summ, na.rm = T)
+stklkt_summ <- rbind(stklkt_summ, "TOTAL"=colSums(stklkt_summ, na.rm = T))
+stklkt_summ <- rbind(stklkt_summ, "PERCENT"=stklkt_summ["TOTAL",]/stklkt_summ["TOTAL", "TOTAL"])*100
+
+
+```
+
+```{r plot stoking lkt data long term, echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data=as.data.frame(t(stklkt_summ[!(colnames(stklkt_summ) %in% "TOTAL")])), aes(x=as.numeric(paste(colnames(stklkt_summ)[! (colnames(stklkt_summ) %in% "TOTAL")])),y=TOTAL))+
+  geom_bar(stat="identity") + xlab("Year") + ylab("Numer of yearling-equivalent lake trout") 
+p1 + scale_y_continuous(labels = comma)
+#ggplotly(p1)
+```
+
+
+## VTFWS online database
 
 ### Data
 
@@ -2665,7 +2854,7 @@ ggplot(data=stkvt[grep("Champ",stkvt$WATER),], aes(x=SPECIES,y=ACTUAL.NUMBER.STO
 ```
 <br>`r fig_cap("vtfws species stocked", caption = "Species stocked in Lake Champlain waters by VTFWS.")`
 
-## NYDEC
+## NYDEC online database
 
 ### Read data and basic stats
 
@@ -2790,8 +2979,8 @@ for (i in 1:length(unique(summary_data$Species))) {
 summary_ls <- list(
   "Phytoplankton" = data.frame("Year"=c(min(dtlcm$Year):max(dtlcm$Year)),"Biovolume" = as.vector(with(dtlcm, tapply(Net.phytoplankton..total.biovolume,list("Year"=year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))), mean, na.rm=T)))),
   "Zooplankton" = data.frame("Year"=zoo19_month_Predator$Year, "Biomass"=rowSums(zoo19_month_Predator[,-1], na.rm = T) + rowSums(zoo19_month_Grazer_sm[,-1], na.rm = T) +rowSums(zoo19_month_Grazer_lr[,-1], na.rm = T)),
-  "Mysis" = mysis_summ[,c("Year","mean_w")],
-  "Zebra Mussel" = data.frame("Year"=rownames(ZMvel_summ), "Densities"=ZMvel_summ$STA19),
+  "Mysids" = mysis_summ[,c("Year","mean_w")],
+  "Zebra mussel" = data.frame("Year"=rownames(ZMvel_summ), "Densities"=ZMvel_summ$STA19),
   "Sculpin" = NA,
   "Trout-perch" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(2016:2018))),
   "Smelt" = data.frame("Year"=smelt_sub_summ$Year, "CPUE"=smelt_sub_summ$CPUE),
@@ -2799,11 +2988,11 @@ summary_ls <- list(
   "Cisco" = data.frame("Year"=cisco$Year,"CPUE"=cisco$JuniperIsland),
   "Alewife" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(c(2016:2018)))),
   "Walleye" = NA,
-  "stocked lake trout" = data.frame("Year"=c(1973:2008,as.numeric(paste(summ_stkvt$Year))), "Stocked"=c(rep(max(summ_stkvt$`Total #fish stocked`),length(c(1973:2008))),summ_stkvt$`Total #fish stocked`)),
-  "Lake Trout" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
-  "Atlantic Salmon" = NA,
+  "Stocked juveniles lake trout" = data.frame("Year"=1972:2016, "Stocked"=as.vector(t(stklkt_summ["TOTAL",as.numeric(paste(colnames(stklkt_summ))) %in% 1972:2016]))),
+  "Lake trout" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
+  "Atlantic salmon" = NA,
   "Burbot" = data.frame("Year"=c(1982:1998),"Density"=rep(0.5,length(c(1982:1998)))),
-  "Sea Lamprey" = data.frame("Year"=c(1990:2018),"Density"=rep(0.5,length(1990:2018)))
+  "Sea lamprey" = data.frame("Year"=c(1990:2018),"Density"=rep(0.5,length(1990:2018)))
 )
 
 # Replacing NA of phytoplankton by 0.5 because we have the data -- just no estimate of biomass right now
@@ -2811,8 +3000,8 @@ summary_ls$Phytoplankton[is.na(summary_ls$Phytoplankton$Biovolume),2] <- max(sum
 
 pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_biomass2.pdf"),width = 12, height = 6)
 layout(matrix(c(1,2), nrow=1), widths=c(3.5,1))
-par(mar=c(5,7,4,0.5))
-plot(c(1973,2019), c(1,length(summary_ls)), pch=NA, xlab="Year", ylab="", axes=F)
+par(mar=c(5,10,4,0.5))
+plot(c(1971,2019), c(1,length(summary_ls)), pch=NA, xlab="Year", ylab="", axes=F)
 axis(1, at=1960:2020, labels=NA, lwd = .5); axis(1,at=1960:2020, labels=NA, lwd.ticks = 0)
 axis(1)
 
@@ -2827,7 +3016,7 @@ for (i in 1:length(summary_ls)) {
     #default
     whichyear= msubset[,1]
     if(names(summary_ls[i])=="Phytoplankton") whichyear= msubset$Year[msubset$Year %in% 2006:2015]
-    if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake Trout", "Sea Lamprey","Burbot")) whichyear= NULL
+    if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake trout", "Sea lamprey","Burbot")) whichyear= NULL
     if(names(summary_ls[i])=="Smelt") whichyear= msubset$Year[msubset$Year %in% 1998:2015]
     if(names(summary_ls[i])=="stocked lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
     
@@ -2868,12 +3057,12 @@ for (i in 1:length(summary_ls)) {
   }
   par(xpd=T)
   #text(x=min(summary_data$MinYear, na.rm = T),y=i,names(summary_ls[i]),pos=2)
-  TeachingDemos::shadowtext(x=1973,y=i, labels = names(summary_ls[i]), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=2)
+  TeachingDemos::shadowtext(x=1971,y=i, labels = names(summary_ls[i]), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=2)
   par(xpd=F)
   
   # Add a different point if invasion
   if(names(summary_ls[i])=="Alewife") points(2003,i,pch=17, col="red")
-  if(names(summary_ls[i])=="Zebra Mussel") points(1993,i,pch=17, col="red")
+  if(names(summary_ls[i])=="Zebra mussel") points(1993,i,pch=17, col="red")
   if(names(summary_ls[i])=="Zooplankton") points(c(2014,2018),rep(i,2),pch=17, col="red")
   
   # Add comment
