@@ -36,6 +36,7 @@ library(rgdal)
 library(raster)
 library(rnaturalearth)
 library(RColorBrewer)
+library(grid)
 library(gridExtra) # get two plots side by side
 library(knitr) # for kable
 library(stringr) # for str_replace()
@@ -57,7 +58,16 @@ getpath4data <- function() {
   if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
 }
 
+# Source functions for fulton cond factor, relative condition, and relative weight
+# Compute_FultonK
+source("https://raw.githubusercontent.com/rosalieb/miscellaneous/master/R/Compute_FultonK.R")
+# RelCond_Fisheries
+source("https://raw.githubusercontent.com/rosalieb/miscellaneous/master/R/RelCond_Fisheries.R")
+# RelWeight_Fisheries
+source("https://raw.githubusercontent.com/rosalieb/miscellaneous/master/R/RelWeight_Fisheries.R")
 
+# turn this to true so some stuffs are not run when I'm knitting (and vice versa)
+R_U_KNITTING = TRUE 
 ```
 
 The objective of this document is to gather all in one place the decisions made for the parameters of the model.
@@ -2043,278 +2053,37 @@ To convert them to the initial equation W = aL<sup>b</sup>:
 
 Year and sites were significant when we tested for interaction: I should probably use parameter for one year and one site? Or on the contrary, we're aware there's some differences but it's more relevant to average them out by using several years.
 
-## Calculate Fulton's factor K
+## Growth equations
 
+### Coding functions
+
+#### Fulton's condition factor
 Because of assumed isometric growth, comparisons should be limited to fish of similar length (small size range) so slope is zero 
 (in other words, condition does not increase with age)
 
 It means we should calculate a and b for smaller bin sizes, get the K for the ideal fish (K=1), then compare fish from the same bin sizes to that K
 
-Below, I wrote a function to compute Fulton's factor ($K = W/L^3$) for different bin sizes. The function is called ```Compute_FultonK``` and require the following arguments: `r args(Compute_FultonK)`
+Below, I wrote a function to compute Fulton's factor ($K = W/L^3$) for different bin sizes. The function is called *Compute_FultonK*.
 
-```{r function calculate fulton factor for different bin size, message=FALSE, warning=FALSE, include=FALSE}
-Compute_FultonK <- function(pop_ID=NULL, pop_length, pop_weight, bin_limits, outliers = NULL) {
-     # Create list to save outputs
-    list_out <- list()
-    
-    # Color output
-    require(wesanderson)
-    colrs <- wes_palette("Darjeeling1", length(bin_limits)-1, type="continuous")
-    
-    # Make sure we're working with numeric variables
-    pop_weight = as.numeric(paste(pop_weight))
-    pop_length = as.numeric(paste(pop_length))
-    
-    list_out$Data <- data.frame(pop_ID, pop_length,pop_weight)
-    
-    # Order bins
-    bin_limits <- bin_limits[order(bin_limits, decreasing = F)]
-    
-    # warning message if wrong length of input vector
-    if (length(pop_weight) != length(pop_length)) stop("\n You do not have the same number of observations for weight and length. Review your data and run the function again.")
-    if (!is.null(pop_ID) | length(pop_weight) != length(pop_ID)) pop_ID=1:length(pop_weight)
-    
-    # create empty column in the dataset for the k of the size class
-    list_out$Data$size_group <- rep(NA, nrow(list_out$Data))
-    list_out$Data$FultonK <- rep(NA, nrow(list_out$Data))
-    list_out$Data$delta_to_K <- rep(NA, nrow(list_out$Data))
-    
-    # create empty matrix to save output
-    param <- as.data.frame(matrix(rep(NA,(length(bin_limits)-1)*6), ncol=6))
-    colnames(param) = c("Min_size", "Max_size", "a", "b", "meanK", "slopeK")
-    
-    # create empty plot to see the points for different bins
-    p1 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (n=", length(bin_limits)-1, ")"),
-        x ="Length (mm)", y = "Weigth (g)") + theme_bw() 
-    p2 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + labs(title=paste0("Weight:length relationship (log-transformed) (n=", length(bin_limits)-1, ")"),
-        x ="log(length)", y = "log(weight)") + theme_bw() 
-    p3 <- ggplot() + labs(title=paste0("Fulton's factor K (n=", length(bin_limits)-1, ")"),
-        x ="Length (cm)", y = "K") + theme_bw() 
-    
-    
-    # Beginning of the loop to calculate Fulton's K per size class
-    # We're going to generate a and b for each size class, then calculate the average condition from that.
-    for (i in 2:length(bin_limits)) {
-      which_in_bin <- which(pop_length>bin_limits[i-1] & pop_length<=bin_limits[i])
-      if (any(outliers %in% which_in_bin)) which_in_bin <- which_in_bin[-which(which_in_bin %in% outliers)]
-      if (length(which_in_bin)>1) {
-        lm_temp = lm(log10(pop_weight[which_in_bin])~log10(pop_length[which_in_bin]))
-      a_temp = 10^(lm_temp$coefficients[1])
-      b_temp = lm_temp$coefficients[2]
-      
-      # Now that we have and b, compute the fulton factor
-      list_out$Data[which_in_bin,"size_group"] <- LETTERS[i-1]
-      list_out$Data[which_in_bin,"FultonK"]    <- (list_out$Data$pop_weight/((list_out$Data$pop_length/10)^3) * a_temp)[which_in_bin]
-      # Normalizing
-      list_out$Data[which_in_bin,"FultonK"] <- (list_out$Data[which_in_bin,"FultonK"]-min(list_out$Data[which_in_bin,"FultonK"]))/(max(list_out$Data[which_in_bin,"FultonK"])-min(list_out$Data[which_in_bin,"FultonK"]))+0.5
-      K_temp <- mean(list_out$Data[which_in_bin,"FultonK"])
-      # Delta to mean K
-       list_out$Data[which_in_bin,"delta_to_K"] <- list_out$Data[which_in_bin,"FultonK"] - K_temp
-      
-      # Add points to plot
-      p1 <- p1 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=pop_weight), colour=colrs[i-1])
-      p2 <- p2 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=log10(pop_length), y=log10(pop_weight)), colour=colrs[i-1])
-      p3 <- p3 + geom_point(data =list_out$Data[which_in_bin,],mapping = aes(x=pop_length, y=FultonK), colour=colrs[i-1], alpha=.4) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour="white", lwd=1.5) + stat_smooth(data =list_out$Data[which_in_bin,],aes(x=pop_length, y=FultonK), method="lm", se = FALSE, colour=colrs[i-1])
-      
-      # Save output
-      lm_temp <- lm(FultonK ~ pop_length,data=list_out$Data[which_in_bin,])
-      param[i-1,] <- c(bin_limits[i-1], bin_limits[i], a_temp, b_temp, K_temp, lm_temp$coefficients[2])  
-      } else { param[i-1,] <- c(bin_limits[i-1], bin_limits[i], NA,NA,NA,NA) }
-      
-      
-    }
-    list_out$Growth_parameters <- param[!is.na(param[,3]),]
-    list_out$plot_WL <- p1
-    list_out$plot_WL_log <- p2
-    list_out$plot_KL <- p3
-     
-    aplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, a)) + geom_point() + stat_smooth() +xlab("Average size (cm)")
-    bplot <- ggplot(param, aes((param$Min_size+param$Max_size)/2, b)) + geom_point() + stat_smooth() +xlab("Average size (cm)")
-    list_out$plot_param_a <- aplot
-    list_out$plot_param_b <- bplot
-    
-    return(list_out)
-}
-
-```
+#### Relative condition factor
 
 I also wrote a function to compute relative condition factor.
 $K_n = W/W'$
 W' is the predicted weight for a population (using a and b factors). It compensates for allometric growth. The average for a given species is 1.0.
 
-The function is called ```RelCond_Fisheries``` and require the following arguments: `r args(RelCond_Fisheries)`
 
-```{r function calculate relative fulton factor for different bin size, message=FALSE, warning=FALSE, include=FALSE}
-RelCond_Fisheries <- function(pop_ID=NULL, pop_length, pop_weight, size_limits=NULL, outliers = NULL) {
-     # Create list to save outputs
-    list_out <- list()
-    
-    # Make sure we're working with numeric variables
-    pop_weight = as.numeric(paste(pop_weight))
-    pop_length = as.numeric(paste(pop_length))
-    
-    
-    # Edit size_limits if entered in a wrong format
-    if(length(size_limits)%%2 != 0) size_limits=NULL
-    if(is.null(size_limits)) size_limits = c(min(pop_length, na.rm=T), max(pop_length, na.rm=T))
-    size_limits <- size_limits[order(size_limits, decreasing = F)]
-    which_size_limits <- which(pop_length>=which_size_limits[1] & pop_length<=which_size_limits[2])
-    
-    # warning message if wrong length of input vector
-    if (length(pop_weight) != length(pop_length)) stop("\n You do not have the same number of observations for weight and length. Review your data and run the function again.")
-    if (!is.null(pop_ID) | length(pop_weight) != length(pop_ID)) pop_ID=1:length(pop_weight)
-    
-    
-    # Remove outliers, then create output dataframe
-    if(!is.null(outliers) & is.numeric(outliers)) {
-      pop_ID     <- pop_ID[-outliers]
-      pop_length <- pop_length[-outliers]
-      pop_weight <- pop_weight[-outliers]
-    }
-    
-      pop_ID     <- pop_ID[which_size_limits]
-      pop_length <- pop_length[which_size_limits]
-      pop_weight <- pop_weight[which_size_limits]
-      
-    list_out$Data <- data.frame(pop_ID, pop_length,pop_weight)
-    
+The function is called *RelCond_Fisheries*.
 
-    # Compute optimal weight for population
-    lm_temp = lm(log10(pop_weight)~log10(pop_length))
-    a_temp = 10^(lm_temp$coefficients[1])
-    b_temp = lm_temp$coefficients[2]
-    
-    # Save output parameters
-    list_out$a <- a_temp
-    list_out$b <- b_temp
-    
-    # Compute Kn= W/W'
-    list_out$Data$Wprim <- a_temp*list_out$Data$pop_length^b_temp
-    list_out$Data$Kn <- list_out$Data$pop_weight / list_out$Data$Wprim
-    
-    # create plot from which a and b parameter were extracted
-    p0 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + 
-      geom_point() +
-      labs(title="Weight:length relationship",
-           x ="Length (cm))", y = "Weight (g)") +
-    stat_smooth() + 
-      theme_bw()
-    
-    # create plot from which a and b parameter were extracted
-    p1 <- ggplot(list_out$Data, aes(log10(pop_length),log10(pop_weight))) + 
-      geom_point() +
-      labs(title="weight:length relationship (log10 scale)",
-           subtitle = paste0("For this sample, a= ",signif(a_temp,3), ", b= ", signif(b_temp,3)),
-           x ="log10(length)", y = "log10(weight)") +
-    stat_smooth(method="lm") + 
-      theme_bw()
-    
-    # create plot of Kn vs. length
-    p2 <- ggplot(list_out$Data, aes(pop_length,Kn)) + 
-      geom_point() +
-      labs(title="Relative condition factor Kn",
-           subtitle = bquote(K[n]*"=W/W', with W'=a"*L^b),
-           x ="Length (cm)", y = "Kn") +
-    geom_hline(yintercept=1) + 
-      theme_bw()
-   
-    list_out$plot_WL <- p0
-    list_out$plot_WL_log <- p1
-    list_out$plot_KnL <- p2
-
-    return(list_out)
-}
-
-```
+#### Relative weigth
 
 Below, I wrote a function to compute relative weight.
 $Wr = W/Ws * 100$
 Ws is a species-specific standard based on W = aLb
 
-The function is called ```RelWeight_Fisheries``` and require the following arguments: `r args(RelWeight_Fisheries)`. The argument *size_limits* allows to calculate the factor only for a range of the population (user must enter a vector of 2 values).
 
-```{r function calculate relative fulton factor for different bin size, message=FALSE, warning=FALSE, include=FALSE}
-RelWeight_Fisheries <- function(pop_ID=NULL, pop_length, pop_weight, a, b, size_limits=NULL, outliers = NULL, source_data=NULL) {
-     # Create list to save outputs
-    list_out <- list()
-    
-    # Make sure we're working with numeric variables
-    pop_weight = as.numeric(paste(pop_weight))
-    pop_length = as.numeric(paste(pop_length))
-    
-    
-    # Edit size_limits if entered in a wrong format
-    if(length(size_limits)%%2 != 0) size_limits=NULL
-    if(is.null(size_limits)) size_limits = c(min(pop_length, na.rm=T), max(pop_length, na.rm=T))
-    size_limits <- size_limits[order(size_limits, decreasing = F)]
-    which_size_limits <- which(pop_length>=size_limits[1] & pop_length<=size_limits[2])
-    
-    # warning message if wrong length of input vector
-    if (length(pop_weight) != length(pop_length)) stop("\n You do not have the same number of observations for weight and length. Review your data and run the function again.")
-    if (!is.null(pop_ID) | length(pop_weight) != length(pop_ID)) pop_ID=1:length(pop_weight)
-    if(is.null(a)|is.null(b)|!is.numeric(a)|!is.numeric(b)) stop("\n Make sure you entered numeric values for a and b. The function needs a and b values to compute relative weight. Find origin of a and b in Murphy et al (1990, 1991), and parameters on fishbase or other online repositories.")
-    
-    
-    # Remove outliers, then create output dataframe
-    if(!is.null(outliers) & is.numeric(outliers)) {
-      pop_ID     <- pop_ID[-outliers]
-      pop_length <- pop_length[-outliers]
-      pop_weight <- pop_weight[-outliers]
-    }
-    
-      pop_ID     <- pop_ID[which_size_limits]
-      pop_length <- pop_length[which_size_limits]
-      pop_weight <- pop_weight[which_size_limits]
-      
-    list_out$Data <- data.frame(pop_ID, pop_length,pop_weight)
-    
+The function is called* RelWeight_Fisheries*. The argument *size_limits* allows to calculate the factor only for a range of the population (user must enter a vector of 2 values).
 
-    # Save output parameters
-    list_out$a <- a
-    list_out$b <- b
-    list_out$source_a_b_param <- source_data
-    
-    # Compute Wr=W/Ws*100
-    list_out$Data$Ws <- a*(list_out$Data$pop_length^b)
-    list_out$Data$Wr <- list_out$Data$pop_weight / list_out$Data$Ws #*100
-    # no longer multiplying by 100 because it brings my ratio to 100? Shoudn't it be close to 1?
-    
-    # create plot from which a and b parameter were extracted
-    p0 <- ggplot(list_out$Data, aes(pop_length,pop_weight)) + 
-      geom_point() +
-      labs(title="Weight:length relationship",
-           x ="Length (cm))", y = "Weight (g)") +
-    stat_smooth() + 
-      theme_bw()
-    
-    # create plot from which a and b parameter were extracted
-    p1 <- ggplot(list_out$Data, aes(log10(pop_length),log10(pop_weight))) + 
-      geom_point() +
-      labs(title="weight:length relationship (log10 scale)",
-           subtitle = paste0("For this sample, a= ",signif(a_temp,3), ", b= ", signif(b_temp,3)),
-           x ="log10(length)", y = "log10(weight)") +
-    stat_smooth(method="lm") + 
-      theme_bw()
-    
-    # create plot of Kn vs. length
-    p2 <- ggplot(list_out$Data, aes(pop_length,Wr)) + 
-      geom_point() +
-      labs(title="Relative weight Wr",
-           subtitle = bquote(W[r]*"=W/"*W[s]*", with "*W[s]*"=a"*L^b*",a and b calculated with RPL method (Murphy et al, 1991)"),
-           x ="Length (cm)", y = "Wr") +
-    geom_hline(yintercept=1) + 
-      theme_bw()
-   
-    list_out$plot_WL <- p0
-    list_out$plot_WL_log <- p1
-    list_out$plot_WrL <- p2
-
-    return(list_out)
-}
-
-```
-
-
+### Fulton's condition factor K
 
 ```{r use function Compute_FultonK, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -2368,22 +2137,26 @@ grid.arrange(
 
 ```
 
+### Relative condition factor
+
 Get relative condition factor:
-```{r}
+```{r use function RelCondLT}
 RelCondLT <- RelCond_Fisheries(pop_ID = LTcond$Trawl.Id,
                 pop_weight = LTcond$weight,
                 pop_length = LTcond$tl.mm/10)
 grid.arrange(RelCondLT$plot_WL_log, RelCondLT$plot_KnL, ncol=2, widths=c(1,1.5))
 
-RelCondLT$Data[which(RelCondLT$Data$Kn>1.6),]
-RelCondLT$a
-RelCondLT$b
+# RelCondLT$Data[which(RelCondLT$Data$Kn>1.6),]
+# RelCondLT$a
+# RelCondLT$b
 
 ```
 <br>`r fig_cap("relative cond LT", "Weight:length relationship (log10 scale) and relative condition factor for lake trout collected in Lake Champlain, over the 2016-2018 field seasons")`<br>
 
+### Relative weigth
+
 Get relative weight:
-```{r}
+```{r use function RelWeightLT}
 RelWeightLT <- RelWeight_Fisheries(pop_ID = LTcond$Trawl.Id,
                 pop_weight = LTcond$weight,
                 pop_length = LTcond$tl.mm/10,
@@ -2896,7 +2669,7 @@ ggplotly(barplot_MainLake)
 trap <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_trapping_data.txt"))
 trap_annual_summ <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/annual_trapping_summary.txt"))
 wound <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/wounding_LAT_LAS.txt"))
-
+annual_survey <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_survey_data.txt"))
 ```
 
 ## Wounding 
@@ -2932,6 +2705,13 @@ trap_summ2 <- data.frame("Total.catch"=colSums(trap_summ,na.rm = T)[order(colSum
 
 ggplot(trap_summ2, aes(rownames(trap_summ2),Total.catch)) +
   geom_bar(stat="identity", position=position_dodge()) + ylab("Number lamprey caught") + xlab("Stations")
+
+```
+
+
+## Survey data
+
+```{r}
 
 ```
 
@@ -3028,7 +2808,7 @@ What are the species stocked by VTFWD? We're only looking at the effective stock
 ```{r look at the species stocked by vtfws, echo=FALSE, message=FALSE, warning=FALSE}
 
 sp_stkvt <- stkvt %>% group_by(as.factor(SPECIES)) %>%
-  summarize(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
+  summarise(mean=mean(ACTUAL.NUMBER.STOCKED, na.rm=T),
             sum=sum(ACTUAL.NUMBER.STOCKED, na.rm=T),
             scheduled=length(ACTUAL.NUMBER.STOCKED),
             went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
@@ -3102,7 +2882,7 @@ What are the species stocked by VTFWD? We're only looking at the effective stock
 ```{r look at the species stocked by nydec, echo=FALSE, message=FALSE, warning=FALSE}
 
 sp_stkny <- stkny %>% group_by(as.factor(Species)) %>%
-  summarize(mean=mean(Number, na.rm=T),
+  summarise(mean=mean(Number, na.rm=T),
             sum=sum(Number, na.rm=T),
             went_through=length(Number))
 
@@ -3118,7 +2898,7 @@ ggplot(data=stkny[grep("Champ",stkny$Waterbody),], aes(x=Species,y=Number, fill=
 ```
 
 
-# Summary
+# Summary of data availability
 
 The plot below summarizes which data are available, for which period for Lake Champlain.
 
@@ -3191,7 +2971,7 @@ summary_ls <- list(
 # Replacing NA of phytoplankton by 0.5 because we have the data -- just no estimate of biomass right now
 summary_ls$Phytoplankton[is.na(summary_ls$Phytoplankton$Biovolume),2] <- max(summary_ls$Phytoplankton$Biovolume,na.rm=T)
 
-pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_biomass2.pdf"),width = 12, height = 6)
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_biomass2.pdf"),width = 12, height = 6)
 layout(matrix(c(1,2), nrow=1), widths=c(3.5,1))
 par(mar=c(5,10,4,0.5))
 plot(c(1971,2019), c(1,length(summary_ls)), pch=NA, xlab="Year", ylab="", axes=F)
@@ -3273,10 +3053,257 @@ legend(x=1,y=9.5, legend = c("Relative biomass","Biomass still \nbeing estimated
 legend(x=1,y=7, legend = c("Species invasion", "No data yet", "Period chosen for \nmodel initialization"),
        pch=c(17,4,NA), lty=c(NA,NA,2), col=c("red","red","black"), bty="n", border = NULL)
 
-dev.off()
+if(!R_U_KNITTING) dev.off()
 par(mfrow=c(1,1))
 
 
 ```
 <br>`r fig_cap("summary biomass", caption = "Species selected for the initial model, and relative evolution of their biomass (width of polygon). We are still collecting data for some species (Burbot, Atlantic Salmon, Sculpin), and converting survey data to biomass (e.g., phytoplankton counts to biovolume before biovolumes started being reported by the state). Asterisks indicate invasive species, and triangles on the timeline indicates the time of invasion.")`
+
+```{r summary of environmental data availability, echo=FALSE, message=FALSE, warning=FALSE}
+# Similar figure than before, but with drivers / environmental variables
+weather <- read.delim(paste0(getpath4data(), "Weather/allWeatherBTV_join.txt"))
+weather$date <- as.Date(weather$date, format="%d/%m/%Y")
+weather$Year <- year(weather$date)
+weather$Month <- month(weather$date)
+# plot(with(weather[weather$Month %in% c(12:3),], tapply(AvgApparentTemperatureCelsius,list("Year"=Year), mean, na.rm=T)), type="b")
+
+summary_env_var <- list(
+  "Summer average air temperature (degC)" = data.frame("Year"=unique(weather$Year),"SumAirTemp" = as.vector(with(weather[weather$Month %in% c(6:9),], tapply(AvgApparentTemperatureCelsius,list("Year"=Year), mean, na.rm=T)))),
+  
+  "Winter average air temperature (degC)" = data.frame("Year"=unique(weather$Year),"WintAirTemp" = as.vector(with(weather[weather$Month %in% c(12,1:3),], tapply(AvgApparentTemperatureCelsius,list("Year"=Year), mean, na.rm=T)))),
+  
+  "Average air temperature (degC)" = data.frame("Year"=unique(weather$Year),"AvgAirTemp" = as.vector(with(weather, tapply(AvgApparentTemperatureCelsius,list("Year"=Year), mean, na.rm=T)))),
+  
+  "Water temperature epilimnion (degC)" = data.frame("Year"=c(min(dtlcm$Year):max(dtlcm$Year)),"WatTemp" = as.vector(with(dtlcm[dtlcm$StationID==21 & month(as.Date(dtlcm$VisitDate, format="%d/%m/%Y")) %in% c(4:10),], tapply(Temperature_E,list("Year"=year(as.Date(dtlcm$VisitDate[dtlcm$StationID==21 & month(as.Date(dtlcm$VisitDate, format="%d/%m/%Y")) %in% c(4:10)], format="%d/%m/%Y"))), mean, na.rm=T)))),
+  "Dissolved phosphorus epilimnion (mug/l)" = data.frame("Year"=c(min(dtlcm$Year):max(dtlcm$Year)),"DissolvedP" = as.vector(with(dtlcm[dtlcm$StationID==21 & month(as.Date(dtlcm$VisitDate, format="%d/%m/%Y")) %in% c(4:10),], tapply(Dissolved.Phosphorus_E,list("Year"=year(as.Date(dtlcm$VisitDate[dtlcm$StationID==21 & month(as.Date(dtlcm$VisitDate, format="%d/%m/%Y")) %in% c(4:10)], format="%d/%m/%Y"))), mean, na.rm=T)))),
+  "Secchi depth (m)" = data.frame("Year"=c(min(dtlcm$Year):max(dtlcm$Year)),"Secchi.Depth" = as.vector(with(dtlcm[dtlcm$StationID==21,], tapply(Secchi.Depth,list("Year"=year(as.Date(dtlcm$VisitDate[dtlcm$StationID==21], format="%d/%m/%Y"))), mean, na.rm=T))))
+)
+
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_env_variables.pdf"),width = 12, height = 8)
+layout(matrix(c(1,0,2,0,3,4), nrow=3, byrow = T), widths=c(3.5,1), heights=c(1.2,.8,2.5))
+par(mar=c(0,10,5,3.5))
+plot(summary_env_var$`Summer average air temperature (degC)`, type="l", xlab="", ylab="Temperature (deg C)", axes=F, xlim=c(1971,2019),
+     ylim=c(min(summary_env_var$`Winter average air temperature (degC)`[,2], na.rm=T)-1, max(summary_env_var$`Summer average air temperature (degC)`[,2], na.rm=T)+1))
+lines(summary_env_var$`Average air temperature (degC)`,lwd=2)
+lines(summary_env_var$`Winter average air temperature (degC)`)
+lines(summary_env_var$`Water temperature epilimnion (degC)`[-c(1:3),], col="darkcyan")
+TeachingDemos::shadowtext(summary_env_var$`Summer average air temperature (degC)`[3,], labels = "summer (June-September)", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=3)
+TeachingDemos::shadowtext(summary_env_var$`Winter average air temperature (degC)`[3,], labels = "winter (December-March)", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=1)
+TeachingDemos::shadowtext(summary_env_var$`Average air temperature (degC)`[1,], labels = "mean annual temperature", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=1, font=2)
+TeachingDemos::shadowtext(summary_env_var$`Water temperature epilimnion (degC)`[5,], labels = "epilimnion temperature (April-October)", col = "darkcyan",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=1)
+
+axis(3, at=1960:2020, labels=NA, lwd = .5); axis(3,at=1960:2020, labels=NA, lwd.ticks = 0)
+axis(3)
+axis(2)
+axis(2, at=c(-20,30), labels=NA)
+mtext("Year", side = 3, line = 2.2)
+
+#2nd plot
+par(mar=c(4,10,0,3.5))
+plot(summary_env_var$`Dissolved phosphorus epilimnion (mug/l)`, type="l", xlab="Year", ylab="", axes=F, xlim=c(1971,2019), col="darkgreen")
+points(summary_env_var$`Dissolved phosphorus epilimnion (mug/l)`,pch=16, col="darkgreen")
+axis(1, at=1960:2030, labels=NA, lwd = .5); axis(1,at=1960:2030, labels=NA, lwd.ticks = 0)
+axis(1)
+axis(4, col="darkgreen", col.ticks = "darkgreen", col.axis = "darkgreen")
+axis(4, at=c(0,20), labels=NA, col="darkgreen")
+mtext("Dissolved phosphorus\nepilimnion (µg/l)", side = 4, line = 3.2, cex=.7, col="darkgreen")
+
+#3rd plot
+par(mar=c(5,10,4,3.5))
+plot(c(1971,2019), c(1,length(summary_ls)), pch=NA, xlab="Year", ylab="", axes=F)
+axis(1, at=1960:2020, labels=NA, lwd = .5); axis(1,at=1960:2020, labels=NA, lwd.ticks = 0)
+axis(1)
+
+axis(3, at=1960:2020, labels=NA, lwd = .5); axis(3,at=1960:2020, labels=NA, lwd.ticks = 0)
+axis(3)
+par(mar=c(5,10,4,0.5))
+
+for (i in 1:length(summary_ls)) {
+  abline(h=i,lty=2, col=adjustcolor("grey", alpha.f = .4))
+  msubset = summary_ls[[i]]
+  if(any(!is.na(msubset))) {
+    # Set which year we actually have all data
+    #default
+    whichyear= msubset[,1]
+    if(names(summary_ls[i])=="Phytoplankton") whichyear= msubset$Year[msubset$Year %in% 2006:2015]
+    if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake trout", "Sea lamprey","Burbot")) whichyear= NULL
+    if(names(summary_ls[i])=="Smelt") whichyear= msubset$Year[msubset$Year %in% 1998:2015]
+    if(names(summary_ls[i])=="stocked lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
+    
+    msubset[,1] <- as.numeric(paste(msubset[,1]))
+    msubset[,2] <- as.numeric(paste(msubset[,2]))
+    # Add rows without data to visualize on the plot
+    # If data are continuous already, msubset_2 will just be a copy of msubset
+    msubset_2 <- rbind(data.frame("x" = msubset[,1],
+                                  "y" = msubset[,2]),
+                       data.frame("x" = c(min(msubset[,1]):max(msubset[,1]))[!min(msubset[,1]):max(msubset[,1])%in%msubset[,1]],
+                                  "y" = rep(NA,length(which(!min(msubset[,1]):max(msubset[,1])%in%msubset[,1])))))
+    msubset_2 <- msubset_2[order(msubset_2$x),]
+    lines(msubset_2[,1],ifelse(!is.na(msubset_2[,2]),i,NA), col="grey", lwd=1.5)
+    x <- msubset_2[,1]
+    w <- msubset_2[,2]/max(msubset_2[,2], na.rm=T)
+    w[is.na(w)] <- 0
+    polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("grey", alpha.f = .4))
+    if(names(summary_ls[i])=="Burbot") TeachingDemos::shadowtext(mean(1982:1998),i, labels = "uncertainties about \ndata availability", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9)
+    x <- msubset_2[msubset_2[,1] %in% whichyear,1]
+    w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
+    w[is.na(w)] <- 0
+    if(names(summary_ls[i])%in%c("Alewife", "Zebra Mussel")) {
+      polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = "black", col=adjustcolor("pink", alpha.f = .6))
+    } else {
+      polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8))
+    }
+    if(names(summary_ls[i])=="Smelt") {
+     for (w in 1:2) {
+       if (w==1) whichyear = 1990:1996
+       if (w==2) whichyear = 1984:1985
+    x <- msubset_2[msubset_2[,1] %in% whichyear,1]
+    w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
+    w[is.na(w)] <- 0
+     polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8)) 
+     }
+    }
+
+  }
+  par(xpd=T)
+  #text(x=min(summary_data$MinYear, na.rm = T),y=i,names(summary_ls[i]),pos=2)
+  TeachingDemos::shadowtext(x=1971,y=i, labels = names(summary_ls[i]), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, pos=2)
+  par(xpd=F)
+  
+  # Add a different point if invasion
+  if(names(summary_ls[i])=="Alewife") points(2003,i,pch=17, col="red")
+  if(names(summary_ls[i])=="Zebra mussel") points(1993,i,pch=17, col="red")
+  if(names(summary_ls[i])=="Zooplankton") points(c(2014,2018),rep(i,2),pch=17, col="red")
+  
+  # Add comment
+  if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
+  
+  # Add a different point if work still in progress
+  if(names(summary_ls[i])%in%c("Burbot","Atlantic Salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
+}
+rect(2000,0.7,2002,i+0.3, lty=2, lwd=.5)
+
+par(mar=c(5,0,2,1))
+plot(c(1,10),c(1,10),axes=F,xlab="",ylab="", pch=NA)
+legend(x=1,y=9.5, legend = c("Relative biomass","Biomass still \nbeing estimated","Invasive species"),
+       fill=c("black",adjustcolor("grey", alpha.f = .4), adjustcolor("pink", alpha.f = .6)), bty="n", border = NULL)
+legend(x=1,y=7, legend = c("Species invasion", "No data yet", "Period chosen for \nmodel initialization"),
+       pch=c(17,4,NA), lty=c(NA,NA,2), col=c("red","red","black"), bty="n", border = NULL)
+
+if(!R_U_KNITTING) dev.off()
+par(mfrow=c(1,1))
+
+
+```
+<br>`r fig_cap("summary biomass and env var", caption = "Upper graph: Environmental parameters (summer, winter, and annual average temperature), epilimnion mean temperature (April-October), and dissolved phosphorus concentration. Lower graph: Species selected for the initial model, and relative evolution of their biomass (width of polygon). We are still collecting data for some species (Burbot, Atlantic Salmon, Sculpin), and converting survey data to biomass (e.g., phytoplankton counts to biovolume before biovolumes started being reported by the state). Asterisks indicate invasive species, and triangles on the timeline indicates the time of invasion.")`
+
+
+# Get P/B for each group
+
+```{r read growth parameters }
+gp <- read.delim(paste0(getpath4data(), "Growth_parameters.txt"))
+```
+
+
+Production rate P/B is defined at steady state as equal to total mortality (Z), the sum of fishing mortality (F) and natural mortality (M) (Pauly et al. 2000^[Pauly, D., Christensen, V., Walters, C., 2000. Ecopath, Ecosim, and Ecospace as tools for evaluating ecosystem impact of fisheries. ICES J. Mar. Sci. 57, 697–706. https://doi.org/10.1006/jmsc.2000.0726]).
+
+In Lake Champlain, fishing mortality is really low (F ~ 0).  M, in fishes, is positively correlated to their value of K (from the von Bertalanffy growth formula), followed by the temperature of their environment, and in a lesser extent, inversely correlated to their asymptotic length (Pauly 1980). We calculated M following the equation below, that was established from 175 marine fish stocks (Pauly 1980^[Pauly, D., 1980. On the interrelationships between natural mortality, growth parameters, and mean environmental temperature in 175 fish stocks. J. Const. int. Explor. Mer 39, 175–192.]).
+
+$log(M)= -0.00066 - 0.279 * log(L_∞) + 0.6543*log(K) + 0.4634*log(T)$
+
+T for now is defined as 14°C because we don't have data for winter in Lake Champlain, so I just need to get a data.
+
+```{r get p/b}
+# using some parameters from growth parameter
+Tenv = 14
+
+getM <- function(Lasympt, K, Tenv) {
+  10^(-0.00066-0.279*log10(Lasympt)+0.6543*log10(K)+0.4634*log10(Tenv))
+}
+  
+gp$Group.name
+(M_sea_lamprey = getM(Lasympt = 69, K = 0.16, Tenv = Tenv))
+(M_lake_trout_ad = getM(Lasympt = 150, K = 0.05, Tenv = Tenv))
+(M_lake_trout_juv = getM(Lasympt = 23, K = 0.25, Tenv = Tenv))
+(M_atlantic_salmon = getM(Lasympt = 150, K = 0.15, Tenv = Tenv))
+(M_burbot = getM(Lasympt = 117, K = 0.05, Tenv = Tenv))
+(M_cisco = getM(Lasympt = 57.000, K = 0.16, Tenv = Tenv))
+(M_whitefish = getM(Lasympt = 79.000, K = 0.12, Tenv = Tenv))
+(M_trout_perch = getM(Lasympt = 15, K = 0.05, Tenv = Tenv))
+(M_alewife = getM(Lasympt = 38.100, K = 0.2, Tenv = Tenv))
+(M_smelt = getM(Lasympt = 33, K = 0.31, Tenv = Tenv))
+(M_sculpin = getM(Lasympt = 12.7, K = NA, Tenv = Tenv))
+
+M_fish <- data.frame("sea_lamprey"= c(M_sea_lamprey),
+            "lake_trout_ad" = M_lake_trout_ad,
+            "lake_trout_juv" = M_lake_trout_juv,
+            "atlantic_salmon"= M_atlantic_salmon,
+            "burbot" = M_burbot,
+            "cisco" = M_cisco,
+            "whitefish" = M_whitefish,
+            "trout_perch"= M_trout_perch,
+            "alewife"=M_alewife,
+            "smelt"=M_smelt,
+            "sculpin"=M_sculpin)
+
+if(!R_U_KNITTING) write.table(M_fish, file=paste0(getpath4data(),"EwE_params/M_fish.txt"), sep="\t")
+
+```
+
+
+
+# Get Q/B for each group
+
+Consumption rate Q/B is a function of the asymptotic length (W∞, g), the mean annual temperature of the water body (T’=1000/T, with T in Kelvin, Tcelsius + 273.15), the aspect ratio of the caudal fin (A), h and d. <br>
+
+$log(Q⁄B)= 7.964-0.204 log(W_∞ )-1.065 T'+0.0873 A+0.532 h + 0.398 d$ <br>
+with $A=  h^2⁄s$ <br>
+and $T'=  1000⁄(Tcelsius+273.15)$ <br>
+
+
+A is an approximation of the swimming and metabolic activity of the fish (Palomares and Pauly 1998^[Palomares, M.L.D., Pauly, D., 1998. Predicting food consumption of fish populations as functions of mortality, food type, morphometrics, temperature and salinity. Mar. Freshwater Res. 49, 447. https://doi.org/10.1071/MF98015]).
+
+<a href="https://www.fishbase.se/manual/fishbasethe_swimming_and_speed_tables.htm">About aspect ratio</a>.
+
+```{r get q/b}
+# using some parameters from growth parameter
+Tk = 1000/(Tenv+273.15)
+
+
+getQB <- function(Wasympt, Tk, A, h, d) {
+  7.964-0.204 * log(Wasympt)-1.065 * Tk + 0.0873 * A+0.532 *h+0.398*d
+}
+  
+gp$Group.name
+(QB_sea_lamprey = getQB(Wasympt = 2.5, Tk=Tk, A = 0.81, h = 0, d = 0))
+(QB_lake_trout_ad = getQB(Wasympt = 32, Tk=Tk, A = 2.11, h =0, d =  0))
+(QB_lake_trout_juv = getQB(Wasympt = 1.2, Tk=Tk, A = 2.11, h =0, d = 0 ))
+(QB_atlantic_salmon = getQB(Wasympt = 35, Tk=Tk, A = , h =0, d =0))
+(QB_burbot = getQB(Wasympt = 34, Tk=Tk, A = 0.73, h = 0, d = 0))
+(QB_cisco = getQB(Wasympt = 3.6, Tk=Tk, A = , h = 0, d = 0))
+(QB_whitefish = getQB(Wasympt = 19, Tk=Tk, A = , h = 0, d = 0))
+(QB_trout_perch = getQB(Wasympt = .058, Tk=Tk, A = , h = 0, d = 0))
+(QB_alewife = getQB(Wasympt = 0.2, Tk=Tk, A = , h = 0, d = 0))
+(QB_smelt = getQB(Wasympt = 0.363, Tk=Tk, A = , h = 0, d = 0))
+(QB_sculpin = getQB(Wasympt = 0.029, Tk=Tk, A = , h = 0, d = 0))
+
+QB_fish <- data.frame("sea_lamprey"= c(QB_sea_lamprey),
+            "lake_trout_ad" = QB_lake_trout_ad,
+            "lake_trout_juv" = QB_lake_trout_juv,
+            "atlantic_salmon"= QB_atlantic_salmon,
+            "burbot" = QB_burbot,
+            "cisco" = QB_cisco,
+            "whitefish" = QB_whitefish,
+            "trout_perch"= QB_trout_perch,
+            "alewife"=QB_alewife,
+            "smelt"=QB_smelt,
+            "sculpin"=QB_sculpin)
+
+if(!R_U_KNITTING) write.table(QB_fish, file=paste0(getpath4data(),"EwE_params/QB_fish.txt"), sep="\t")
+
+```
+
+
 
