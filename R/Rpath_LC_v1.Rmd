@@ -20,13 +20,13 @@ fontsize: 11pt
 knitr::opts_chunk$set(
   comment = '#>',
   collapse = T)
-devtools::install_github("NOAA-EDAB/Rpath", dependencies = T)
-devtools::install_github('NOAA-EDAB/Rpath', build_vignettes = TRUE)
+#devtools::install_github("NOAA-EDAB/Rpath", dependencies = T)
+#devtools::install_github('NOAA-EDAB/Rpath', build_vignettes = TRUE)
 library(Rpath); library(data.table)
 ```
 
 # General documentation about Rpath
-_Copied from <a href="https://rdrr.io/github/NOAA-EDAB/Rpath/f/vignettes/Rpath.Rmd"> here</a>, I don't know how stable the link is._
+_Copied from <a href="https://rdrr.io/github/NOAA-EDAB/Rpath/f/vignettes/Rpath.Rmd"> here</a>, because I don't know how stable the link is._
 <br>
 Rpath is an implementation of the ecosystem model Ecopath with Ecosim (EwE; Christensen and Pauly 1992^[Christensen and Pauly. 1992. ECOPATH II - a software for balancing steady-state models and calculating network characteristics. Ecological Modelling 61:169-85], Walters et al. 1997^[Walters et al. 1997. Structuring dynamic models of exploited ecosystems from trophic mass-balance assessments. Reviews of Fish Biology and Fisheries 7:1-34]). This vignette describes some of the basic functionality of the package using a fictional ecosystem, R Ecosystem. Any resemblance to an actual ecosystem is purely coincidental. To see the underlying mathematics please refer to Lucey et al. (in prep^[Lucey et al. in prep. Improving the EBFM toolbox with an alternative open source version of Ecopath with Ecosim]).
 
@@ -296,25 +296,263 @@ webplot(REco, fleets = T, highlight = 'AduRoundfish1')
 
 ### Parameter file generation
 
-```{r parameter file generation lake champlain}
-groups <- c('Sea Lamprey', 'Adult lake trout', 'Juvenile lake trout', 'Stocked lake trout', 'Atlantic salmon', 'Burbot', 'Walleye', 'Whitefish', 'Cisco', 'Smelt', 'Alewife', 'Trout-perch', 'Sculpin', 'Zoo predators', 'Mysis', 'Benthic invertebrates', 'Zoo grazers', 'Phytoplankton', 'Detritus')
+```{r parameter file generation lake champlain, echo=TRUE, message=FALSE, warning=FALSE}
+groups <- c('Sea Lamprey', 'Adult lake trout', 'Juvenile lake trout', 'Atlantic salmon', 'Burbot', 'Walleye', 'Whitefish', 'Cisco', 'Smelt', 'Alewife', 'Trout-perch', 'Sculpin', 'Zoo predators', 'Mysis', 'Benthic invertebrates', 'Zoo grazers', 'Phytoplankton', 'Detritus','Fleet1')
 # type 1= primary producer
 # type 2= detritus
 # type 3= fleet
 # type 0= consumer (the rest)
-types  <- c(rep(0, length(groups)-2), 1, 2)
+types  <- c(rep(0, length(groups)-3), 1, 2,3)
 
-stgroups <- c(rep(NA, 1), rep('LakeTrout', 3), rep(NA, 15))
+stgroups <- c(rep(NA, 1), rep('LakeTrout', 2), rep(NA, 15),NA)
 
-#REco.params <- create.rpath.params(group = groups, type = types, stgroup = stgroups)
+REco.params.LC <- create.rpath.params(group = groups, type = types, stgroup = stgroups)
 ```
+
+Below is the data frame we're going to populate.
+
+```{r echo=FALSE}
+knitr::kable(REco.params.LC$model, caption = 'Model list created using the `create.rpath.param` function')
+```
+
 
 ### Model parameters
-Not run at the moment -- still need to get Rpath first.
 
-```{r eval=FALSE, include=TRUE}
-knitr::kable(REco.params$model, caption = 'Example of the model list created using the `create.rpath.param` function')
+#### Biomass
+
+```{r}
+M_fish <- read.delim(paste0(getpath4data(),"EwE_params/M_fish.txt"))
+
+
+REco.params.LC$model[Group %in% c('Sea Lamprey'), Biomass := M_fish$sea_lamprey]
+REco.params.LC$model[Group %in% c('Adult lake trout'), Biomass := M_fish$lake_trout_ad]
+REco.params.LC$model[Group %in% c('Juvenile lake trout'), PBiomassB := M_fish$lake_trout_juv]
+REco.params.LC$model[Group %in% c('Atlantic salmon'), Biomass := M_fish$atlantic_salmon]
+REco.params.LC$model[Group %in% c('Burbot'), Biomass := M_fish$burbot]
+REco.params.LC$model[Group %in% c('Walleye'), Biomass := M_fish$walleye]
+REco.params.LC$model[Group %in% c('Whitefish'), Biomass := M_fish$whitefish]
+REco.params.LC$model[Group %in% c('Cisco'), Biomass := M_fish$cisco]
+REco.params.LC$model[Group %in% c('Smelt'), Biomass := M_fish$smelt]
+REco.params.LC$model[Group %in% c('Alewife'), Biomass := M_fish$alewife]
+REco.params.LC$model[Group %in% c('Trout-perch'), Biomass := M_fish$trout_perch]
+REco.params.LC$model[Group %in% c('Sculpin'), Biomass := M_fish$sculpin]
+REco.params.LC$model[Group %in% c('Benthic invertebrates'), Biomass := 3]
+REco.params.LC$model[Group %in% c('Zoo predators'), Biomass := 13]
+REco.params.LC$model[Group %in% c('Zoo grazers'), Biomass := 13]
+REco.params.LC$model[Group %in% c('Mysis'), Biomass := 3]
+REco.params.LC$model[Group %in% c('Phytoplankton'), Biomass := 300]
+
 ```
 
 
+#### P/B
+
+```{r}
+M_fish <- read.delim(paste0(getpath4data(),"EwE_params/M_fish.txt"))
+
+
+REco.params.LC$model[Group %in% c('Sea Lamprey'), PB := M_fish$sea_lamprey]
+REco.params.LC$model[Group %in% c('Adult lake trout'), PB := M_fish$lake_trout_ad]
+REco.params.LC$model[Group %in% c('Juvenile lake trout'), PB := M_fish$lake_trout_juv]
+REco.params.LC$model[Group %in% c('Atlantic salmon'), PB := M_fish$atlantic_salmon]
+REco.params.LC$model[Group %in% c('Burbot'), PB := M_fish$burbot]
+REco.params.LC$model[Group %in% c('Walleye'), PB := M_fish$walleye]
+REco.params.LC$model[Group %in% c('Whitefish'), PB := M_fish$whitefish]
+REco.params.LC$model[Group %in% c('Cisco'), PB := M_fish$cisco]
+REco.params.LC$model[Group %in% c('Smelt'), PB := M_fish$smelt]
+REco.params.LC$model[Group %in% c('Alewife'), PB := M_fish$alewife]
+REco.params.LC$model[Group %in% c('Trout-perch'), PB := M_fish$trout_perch]
+REco.params.LC$model[Group %in% c('Sculpin'), PB := M_fish$sculpin]
+REco.params.LC$model[Group %in% c('Benthic invertebrates'), PB := 3]
+REco.params.LC$model[Group %in% c('Zoo predators'), PB := 13]
+REco.params.LC$model[Group %in% c('Zoo grazers'), PB := 13]
+REco.params.LC$model[Group %in% c('Mysis'), PB := 3]
+REco.params.LC$model[Group %in% c('Phytoplankton'), PB := 300]
+
+```
+
+#### Q/B
+
+```{r}
+QB_fish <- read.delim(paste0(getpath4data(),"EwE_params/QB_fish.txt"))
+
+
+REco.params.LC$model[Group %in% c('Sea Lamprey'), QB := QB_fish$sea_lamprey]
+REco.params.LC$model[Group %in% c('Adult lake trout'), QB := QB_fish$lake_trout_ad]
+REco.params.LC$model[Group %in% c('Juvenile lake trout'), QB := QB_fish$lake_trout_juv]
+REco.params.LC$model[Group %in% c('Atlantic salmon'), QB := QB_fish$atlantic_salmon]
+REco.params.LC$model[Group %in% c('Burbot'), QB := QB_fish$burbot]
+REco.params.LC$model[Group %in% c('Walleye'), QB := QB_fish$walleye]
+REco.params.LC$model[Group %in% c('Whitefish'), QB := QB_fish$whitefish]
+REco.params.LC$model[Group %in% c('Cisco'), QB := QB_fish$cisco]
+REco.params.LC$model[Group %in% c('Smelt'), QB := QB_fish$smelt]
+REco.params.LC$model[Group %in% c('Alewife'), QB := QB_fish$alewife]
+REco.params.LC$model[Group %in% c('Trout-perch'), QB := QB_fish$trout_perch]
+REco.params.LC$model[Group %in% c('Sculpin'), QB := QB_fish$sculpin]
+REco.params.LC$model[Group %in% c('Benthic invertebrates'), QB := 13]
+REco.params.LC$model[Group %in% c('Zoo predators'), QB := 200]
+REco.params.LC$model[Group %in% c('Zoo grazers'), QB := 365]
+REco.params.LC$model[Group %in% c('Mysis'), QB := 20]
+
+```
+
+#### EE
+
+```{r}
+QB_fish <- read.delim(paste0(getpath4data(),"EwE_params/QB_fish.txt"))
+
+
+REco.params.LC$model$EE <- rep(0.8, length(REco.params.LC$model$EE))
+
+```
+
+
+#### Fisheries
+No fisheries, but it seems that the model needs to have at least one fleet?
+```{r}
+# Landing
+REco.params.LC$model[, Fleet1 := rep(0, nrow(REco.params.LC$model))]
+
+```
+
+
+#### Stanza parameters
+
+We need to populate the stanza list. This is actually a list itself containing 3 things: the number of stanza groups, stanza group parameters, and individual stanza parameters. The number of stanzas is automatically populated. For stanza groups, we need their von Bertalanffy growth function specialized K and weight at 50% maturity divided by their weight infinity (relative weight at maturity). Individual stanzas need the first and last month the species is in the stanza, the total mortality (Z) on the stanza, and whether or not it is the leading stanza.
+
+```{r stanzas data}
+REco.params.LC$stanzas$stgroups
+REco.params.LC$stanzas$stindiv
+REco.params.LC$stanzas$NStanzaGroups
+```
+
+
+```{r populate stanzas data}
+#Group parameters
+REco.params.LC$stanzas$stgroups[, VBGF_Ksp := c(0.05)]
+W_lt_at_maturity <- 10^(-5.519 + log10(45) * 3.17882)
+REco.params.LC$stanzas$stgroups[, Wmat     := c(1.2/32)] # weight at maturity / max weight? 
+
+#Individual stanza parameters
+REco.params.LC$stanzas$stindiv[, First   := c(0,24)]
+REco.params.LC$stanzas$stindiv[,  Last    := c(23,400)]
+REco.params.LC$stanzas$stindiv[,  Z       := c(M_fish$lake_trout_juv,
+                                               M_fish$lake_trout_ad)]
+REco.params.LC$stanzas$stindiv[,  Leading := c(FALSE, TRUE)]
+
+
+```
+
+
+```{r rebuild the eco param table}
+
+REco.params.LC <- rpath.stanzas(REco.params.LC)
+
+```
+
+
+```{r}
+stanzaplot(REco.params.LC, StanzaGroup = 1)
+# black: pop biomass
+# green: number
+# blue: individual weight
+# red: stanza separation
+```
+
+#### Diet parameters
+
+The data entered in the diet list is the same as the data entered in the diet composition tab in EwE. Just as within EwE, the columns represent the predators while the rows represent the prey. Individual diet components can be adjusted by specifying the prey in the ‘Group’ variable and assigning a value to the predator. For example, if I want to assign 10% of the lake trout diet as ‘smelt’, I would write:
+
+```REco.params.LC$diet[Group == 'Smelt', 'Adult lake trout' := 0.1]```
+
+```{r}
+# Sea Lamprey diet
+REco.params.LC$diet[Group == 'Adult lake trout', 'Sea Lamprey' := 0.4]
+REco.params.LC$diet[Group == 'Atlantic salmon', 'Sea Lamprey' := 0.4]
+REco.params.LC$diet[Group == 'Burbot', 'Sea Lamprey' := 0.1]
+REco.params.LC$diet[Group == 'Walleye', 'Sea Lamprey' := 0.05]
+REco.params.LC$diet[Group == 'Whitefish', 'Sea Lamprey' := 0.05]
+
+# Adult lake trout
+REco.params.LC$diet[Group == 'Alewife', 'Adult lake trout' := 0.65]
+REco.params.LC$diet[Group == 'Smelt', 'Adult lake trout' := 0.25]
+REco.params.LC$diet[Group == 'Sculpin', 'Adult lake trout' := 0.1]
+
+# Juvenile lake trout
+REco.params.LC$diet[Group == 'Alewife', 'Juvenile lake trout' := 0.2]
+REco.params.LC$diet[Group == 'Smelt', 'Juvenile lake trout' := 0.2]
+REco.params.LC$diet[Group == 'Sculpin', 'Juvenile lake trout' := 0.2]
+REco.params.LC$diet[Group == 'Mysis', 'Juvenile lake trout' := 0.3]
+REco.params.LC$diet[Group == 'Zoo predators', 'Juvenile lake trout' := 0.05]
+REco.params.LC$diet[Group == 'Zoo grazers', 'Juvenile lake trout' := 0.05]
+
+# Atlantic salmon
+REco.params.LC$diet[Group == 'Alewife', 'Atlantic salmon' := 0.5]
+REco.params.LC$diet[Group == 'Smelt', 'Atlantic salmon' := 0.5]
+
+# Burbot
+REco.params.LC$diet[Group == 'Smelt', 'Burbot' := 0.3]
+REco.params.LC$diet[Group == 'Sculpin', 'Burbot' := 0.2]
+REco.params.LC$diet[Group == 'Benthic invertebrates', 'Burbot' := 0.5]
+
+# Walleye
+REco.params.LC$diet[Group == 'Smelt', 'Walleye' := 0.75]
+REco.params.LC$diet[Group == 'Zoo predators', 'Walleye' := 0.1]
+REco.params.LC$diet[Group == 'Zoo grazers', 'Walleye' := 0.15]
+
+# Whitefish
+REco.params.LC$diet[Group == 'Smelt', 'Whitefish' := 0.2]
+REco.params.LC$diet[Group == 'Zoo predators', 'Whitefish' := 0.3]
+REco.params.LC$diet[Group == 'Benthic invertebrates', 'Whitefish' := 0.5]
+
+# Cisco
+REco.params.LC$diet[Group == 'Smelt', 'Cisco' := 0.3]
+REco.params.LC$diet[Group == 'Alewife', 'Cisco' := 0.3]
+REco.params.LC$diet[Group == 'Zoo predators', 'Cisco' := 0.2]
+REco.params.LC$diet[Group == 'Benthic invertebrates', 'Cisco' := 0.2]
+
+# Smelt
+REco.params.LC$diet[Group == 'Zoo grazers', 'Smelt' := 0.7]
+REco.params.LC$diet[Group == 'Zoo predators', 'Smelt' := 0.3]
+
+# Alewife
+REco.params.LC$diet[Group == 'Zoo grazers', 'Alewife' := 0.7]
+REco.params.LC$diet[Group == 'Zoo predators', 'Alewife' := 0.3]
+
+# Trout-perch
+REco.params.LC$diet[Group == 'Benthic invertebrates', 'Trout-perch' := 0.3]
+REco.params.LC$diet[Group == 'Zoo predators', 'Trout-perch' := 0.4]
+REco.params.LC$diet[Group == 'Zoo grazers', 'Trout-perch' := 0.3]
+
+# Sculpin
+REco.params.LC$diet[Group == 'Mysis', 'Alewife' := 0.5]
+REco.params.LC$diet[Group == 'Benthic invertebrates', 'Alewife' := 0.5]
+
+# Zoo predators
+REco.params.LC$diet[Group == 'Zoo grazers', 'Zoo predators' := 1]
+
+# Mysis
+REco.params.LC$diet[Group == 'Zoo predators', 'Mysis' := 0.1]
+REco.params.LC$diet[Group == 'Zoo grazers', 'Mysis' := 0.2]
+REco.params.LC$diet[Group == 'Phytoplankton', 'Mysis' := 0.2]
+REco.params.LC$diet[Group == 'Mysis', 'Mysis' := 0.1]
+REco.params.LC$diet[Group == 'Detritus', 'Mysis' := 0.4]
+
+# Benthic invertebrates
+REco.params.LC$diet[Group == 'Phytoplankton', 'Benthic invertebrates' := 1]
+
+# Zoo grazers
+REco.params.LC$diet[Group == 'Phytoplankton', 'Zoo grazers' := 1]
+
+
+
+```
+
+
+### Run ecopath
+
+```{r}
+REco <- rpath(REco.params.LC, eco.name = 'Lake Champlain')
+REco
+```
 
