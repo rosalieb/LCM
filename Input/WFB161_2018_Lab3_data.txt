@@ -1,0 +1,1 @@
+Trawl	Trawl 1	Trawl 2	Trawl 3	Trawl 4	Trawl 5	Trawl 6	Trawl 7	Trawl 8Trout perch	312	242	545	124	376	164	291	165Rainbow smelt	14	9	4	2	9	9	23	77Alewife	0	0	0	1	0	31	3	3Slimy sculpin	0	0	1	0	0	5	13	5Lamprey	0	0	0	1	0	2	1	2Lake trout	3	12	5	7	11	14	27	17Tesselated darter	1	0	0	1	0	0	0	0
