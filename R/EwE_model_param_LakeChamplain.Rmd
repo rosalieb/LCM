@@ -1,19 +1,23 @@
 ---
 title: "Model parameter EwE Lake Champlain"
 author: "Rosalie Bruel"
-date: "11/07/2019"
-output: 
+date: "created on 2019-07-11 -- last update: `r Sys.Date()`"
+output:
   html_document:
     df_print: paged
-    fig_caption: true
+    fig_caption: yes
+    number_sections: yes
     toc: yes
     toc_depth: 3
-    toc_float: true
-    number_sections: true
-editor_options: 
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+fontsize: 11pt
+editor_options:
   chunk_output_type: console
   df_print: paged
-fontsize: 11pt
+always_allow_html: yes
 ---
 
 _Last update: `r Sys.Date()`_
@@ -21,6 +25,12 @@ _Last update: `r Sys.Date()`_
 ```{r setup, include=FALSE}
 knitr::opts_knit$set(root.dir = dirname(getwd()))
 knitr::opts_chunk$set(echo = TRUE)
+# tmp <- lessismore(packages = .packages(), path2file = "R/EwE_model_param_LakeChamplain.Rmd", plot_output = T)
+# cat(tmp$summary)
+# tmp$functions_non_matched
+# tmp$packages_used
+# tmp$packages_non_used
+# tmp$summary_functions_plot
 library(ggplot2)
 library(plotly)
 library(plyr) #for ddply
@@ -45,6 +55,9 @@ library(ggraph) # for nodes plot
 library(igraph) # probably better for nodes graph because can also assign weigth
 library(tidygraph) # to transform dataframe in node datasets
 library(scales) # Get full number in x/y scales with scale_x_continuous(labels = comma)/scale_y_continuous(labels = comma) instead of 1.00e09 for example
+library(concurve) # plot p-value and s-value, see recommandations in Chow and Sander, 2019
+library(psych) # for pairs-panels (scaterplot matrix)
+
 
 # Captions with library captioner
 # https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
@@ -55,6 +68,13 @@ tab_cap <- captioner::captioner("Table")
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
   if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+    if(Sys.getenv("USER")=="YOUR USER NAME") return("YOUR PATH")
   if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
 }
 
@@ -102,7 +122,7 @@ ggraph(graph, "grid") +
 ```
 <br>`r fig_cap("node plot1", caption="Lake Champlain food web – species of interest")`
 
-```{r plot food web with igraph}
+```{r plot food web with igraph, echo=FALSE, message=FALSE, warning=FALSE}
 ewediet <- read.delim(paste0(getpath4data(),"EwE_params/EwE_diet.txt"))
 colnames(ewediet)[-c(1:2)] <- as.character(ewediet$predator[1:c(ncol(ewediet)-2)])
 rownames(ewediet) <- as.character(ewediet$predator)
@@ -151,6 +171,7 @@ E(net)$width <- as.numeric(paste(E(net)$weight))*10
 # mylayout should have 2 columns, x and y, and number of rows of the number of groups: length(V(net)$name) == 18
 
 mylayout <- ewediet_nodes %>% mutate(
+  # x positionning 
   x = case_when(id == "Sea lamprey"      ~ 0,
                 id == "Adult lake trout" ~ 0,
                 id == "Atlantic salmon"  ~ 2,
@@ -169,6 +190,7 @@ mylayout <- ewediet_nodes %>% mutate(
                 id == "Zooplankton (grazers)"      ~ 0,
                 id == "Phytoplankton"    ~ -2,
                 id == "Detritus"         ~ 0),
+  # Label positioning (1= bottom, 2=left, 3=top, 4= right) 
   x2 = case_when(id == "Sea lamprey"     ~ 3,
                 id == "Adult lake trout" ~ 3,
                 id == "Atlantic salmon"  ~ 3,
@@ -195,14 +217,14 @@ E(net)$label <- NA
 V(net)$label <- paste0(ewediet_nodes$id,"\n")
 V(net)$label <- NA
 
-pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_interaction4.pdf"),width = 8, height = 8)
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_interaction4.pdf"),width = 8, height = 8)
 par(mar=c(0,4,0,7))
 plot.igraph(net,edge.color=adjustcolor(edge.col,alpha.f = .8), edge.curved=.1,
                   layout=-as.matrix(mylayout)[,1:2])
 par(xpd=T)
 TeachingDemos::shadowtext(-norm_coords(mylayout[,1:2], -1, 1, -1, 1), label=ewediet_nodes$id,pos=mylayout[,3], offset=1.3, col="black",bg = "white",  theta = (1:8/4)*pi, r1 = 0.06, r2 = 0.04)
 par(xpd=F)
-dev.off()
+if(!R_U_KNITTING) dev.off()
 
 ```
 
@@ -213,6 +235,7 @@ For the Lake Champlain monitoring data, I'm using the data I processed for the S
 dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step4.txt"))
 names(dtlcm)
 dtlcm$Year <- as.numeric(paste(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))))
+
 ```
 
 
@@ -298,6 +321,8 @@ I'm calculating the depth of the euphotic zone based on the secchi depth.
 __Data__:  
 * Long-term monitoring dataset
 
+`r fig_cap("secchi", caption = "Secchi depths across all sites and years", display=FALSE)`
+
 The secchi depth across all sites and years is ploted below (`r fig_cap("secchi", display="cite")`).
 
 ```{r get secchi depth from LTM, echo=FALSE, message=FALSE, warning=FALSE}
@@ -310,7 +335,7 @@ secchi_depth_p <- dtlcm %>% ggplot(mapping = aes(x = as.factor(StationID), y = -
   scale_fill_discrete(name = "Stations")
 secchi_depth_p
 ```
-<br>`r fig_cap("secchi", caption = "Secchi depths across all sites and years")`
+<br> `r fig_cap("secchi", display="full")`
 
 It would seems like years 2000 have generally deeper secchi depths. There's also some kind of oscillations: ± 2 m in secchi depth. Teleconnections with some ocean cycles?
 ```{r plot secchi depth per sites with facet wrap, echo=FALSE, message=FALSE, warning=FALSE}
@@ -342,6 +367,26 @@ dtlcm_secchi_summ <- as.data.frame(
   with(dtlcm_secchi, tapply(dtlcm_secchi$Secchi.Depth
   ,list("Year"=as.factor(Year),"StationID"=as.factor(StationID)), mean, na.rm=T))
   )
+
+pairs.panels(cbind(as.numeric(paste(rownames(dtlcm_secchi_summ))),dtlcm_secchi_summ[,c("2","4","7","9")]), 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+pairs.panels(cbind(as.numeric(paste(rownames(dtlcm_secchi_summ))),dtlcm_secchi_summ[,c("16","21","19","25","33","36","46")]), 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+pairs.panels(cbind(as.numeric(paste(rownames(dtlcm_secchi_summ))),dtlcm_secchi_summ[,c("34","40","50","51")]), 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+
 dtlcm_secchi_summ2 <- data.frame(melt(dtlcm_secchi_summ), "Year"=as.numeric(paste(rep(rownames(dtlcm_secchi_summ), times=ncol(dtlcm_secchi_summ)))))
 
 dtlcm_secchi_summ2$meiv_summer <- rep(NA, nrow(dtlcm_secchi_summ2))
@@ -355,6 +400,9 @@ for (i in min(dtlcm_secchi_summ2$Year):max(dtlcm_secchi_summ2$Year)) {
 # dtlcm_secchi <- dtlcm_secchi %>%
 #   mutate(meiv = case_when(VisitDate == 2000 ~ rowMeans(meiv[,-1])[meiv$YEAR==2000]))
 
+```
+
+```{r plot meiv index with secchi, echo=FALSE, message=FALSE, warning=FALSE}
 p1 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=meiv_summer, y=value, col=Year)) +
   geom_point() + stat_smooth(method = "lm") +
   #geom_point(aes(x=meiv_min, y=value, col="min meiv"))+
@@ -366,7 +414,6 @@ p2 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=meiv_winte
   facet_wrap(~as.factor(variable)) + ggtitle("Winter ENSO index (legacy)")
 
 grid.arrange(p1,p2,nrow=1)
-
 ```
 <br>`r fig_cap("secchi3", caption = "Secchi depth against Multivariate ENSO Index for each monitoring station.")`
 
@@ -393,6 +440,147 @@ p4 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=amo_winter
 
 grid.arrange(p3,p4,nrow=1)
 ```
+<br>`r fig_cap("secchi4", caption = "Secchi depth against AMO (summer and winter).")`
+
+```{r}
+head(dtlcm_secchi_summ2)
+library(mgcv)
+gam1 <- gam(value ~ s(meiv_summer) + variable, data=dtlcm_secchi_summ2)
+summary(gam1)
+plot(gam1);abline(h=0,lty=2)
+gam2 <- gam(value ~ s(meiv_winter) + variable, data=dtlcm_secchi_summ2)
+summary(gam2)
+plot(gam2)
+gam3 <- gam(value ~ s(amo_winter) + variable, data=dtlcm_secchi_summ2)
+summary(gam3)
+plot(gam3)
+gam4 <- gam(value ~ s(amo_winter) + variable, data=dtlcm_secchi_summ2)
+summary(gam4)
+plot(gam4)
+# Alternatively, we could fit a smoother to each station, as below
+gam5 <- gam(value ~ s(meiv_summer, by = as.numeric(variable==2)) +
+              s(meiv_summer, by = as.numeric(variable==4)) +
+              s(meiv_summer, by = as.numeric(variable==7)) +
+              s(meiv_summer, by = as.numeric(variable==9)) +
+              s(meiv_summer, by = as.numeric(variable==16)) +
+              s(meiv_summer, by = as.numeric(variable==19)) +
+              s(meiv_summer, by = as.numeric(variable==21)) +
+              s(meiv_summer, by = as.numeric(variable==25)) +
+              s(meiv_summer, by = as.numeric(variable==33)) +
+              s(meiv_summer, by = as.numeric(variable==34)) +
+              s(meiv_summer, by = as.numeric(variable==36)) +
+              s(meiv_summer, by = as.numeric(variable==40)) +
+              s(meiv_summer, by = as.numeric(variable==46)) +
+              s(meiv_summer, by = as.numeric(variable==50)) +
+              s(meiv_summer, by = as.numeric(variable==51)), data=dtlcm_secchi_summ2)
+summary(gam5)
+# Good R2, but looking at the plot, there is no crossing of the intercept, except for 9 and 46.
+#plot(gam5)
+```
+
+With GLS:
+
+Residuals are not normally distributed.
+
+```{r}
+library(nlme)
+M0 <- gls(value ~ amo_winter + variable + Year, data=dtlcm_secchi_summ2, na.action = na.omit)
+summary(M0)
+
+#plot the standardized residuals vs. fitted
+plot(M0)
+
+```
+
+
+**Compound symmetry** covariance matrix assumes that whatever the distance in time between two observations, their residual correaltion is the same (i.e., it doesn't change with increasing/decreasing time between observations). Constant covariance.
++ Often too simplistic for time series data.
+```{r}
+
+M1<-gls(value ~ amo_winter + variable + Year, na.action = na.omit, correlation = corCompSymm(form=~Year|variable), data=dtlcm_secchi_summ2)
+
+
+#look at the model output
+summary(M1)
+```
+
+**AR1: Auto-regressive model of order 1** Models the residual at time s as a function of the residual of time s-1 along with noise.
+
+The parameter for this correlation function, $\rho$, is unknown and has to be estimated from the data. The further away two residuals are separated in time, the lower their correlation. 
+```{r}
+#fit the model with AR-1 correlation function, corAR1
+M2<-gls(value ~ amo_winter + variable + Year, na.action = na.omit, correlation = corAR1(form=~Year|variable), data=dtlcm_secchi_summ2)
+
+#look at the output
+summary(M2)
+#the parameter estimate is much higher. Residuals separated by one year have a correlation of 0.31. Residuals separated by two years have a correlation of 0.31^2=.10. Residuals separated by two years have a correlation of 0.77^3=.02, etc. 
+
+#compare the three models with AIC
+AIC(M0,M1,M2)
+
+```
+
+**ARMA Error Structures**
+More complex structures based on the AR-1, using an auto-regressive moving average (ARMA) model for residuals. ARMA has two parameters defining it's order: the number of auto-regressive parameters (p) and the number of moving average parameters (q). So, ARMA(1,0) refers to AR-1. 
+
+Realize that the p and q parameters have to be estimated from the data - using values of p or q larger than 2 or 3 tend to give error messages related to convergence problems (i.e., the larger p and/or q are, the more parameters there will be to estimate, which can give you convergence problems). 
+
+```{r}
+#here, we'll define a bunch of ARMA(p,q) structures
+#Zuur says that it's kind of a black box. We're starting with these values, but we don't really know why.
+cs1 <- corARMA(c(0.2), p = 1, q = 0) #0.2 is a chosen starting value for p
+cs2 <- corARMA(c(0.3, -0.3), p = 2, q = 0) #0.3 and -0.3 are chosen starting values for 2 p's 
+cs3 <- corARMA(c(0.3, -0.3, -0.3), p = 3, q = 0) #starting values for 3 p's
+
+#fit models using all of the correlation structures above
+M3arma1<-gls(value ~ amo_winter + variable + Year, correlation = cs1, na.action = na.omit, data=dtlcm_secchi_summ2) #equivalent to AR1
+M3arma2<-gls(value ~ amo_winter + variable + Year, correlation = cs2, na.action = na.omit, data=dtlcm_secchi_summ2)
+
+
+M3arma3<-gls(value ~ amo_winter + variable + Year,na.action=na.omit,
+            correlation=cs3,data=dtlcm_secchi_summ2)
+
+AIC(M0,M1,M2,M3arma1,M3arma2,M3arma3)
+
+
+```
+
+These models are not all nested, so we need to compare them using AIC (we cannot use likelihood ratio tests).
+Model below not working (no convergence).
+
+```{r}
+BM1<-gamm(value ~ amo_winter +  variable + s(Year, by=variable),
+          weights = varIdent(form = ~1|variable), data=dtlcm_secchi_summ2)
+```
+
+The `varIdent(form=~1|variable)` should in theory allows each time series (i.e., each station) to have a different variance. The `s(Year, by=variable)` is here to ensure that the smoother is applied over each station's time series.
+
+The problem with this model is that the p-values assume independence, and because thet data are time series, this assumption may be violated. Adding an AR-1 residual auto-correlation structure can help with that.
+
+```{r}
+
+#fit the same model with AR-1 temporal correlation
+BM2<-gamm(value ~ s(amo_winter) + variable,
+          correlation = corAR1(form=~Year|variable),
+          data=dtlcm_secchi_summ2)
+
+
+
+#Use AIC to compare the two models
+#AIC(BM1$lme,BM2$lme)
+#look at output for the best model
+summary(BM2$gam)
+summary(BM2$lme)
+
+anova(BM2$gam)
+
+plot(BM2$gam)
+
+
+
+```
+
+The `anova()` output is the most straightforward. Only the Oahu time series have signifcant long-term trends and rainfall effects. The Maui time series are only affected by rainfall. 
 
 
 ## Setting the euphotic zone
@@ -619,7 +807,10 @@ head(mysis)
 Mysis data are available from `r paste(min(mysis$Year),"to",max(mysis$Year))`, usually from months `r paste(min(month(mysis$Date)),"to",max(month(mysis$Date)))`, for `r length(unique(mysis$Station))` (`r paste(unique(mysis$Station),sep="", collapse=", ")`).
 
 Lake Champlain Mysid net tows = 0.5 m net, whole water column tows. 
-To calculate the net area, we use the formula for the volume of a cylinder: $V = r^2 * \pi $
+To calculate the net area, we use the formula for the volume of a cylinder:<br>
+
+$V = r^2 * \pi $
+<br>
 
 ```{r get net area fo mysis tow}
 diameter_tow = 0.5
@@ -735,7 +926,11 @@ with (data=mysis_summ
       , expr = errbar(Year,mean_w,mean_w+sd_w/2,mean_w-sd_w/2, pch=16, cap=.01, xlab="Year",ylab="mean biomass (mg mysis/m2)", cex=.8)
         )
 ```
-`r fig_cap("mysis biomass 1", caption="Average (and sd) mysis biomass per year")`
+<br>`r fig_cap("mysis biomass 1", caption="Average (and sd) mysis biomass per year")`
+
+## Get biomass in t/km2
+1 g.m<sup>-2</sup> = 1,000,000 t.m<sup>-2</sup> = 1,000,000/1e-6 t.km<sup>-2</sup> = 1t.km<sup>-2</sup> 
+
 
 # Benthic invertebrates
 
@@ -753,7 +948,7 @@ Zebra mussels in Lake Champlain continued to reproduce and settle successfully d
 "
 
 __Other resources:__ <br
-  * <a href="https://dec.vermont.gov/sites/dec/files/wsm/lakes/images/lp_zm-sitemap.gif">Map of sampling locations<a>
+<a href="https://dec.vermont.gov/sites/dec/files/wsm/lakes/images/lp_zm-sitemap.gif">Map of sampling locations</a>
   
 __STA19__ in the veligers dataset is the station in the Main Lake. I'm going to extract these density to start with (veligers/m3)
 
@@ -1388,6 +1583,22 @@ The relationship is not linear without log-transforming the data. Here, we have 
 
 ```{r summary model smelt W ~ L, message = FALSE, warning = FALSE}
 summary(lm1)
+# test the concurve package
+# randomframe <- curve_gen(lm1, "logL")
+# tibble::tibble(randomframe)
+# ggconcurve(type = "consonance", randomframe)
+
+# Try a model with a random distribution to see how the range of values vary
+# smelt2 <- smelt
+# smelt2$logL <- smelt$logL+rep(1:10,length.out = nrow(smelt))
+# lm2 <- lm(logW~logL,data = smelt2)
+# fitPlot(lm2,xlab="Log Total Length (mm)", ylab = "Log Weight (g)", main="")
+# randomframe2 <- curve_gen(lm2, "logL")
+# summary(lm2)
+# randomframe2 <- curve_gen(lm1, "logL")
+# ggconcurve(type = "consonance", randomframe2)
+
+
 ```
 
 ### Test whether rainbow smelt exhibit isometric or allometric growth
@@ -1706,8 +1917,15 @@ with(LTcond, tapply(rep(1,nrow(LTcond)),list("Year#"=Year, "Site"=Local), sum))
 
 ```
 
-## Read and explore effort data
+## Simple approach: estimate biomass from number of juveniles stocked
 
+```{r}
+n_lt_stocked = 85000 #number lake trout stocked
+w_lt_juv     = 1     #weight juvenile lake trout in g
+```
+
+
+## Read and explore effort data
 
 First, import the data. They are all kept in different files, so that need to be processed a little bit.  
 ```{r read data effort LT, include=FALSE}
@@ -1804,7 +2022,7 @@ panel.background = element_blank(), axis.line = element_line(colour = "black")) 
 ```
 
 ## Map trips
-```{r map trip LT, message=FALSE, warning=FALSE, include=FALSE}
+```{r map trip LT, message=FALSE, warning=FALSE, include=FALSE, cache=TRUE}
 bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
 lcgroupmap=c("lake",rep("island", 84562))
 bathy2 <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
@@ -2665,16 +2883,21 @@ ggplotly(barplot_MainLake)
 
 # Lamprey
 
+Note: some data are available in FSAdata -- SLampreyGL: Stock and recruitment data for Sea Lamprey in the Great Lakes, 1997-2007.
+
 ```{r read sea lamprey data, include=FALSE}
 trap <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_trapping_data.txt"))
 trap_annual_summ <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/annual_trapping_summary.txt"))
 wound <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/wounding_LAT_LAS.txt"))
 annual_survey <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_survey_data.txt"))
+annual_survey[,2] <- as.numeric(paste(annual_survey[,2]))
+annual_survey[,3] <- as.numeric(paste(annual_survey[,3]))
+annual_survey[,4] <- as.numeric(paste(annual_survey[,4]))
 ```
 
 ## Wounding 
 Lake Champlain salmonids presented a high rate of woundings which motivated the long-term sea lamprey control program, operated by VTFWS. The figure below shows the evolution of wounding per 100 fish.
-```{r}
+```{r wounding by sea lamprey, echo=FALSE, message=FALSE, warning=FALSE}
 p <- ggplot(melt(wound, id.vars='Year'), aes(Year, value, fill=variable)) +
   geom_bar(stat="identity", position=position_dodge()) + 
   geom_text(aes(label=value), vjust=1.6, hjust=c(rep(1.3,16), rep(-0.3,16)), color="black", size=2.7) + 
@@ -2694,28 +2917,86 @@ p +
 
 ## Management of sea lamprey population
 Work on trapping data.
-```{r working on trapping data}
+`r fig_cap("total catch vs. number surveys", "Total number of lamprey caught versus the total number of year surveyed. Note that sometimes sites with a same name were sampled twice a year (for example, Lewis Stream was sampled twice in 2005, 2009, 2013. Reach 1: Mouth to falls in North Ferrisburgh, Reach 2: falls to Scott Dam). The actual number of surveys may be higher.", display= FALSE)`
+
+```{r working on trapping data, echo=FALSE}
 trap$Date <- as.Date(trap$Date, format="%d-%b-%Y")
 summary(trap)
 
 trap_summ <- as.data.frame(with(trap, tapply(rep(1,nrow(trap)),list("Year"=Year, "River"=River), sum, na.rm=T)))
 
 
-trap_summ2 <- data.frame("Total.catch"=colSums(trap_summ,na.rm = T)[order(colSums(trap_summ,na.rm = T), decreasing = T)])
+trap_summ2 <- data.frame("Total.catch"=colSums(trap_summ,na.rm = T),
+                         "Number.surveys"=sapply(trap_summ, function(x) sum(!is.na(x))))
+trap_summ2 <- trap_summ2[order(trap_summ2$Total.catch, decreasing = TRUE),]
 
-ggplot(trap_summ2, aes(rownames(trap_summ2),Total.catch)) +
-  geom_bar(stat="identity", position=position_dodge()) + ylab("Number lamprey caught") + xlab("Stations")
+ggplot(trap_summ2, aes(rownames(trap_summ2),Total.catch, fill=trap_summ2$Number.surveys)) +
+  geom_bar(stat="identity", position=position_dodge()) +  labs(x="Stations", y="Number lamprey caught", fill = "Number of years surveyed") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="bottom",
+        panel.background = element_rect(fill = "white", colour = "grey50"))
 
 ```
+<br>`r fig_cap("total catch vs. number surveys", display="full")`
+
+
+Great Chazy river (NY) and Lewis stream (VT) are the two sites with the most lampreys `r fig_cap("total catch vs. number surveys", display="cite")`.
+
+```{r visualize total catch versus number of surveys}
+ggplot(trap_summ2, aes(Number.surveys, Total.catch)) + 
+  labs(x="Total number of years surveyed", y="Total number of lamprey caught") + 
+  geom_label(aes(Number.surveys, Total.catch), label=rownames(trap_summ2), nudge_y = -150,alpha=.8) + 
+  geom_point(alpha=.5) + 
+  theme_classic() 
+```
+<br>`r fig_cap("total catch vs. number surveys", display="full")`
+
+## Lamprey weigth-length relationship from trap data
+
+### Fit linear model
+```{r fit linear model sea lamprey}
+par(mar=c(5.1,4.1,4.1,4.1))
+hist(trap$length)
+trap$logL <- log10(trap$length/10)
+trap$logW <- log10(trap$weight)
+lm1 <- lm(logW~logL,data = trap)
+fitPlot(lm1,xlab="Log total length", ylab = "Log weight", main="")
+axis(3, at=log10(c(0:10,seq(10,90,10),seq(100,500,100))), labels = c(0:10,seq(10,90,10),seq(100,500,100)))
+mtext("Total length (cm)", side=3, line = 2.5)
+axis(4, at=log10(c(0:9,seq(10,100,10),seq(0,1000,100))), labels=c(0:9,seq(10,100,10),seq(0,1000,100)))
+mtext("Total weight (g)", side=4, line = 2.5)
+summary(lm1)
+```
+<br>`r fig_cap("lm w l relationship sea lamprey", caption="Weight-length relationship (log scale) for sea lamprey.")`
+
+### Conclusion a and b parameters
+To convert them to the initial equation W = aL<sup>b</sup>:  
+```{r conclusion a and b parameters for sea lamprey, message = FALSE, warning = FALSE}
+(a = 10^(lm1$coefficients[1]))
+(b = lm1$coefficients[2])
+```
+
+Therefore, the initial equation is W = 0.01726149 x L<sup>2.429350</sup>
 
 
 ## Survey data
 
 ```{r}
+head(annual_survey)
 
+ggplot(annual_survey, aes(year_surveyed, num_ammocoetes)) +
+  geom_bar(stat="identity", position=position_dodge()) +  labs(x="Stations", y="Number lamprey caught", fill = "Number of years surveyed") + facet_wrap(~river_trib_system) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="bottom",
+        panel.background = element_rect(fill = "white", colour = "grey50"))
 ```
+<br>`r fig_cap("num_ammocoetes per year", caption="Number of ammocoetes caught per year, and per sites")`
 
 
+## Get biomass for model
+
+The mortality between the ammocoetes and transformers stage is really high, so using the number of ammocoetes per streams may not be the best approach. 
+However, trapping of adults is really efficient (~95% said Ellen), so backtracking and estimating the number of individuals at the parasitoid stage. Sea lamprey will spend 12-18 months in the parasitoid stage.
+
+"Estimates of the lake-wide out-migrating transformer population for the 2002 and 2003 parasitic-phase cohorts were 269,139 ± 55,610 (SD) and 111,807 ± 23,511 (SD)" (Howe et al, 2006^[Howe, E.A., Ellen Marsden, J., Bouffard, W., 2006. Movement of Sea Lamprey in the Lake Champlain Basin. Journal of Great Lakes Research 32, 776–787. https://doi.org/10.3394/0380-1330(2006)32[776:MOSLIT]2.0.CO;2]).
 
 # Stocking
 
@@ -3224,23 +3505,27 @@ getM <- function(Lasympt, K, Tenv) {
 }
   
 gp$Group.name
-(M_sea_lamprey = getM(Lasympt = 69, K = 0.16, Tenv = Tenv))
-(M_lake_trout_ad = getM(Lasympt = 150, K = 0.05, Tenv = Tenv))
-(M_lake_trout_juv = getM(Lasympt = 23, K = 0.25, Tenv = Tenv))
-(M_atlantic_salmon = getM(Lasympt = 150, K = 0.15, Tenv = Tenv))
-(M_burbot = getM(Lasympt = 117, K = 0.05, Tenv = Tenv))
-(M_cisco = getM(Lasympt = 57.000, K = 0.16, Tenv = Tenv))
-(M_whitefish = getM(Lasympt = 79.000, K = 0.12, Tenv = Tenv))
-(M_trout_perch = getM(Lasympt = 15, K = 0.05, Tenv = Tenv))
-(M_alewife = getM(Lasympt = 38.100, K = 0.2, Tenv = Tenv))
-(M_smelt = getM(Lasympt = 33, K = 0.31, Tenv = Tenv))
-(M_sculpin = getM(Lasympt = 12.7, K = NA, Tenv = Tenv))
+M_sea_lamprey = getM(Lasympt = 69, K = 0.16, Tenv = Tenv)
+M_lake_trout_ad = getM(Lasympt = 74.6, K = 0.232, Tenv = Tenv) # K was obtained from regression done for Lake Champlain fish (Grace and Ellen). L∞=746mm
+M_lake_trout_juv = getM(Lasympt = 23, K = 0.232, Tenv = Tenv)
+M_lake_trout_stk = getM(Lasympt = 5, K = 0.232, Tenv = Tenv)
+M_atlantic_salmon = getM(Lasympt = 150, K = 0.15, Tenv = Tenv)
+M_burbot = getM(Lasympt = 117, K = 0.05, Tenv = Tenv)
+M_walleye = getM(Lasympt = 107, K = 0.2, Tenv = Tenv)
+M_cisco = getM(Lasympt = 57.000, K = 0.16, Tenv = Tenv)
+M_whitefish = getM(Lasympt = 79.000, K = 0.12, Tenv = Tenv)
+M_trout_perch = getM(Lasympt = 15, K = 0.05, Tenv = Tenv)
+M_alewife = getM(Lasympt = 38.100, K = 0.2, Tenv = Tenv)
+M_smelt = getM(Lasympt = 33, K = 0.31, Tenv = Tenv)
+M_sculpin = getM(Lasympt = 12.7, K = NA, Tenv = Tenv)
 
 M_fish <- data.frame("sea_lamprey"= c(M_sea_lamprey),
             "lake_trout_ad" = M_lake_trout_ad,
             "lake_trout_juv" = M_lake_trout_juv,
+            "lake_trout_stk" = M_lake_trout_stk,
             "atlantic_salmon"= M_atlantic_salmon,
             "burbot" = M_burbot,
+            "walleye" = M_walleye,
             "cisco" = M_cisco,
             "whitefish" = M_whitefish,
             "trout_perch"= M_trout_perch,
@@ -3250,6 +3535,7 @@ M_fish <- data.frame("sea_lamprey"= c(M_sea_lamprey),
 
 if(!R_U_KNITTING) write.table(M_fish, file=paste0(getpath4data(),"EwE_params/M_fish.txt"), sep="\t")
 
+M_fish
 ```
 
 
@@ -3277,23 +3563,27 @@ getQB <- function(Wasympt, Tk, A, h, d) {
 }
   
 gp$Group.name
-(QB_sea_lamprey = getQB(Wasympt = 2.5, Tk=Tk, A = 0.81, h = 0, d = 0))
-(QB_lake_trout_ad = getQB(Wasympt = 32, Tk=Tk, A = 2.11, h =0, d =  0))
-(QB_lake_trout_juv = getQB(Wasympt = 1.2, Tk=Tk, A = 2.11, h =0, d = 0 ))
-(QB_atlantic_salmon = getQB(Wasympt = 35, Tk=Tk, A = , h =0, d =0))
-(QB_burbot = getQB(Wasympt = 34, Tk=Tk, A = 0.73, h = 0, d = 0))
-(QB_cisco = getQB(Wasympt = 3.6, Tk=Tk, A = , h = 0, d = 0))
-(QB_whitefish = getQB(Wasympt = 19, Tk=Tk, A = , h = 0, d = 0))
-(QB_trout_perch = getQB(Wasympt = .058, Tk=Tk, A = , h = 0, d = 0))
-(QB_alewife = getQB(Wasympt = 0.2, Tk=Tk, A = , h = 0, d = 0))
-(QB_smelt = getQB(Wasympt = 0.363, Tk=Tk, A = , h = 0, d = 0))
-(QB_sculpin = getQB(Wasympt = 0.029, Tk=Tk, A = , h = 0, d = 0))
+QB_sea_lamprey = getQB(Wasympt = 2.5, Tk=Tk, A = 0.81, h = 0, d = 0)
+QB_lake_trout_ad = getQB(Wasympt = 32, Tk=Tk, A = 2.11, h =0, d =  0)
+QB_lake_trout_juv = getQB(Wasympt = 1.2, Tk=Tk, A = 2.11, h =0, d = 0)
+QB_lake_trout_stk = getQB(Wasympt = 0.2, Tk=Tk, A = 2.11, h =0, d = 0)
+QB_atlantic_salmon = getQB(Wasympt = 35, Tk=Tk, A = 2.02, h =0, d =0)
+QB_walleye = getQB(Wasympt = 11.3, Tk=Tk, A = 1.29, h = 0, d = 0)
+QB_burbot = getQB(Wasympt = 34, Tk=Tk, A = 0.73, h = 0, d = 0)
+QB_cisco = getQB(Wasympt = 3.6, Tk=Tk, A = 2.73, h = 0, d = 0)
+QB_whitefish = getQB(Wasympt = 19, Tk=Tk, A = 1.80, h = 0, d = 0)
+QB_trout_perch = getQB(Wasympt = .058, Tk=Tk, A = 1.35, h = 0, d = 0)
+QB_alewife = getQB(Wasympt = 0.2, Tk=Tk, A = 1.76, h = 0, d = 0)
+QB_smelt = getQB(Wasympt = 0.363, Tk=Tk, A = 2.34, h = 0, d = 0)
+QB_sculpin = getQB(Wasympt = 0.029, Tk=Tk, A = 0.89, h = 0, d = 0)
 
 QB_fish <- data.frame("sea_lamprey"= c(QB_sea_lamprey),
             "lake_trout_ad" = QB_lake_trout_ad,
             "lake_trout_juv" = QB_lake_trout_juv,
+            "lake_trout_stk" = QB_lake_trout_stk,
             "atlantic_salmon"= QB_atlantic_salmon,
             "burbot" = QB_burbot,
+            "walleye" = QB_walleye,
             "cisco" = QB_cisco,
             "whitefish" = QB_whitefish,
             "trout_perch"= QB_trout_perch,
@@ -3303,6 +3593,7 @@ QB_fish <- data.frame("sea_lamprey"= c(QB_sea_lamprey),
 
 if(!R_U_KNITTING) write.table(QB_fish, file=paste0(getpath4data(),"EwE_params/QB_fish.txt"), sep="\t")
 
+QB_fish
 ```
 
 
