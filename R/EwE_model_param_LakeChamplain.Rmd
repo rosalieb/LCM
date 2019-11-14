@@ -3018,7 +3018,7 @@ stklkt_summ <- rbind(stklkt_summ, "PERCENT"=stklkt_summ["TOTAL",]/stklkt_summ["T
 
 ```{r plot stoking lkt data long term, echo=FALSE, message=FALSE, warning=FALSE}
 p1 <- ggplot(data=as.data.frame(t(stklkt_summ[!(colnames(stklkt_summ) %in% "TOTAL")])), aes(x=as.numeric(paste(colnames(stklkt_summ)[! (colnames(stklkt_summ) %in% "TOTAL")])),y=TOTAL))+
-  geom_bar(stat="identity") + xlab("Year") + ylab("Numer of yearling-equivalent lake trout") 
+  geom_bar(stat="identity") + xlab("Year") + ylab("Numer of yearling-equivalent lake trout") + theme_bw()
 p1 + scale_y_continuous(labels = comma)
 #ggplotly(p1)
 ```
