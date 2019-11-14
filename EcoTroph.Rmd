@@ -1,0 +1,47 @@
+---
+title: "EcoTroph"
+author: "Rosalie Bruel"
+date: "14/11/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(EcoTroph)
+```
+
+```{r}
+# Replace here which Ecopath output must be used
+outputREco <- REco2
+#Create EcoTroph Eco
+ETEco <- data.frame("group_name" = outputREco$Group,
+                    "TL"         = outputREco$TL,
+                    "biomass"    = outputREco$BB,
+                    "prod"       = outputREco$PB,
+                    "catch.1"    = outputREco$Catch[,1])#,
+#                    "catch.2"    = outputREco$Catch[,2])
+create.smooth(ETEco)
+create.smooth(ETEco, smooth_type = 2)
+# Outputoftheplot(smooth) graphic function, applied to the REco example. Each curve represents the distribution across trophic levels for all groups whose mean trophic level is equal to the mean value of the distribution. Only curves related to existing groups are displayed.
+plot(create.smooth(ETEco))
+
+
+A <- create.smooth(ETEco)
+# Transpose of the biomass column
+T_biomass <- Transpose(A, ETEco, "biomass")
+# Transpose of the catch.1 column
+Transpose(A, ETEco, "catch.1")
+
+# title and log scale for the biomass
+# Figure3: Output of the plot(Transpose) graphical function applied to the biomass data per ecological group in the example ecosystem. The top panel displays the distributions for each group, while the bottom panel displays the biomass trophic spectrum (BTS, i.e. the sum of all groups).
+plot(T_biomass, title = "biomass", log)
+
+
+# constant sigmaLN
+#ET_Main <- create.ETmain(ecopath = ETEco)
+#ET_Main
+
+```
+
