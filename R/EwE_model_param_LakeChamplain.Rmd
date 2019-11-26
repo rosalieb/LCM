@@ -358,13 +358,18 @@ Multivariate ENSO Index version 2 (MEI) data retrieved from NOAA (<a href="https
 
 ```{r meiv index with secchi, echo=FALSE, message=FALSE, warning=FALSE}
 meiv <- read.delim(paste0(getpath4data(),"meiv2.data.txt"))
-dtlcm_secchi <- dtlcm[,c("StationID", "VisitDate", "Secchi.Depth")]
+dtlcm_secchi <- dtlcm[,c("StationID", "VisitDate", "Secchi.Depth","Total.Phosphorus_E")]
 dtlcm_secchi$VisitDate <- as.Date(dtlcm_secchi$VisitDate, format="%d/%m/%Y")
 dtlcm_secchi <- dtlcm_secchi[complete.cases(dtlcm_secchi),]
 dtlcm_secchi$Year <- year(dtlcm_secchi$VisitDate)
 
 dtlcm_secchi_summ <- as.data.frame(
   with(dtlcm_secchi, tapply(dtlcm_secchi$Secchi.Depth
+  ,list("Year"=as.factor(Year),"StationID"=as.factor(StationID)), mean, na.rm=T))
+  )
+
+dtlcm_TP_summ <- as.data.frame(
+  with(dtlcm_secchi, tapply(dtlcm_secchi$Total.Phosphorus_E
   ,list("Year"=as.factor(Year),"StationID"=as.factor(StationID)), mean, na.rm=T))
   )
 
@@ -389,6 +394,9 @@ pairs.panels(cbind(as.numeric(paste(rownames(dtlcm_secchi_summ))),dtlcm_secchi_s
 
 dtlcm_secchi_summ2 <- data.frame(melt(dtlcm_secchi_summ), "Year"=as.numeric(paste(rep(rownames(dtlcm_secchi_summ), times=ncol(dtlcm_secchi_summ)))))
 
+dtlcm_TP_summ2 <- data.frame(melt(dtlcm_TP_summ), "Year"=as.numeric(paste(rep(rownames(dtlcm_TP_summ), times=ncol(dtlcm_TP_summ)))))
+
+dtlcm_secchi_summ2$TP <- dtlcm_TP_summ2$value
 dtlcm_secchi_summ2$meiv_summer <- rep(NA, nrow(dtlcm_secchi_summ2))
 dtlcm_secchi_summ2$meiv_winter <- rep(NA, nrow(dtlcm_secchi_summ2))
 
@@ -403,7 +411,7 @@ for (i in min(dtlcm_secchi_summ2$Year):max(dtlcm_secchi_summ2$Year)) {
 ```
 
 ```{r plot meiv index with secchi, echo=FALSE, message=FALSE, warning=FALSE}
-p1 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=meiv_summer, y=value, col=Year)) +
+p1 <- ggplot(dtlcm_secchi_summ2[dtlcm_secchi_summ2$Year!=2015,],aes(x=meiv_summer, y=value/log(TP), col=Year)) +
   geom_point() + stat_smooth(method = "lm") +
   #geom_point(aes(x=meiv_min, y=value, col="min meiv"))+
   #geom_point(aes(x=meiv_max, y=value, col="max meiv"))+
@@ -1917,9 +1925,9 @@ with(LTcond, tapply(rep(1,nrow(LTcond)),list("Year#"=Year, "Site"=Local), sum))
 
 ```
 
-## Simple approach: estimate biomass from number of juveniles stocked
+## Simple approach: estimate biomass from number of juvenile stocked
 
-```{r}
+```{r simple approach for LT biomass estimate}
 n_lt_stocked = 85000 #number lake trout stocked
 w_lt_juv     = 1     #weight juvenile lake trout in g
 ```
@@ -3006,19 +3014,17 @@ Data communicated by Ellen on September 23rd, 2019. She presents them in Marsden
 ```{r read long term stocking data VT, include=FALSE}
 stklkt <- read.delim(paste0(getpath4data(),"data_from_Ellen/LC_LKT_stocking_history_1972_2018.txt"))
 head(stklkt)
+#stklkt_summ <- read.delim(paste0(getpath4data(),"data_from_Ellen/LC_LKT_stocking_history_1972_2018_summ.txt"))
 
 # create a summary
-stklkt_summ <- as.data.frame(with(stklkt, tapply(NB_EQUIV,list("Stocking_site"=STOCKING_SITE, "Year"=YEAR), sum, na.rm=T)))
+stklkt_summ <- as.data.frame(with(stklkt, tapply(NB_EQUIV,list("Year"=YEAR,"Stocking_site"=STOCKING_SITE), sum, na.rm=T)))
 stklkt_summ$TOTAL <- rowSums(stklkt_summ, na.rm = T)
-stklkt_summ <- rbind(stklkt_summ, "TOTAL"=colSums(stklkt_summ, na.rm = T))
-stklkt_summ <- rbind(stklkt_summ, "PERCENT"=stklkt_summ["TOTAL",]/stklkt_summ["TOTAL", "TOTAL"])*100
-
 
 ```
 
 ```{r plot stoking lkt data long term, echo=FALSE, message=FALSE, warning=FALSE}
-p1 <- ggplot(data=as.data.frame(t(stklkt_summ[!(colnames(stklkt_summ) %in% "TOTAL")])), aes(x=as.numeric(paste(colnames(stklkt_summ)[! (colnames(stklkt_summ) %in% "TOTAL")])),y=TOTAL))+
-  geom_bar(stat="identity") + xlab("Year") + ylab("Numer of yearling-equivalent lake trout") + theme_bw()
+p1 <- ggplot(stklkt_summ, aes(x=as.numeric(paste(rownames(stklkt_summ))),y=TOTAL)) +
+  geom_bar(stat="identity") + xlab("Year") + ylab("Number of yearling-equivalent lake trout") + theme_bw()
 p1 + scale_y_continuous(labels = comma)
 #ggplotly(p1)
 ```
@@ -3242,7 +3248,7 @@ summary_ls <- list(
   "Cisco" = data.frame("Year"=cisco$Year,"CPUE"=cisco$JuniperIsland),
   "Alewife" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(c(2016:2018)))),
   "Walleye" = NA,
-  "Stocked juveniles lake trout" = data.frame("Year"=1972:2016, "Stocked"=as.vector(t(stklkt_summ["TOTAL",as.numeric(paste(colnames(stklkt_summ))) %in% 1972:2016]))),
+  "Stocked juvenile lake trout" = data.frame("Year"=1972:2016, "Stocked"=as.vector(t(stklkt_summ["TOTAL",as.numeric(paste(colnames(stklkt_summ))) %in% 1972:2016]))),
   "Lake trout" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
   "Atlantic salmon" = NA,
   "Burbot" = data.frame("Year"=c(1982:1998),"Density"=rep(0.5,length(c(1982:1998)))),
@@ -3252,8 +3258,8 @@ summary_ls <- list(
 # Replacing NA of phytoplankton by 0.5 because we have the data -- just no estimate of biomass right now
 summary_ls$Phytoplankton[is.na(summary_ls$Phytoplankton$Biovolume),2] <- max(summary_ls$Phytoplankton$Biovolume,na.rm=T)
 
-if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_biomass2.pdf"),width = 12, height = 6)
-layout(matrix(c(1,2), nrow=1), widths=c(3.5,1))
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/5-Summary/summary_biomass2.pdf"),width = 9, height = 5)
+layout(matrix(c(1,2), nrow=1), widths=c(3.5,1.2))
 par(mar=c(5,10,4,0.5))
 plot(c(1971,2019), c(1,length(summary_ls)), pch=NA, xlab="Year", ylab="", axes=F)
 axis(1, at=1960:2020, labels=NA, lwd = .5); axis(1,at=1960:2020, labels=NA, lwd.ticks = 0)
@@ -3287,16 +3293,16 @@ for (i in 1:length(summary_ls)) {
     x <- msubset_2[,1]
     w <- msubset_2[,2]/max(msubset_2[,2], na.rm=T)
     w[is.na(w)] <- 0
-    polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("grey", alpha.f = .4))
+    polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("grey", alpha.f = .7))
     if(names(summary_ls[i])=="Burbot") TeachingDemos::shadowtext(mean(1982:1998),i, labels = "uncertainties about \ndata availability", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9)
     x <- msubset_2[msubset_2[,1] %in% whichyear,1]
     w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
     w[is.na(w)] <- 0
-    if(names(summary_ls[i])%in%c("Alewife", "Zebra Mussel")) {
-      polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = "black", col=adjustcolor("pink", alpha.f = .6))
-    } else {
-      polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8))
-    }
+    # if(names(summary_ls[i])%in%c("Alewife", "Zebra Mussel")) {
+    #   polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = "black", col=adjustcolor("pink", alpha.f = .6))
+    # } else {
+       polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8))
+    # }
     if(names(summary_ls[i])=="Smelt") {
      for (w in 1:2) {
        if (w==1) whichyear = 1990:1996
@@ -3304,7 +3310,7 @@ for (i in 1:length(summary_ls)) {
     x <- msubset_2[msubset_2[,1] %in% whichyear,1]
     w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
     w[is.na(w)] <- 0
-     polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8)) 
+     polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .7)) 
      }
     }
 
@@ -3320,7 +3326,7 @@ for (i in 1:length(summary_ls)) {
   if(names(summary_ls[i])=="Zooplankton") points(c(2014,2018),rep(i,2),pch=17, col="red")
   
   # Add comment
-  if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
+  #if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
   
   # Add a different point if work still in progress
   if(names(summary_ls[i])%in%c("Burbot","Atlantic Salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
@@ -3329,8 +3335,8 @@ rect(2000,0.7,2002,i+0.3, lty=2, lwd=.5)
 
 par(mar=c(5,0,2,1))
 plot(c(1,10),c(1,10),axes=F,xlab="",ylab="", pch=NA)
-legend(x=1,y=9.5, legend = c("Relative biomass","Biomass still \nbeing estimated","Invasive species"),
-       fill=c("black",adjustcolor("grey", alpha.f = .4), adjustcolor("pink", alpha.f = .6)), bty="n", border = NULL)
+legend(x=1,y=9.5, legend = c("Relative biomass","Biomass still \nbeing estimated"),
+       fill=c("black",adjustcolor("grey", alpha.f = .7)), bty="n", border = NULL)
 legend(x=1,y=7, legend = c("Species invasion", "No data yet", "Period chosen for \nmodel initialization"),
        pch=c(17,4,NA), lty=c(NA,NA,2), col=c("red","red","black"), bty="n", border = NULL)
 
@@ -3539,8 +3545,103 @@ M_fish
 ```
 
 
+```{r get P/B for various temperatures, echo=FALSE}
+# using some parameters from growth parameter
+Tenvt = seq(12,16,by=0.1)
+
+for (i in 1:length(Tenvt)) {
+  Tenv <- Tenvt[i]
+  
+  M_sea_lamprey = getM(Lasympt = 69, K = 0.16, Tenv = Tenv)
+  M_lake_trout_ad = getM(Lasympt = 74.6, K = 0.232, Tenv = Tenv) # K was obtained from regression done for Lake Champlain fish (Grace and Ellen). L∞=746mm
+  M_lake_trout_juv = getM(Lasympt = 23, K = 0.232, Tenv = Tenv)
+  M_lake_trout_stk = getM(Lasympt = 5, K = 0.232, Tenv = Tenv)
+  M_atlantic_salmon = getM(Lasympt = 150, K = 0.15, Tenv = Tenv)
+  M_burbot = getM(Lasympt = 117, K = 0.05, Tenv = Tenv)
+  M_walleye = getM(Lasympt = 107, K = 0.2, Tenv = Tenv)
+  M_cisco = getM(Lasympt = 57.000, K = 0.16, Tenv = Tenv)
+  M_whitefish = getM(Lasympt = 79.000, K = 0.12, Tenv = Tenv)
+  M_trout_perch = getM(Lasympt = 15, K = 0.05, Tenv = Tenv)
+  M_alewife = getM(Lasympt = 38.100, K = 0.2, Tenv = Tenv)
+  M_smelt = getM(Lasympt = 33, K = 0.31, Tenv = Tenv)
+  M_sculpin = getM(Lasympt = 12.7, K = NA, Tenv = Tenv)
+  
+  if (i==1) M_fish2 <- data.frame("T_env" = Tenv,
+              "sea_lamprey"= M_sea_lamprey,
+              "lake_trout_ad" = M_lake_trout_ad,
+              "lake_trout_juv" = M_lake_trout_juv,
+              "lake_trout_stk" = M_lake_trout_stk,
+              "atlantic_salmon"= M_atlantic_salmon,
+              "burbot" = M_burbot,
+              "walleye" = M_walleye,
+              "cisco" = M_cisco,
+              "whitefish" = M_whitefish,
+              "trout_perch"= M_trout_perch,
+              "alewife"=M_alewife,
+              "smelt"=M_smelt,
+              "sculpin"=M_sculpin) else
+                 M_fish2 <- rbind(M_fish2,
+                                c(Tenv,M_sea_lamprey,M_lake_trout_ad, M_lake_trout_juv, M_lake_trout_stk, M_atlantic_salmon,M_burbot, M_walleye,M_cisco,M_whitefish,M_trout_perch,M_alewife, M_smelt,M_sculpin))
+
+}
+
+M_fish3 <- cbind("T_env"=M_fish2[,1],data.frame(lapply(M_fish2[,-1], function(X) X/X[1])))
+
+ggplot(M_fish2, aes(T_env, lake_trout_ad/REco2$BB[REco2$Group=="Adult lake trout"])) + geom_point() +
+  geom_point(aes(T_env, alewife/REco2$BB[REco2$Group=="Alewife"]), col="blue") +
+  geom_point(aes(T_env, atlantic_salmon/REco2$BB[REco2$Group=="Atlantic salmon"]), col="pink") + labs(x="T environment",y="Mortality/Biomass") + theme_bw()
+
+```
+`r fig_cap("varying T env impact on PB fish", caption="Mortality (pondered by biomass) as a function of water temperature, for 3 groups in the food web.")`
+
+## P/B for zooplankton (Stockwell and Johannsson 1997^[Stockwell, J.D., Johannsson, O.E., 1997. Temperature-dependent allometric models to estimate zooplankton production in temperate freshwater lakes. Can. J. Fish. Aquat. Sci. 54, 2350–2360. https://doi.org/10.1139/f97-141])
+
+Found the method to get a better estimate of P/B in the supplementary materials B of Zhang et al 2016 paper on Lake Erie^[Zhang, H., Rutherford, E.S., Mason, D.M., Breck, J.T., Wittmann, M.E., Cooke, R.M., Lodge, D.M., Rothlisberger, J.D., Zhu, X., Johnson, T.B., 2016. Forecasting the Impacts of Silver and Bighead Carp on the Lake Erie Food Web. Transactions of the American Fisheries Society 145, 136–162. https://doi.org/10.1080/00028487.2015.1069211].
+
+To quote them:
+"P/B values were calculated based on published relationships between temperature and production (Shuter and Ing 1997; Stockwell and Johannsson 1997). Specifically, for non-predatory cladocerans, P/B=0.162/d when temperature was >10°C, and 0.042/d when temperature was <10°C (Stockwell and Johannsson 1997); for predatory cladocerans, P/B is a function of body weight and water temperature:
+$log(dailyP/B) = -0.23*log(dry_{wt}(µg))-0.73$, when mean seasonal temperature > 10, and $log(dailyP/B) = -0.26*log(dry_{wt}(µg))-1.36$ when mean seasonal temperature < 10  ̊C. For copepods and rotifer, P/B is calculated as: $log(median_{daily}P/B) = A + 0.04336*(medianTemperature(°C))$, where A = -1.844 for cyclopoids, -2.294 for calanoids, and -1.631 for rotifers (Shuter and Ing 1997). We used water temperature values provided from output of a 1-dimensional model of Lake Erie water temperature by Rucinski et al. (2010). Q/B values were calculated based on gross growth efficiency reported by Straile (1997). Diet for most zooplankton groups was obtained from Vanderploeg (1994), but for Bythotrephes spp was obtained from Vanderploeg et al. (1993)."
+
+```{r get P/B for for zooplankton}
+dailyPB <- function(drywt, mean_seasonal_temperature) {
+  # dry weight in µg
+  # mean seasonal temperature in °C
+  if(mean_seasonal_temperature>10) {
+    return(10^(-0.23*log10(drywt)-0.73))
+    } else {
+    return(10^(-0.26*log10(drywt)-1.36))
+  }
+}
+
+dailyPB_test <- data.frame("drywt" = seq(0.01,2,0.01),
+                           "temp11"= dailyPB(seq(0.01,2,0.01),11),
+                           "temp9" = dailyPB(seq(0.01,2,0.01),9)) 
+ggplot(dailyPB_test) + 
+  geom_line(aes(drywt,temp11, colour=">10"), show.legend = T) +
+  geom_line(aes(drywt,temp9, colour="<=10"), show.legend = T) +
+  labs(x="Dry weight (µg)", y="daily P/B") +
+  theme_bw() + 
+  theme(
+    legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) +
+  scale_colour_manual(name="Mean seasonal temperature (°C)", values=c(">10"="coral1", "<=10"="black"))
+
+
+```
+
+
+## Export P/B
+
+```{r export P/B}
+# if(!R_U_KNITTING) write.table(x, file=paste0(getpath4data(),"EwE_params/P_B.txt"), sep="\t")
+```
+
 
 # Get Q/B for each group
+
 
 Consumption rate Q/B is a function of the asymptotic length (W∞, g), the mean annual temperature of the water body (T’=1000/T, with T in Kelvin, Tcelsius + 273.15), the aspect ratio of the caudal fin (A), h and d. <br>
 
