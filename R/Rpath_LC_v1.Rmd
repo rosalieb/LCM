@@ -367,7 +367,7 @@ M_fish <- read.delim(paste0(getpath4data(),"EwE_params/M_fish.txt"))
 
 REco.params.LC$model[Group %in% c('Sea Lamprey'), PB := M_fish$sea_lamprey]
 REco.params.LC$model[Group %in% c('Adult lake trout'), PB := M_fish$lake_trout_ad]
-REco.params.LC$model[Group %in% c('Juvenile lake trout'), PB := M_fish$lake_trout_juv]
+REco.params.LC$model[Group %in% c('Juvenile lake trout'), PB := M_fish$lake_trout_juv-0.2]
 REco.params.LC$model[Group %in% c('Stocked lake trout'), PB := M_fish$lake_trout_stk]
 REco.params.LC$model[Group %in% c('Atlantic salmon'), PB := M_fish$atlantic_salmon]
 REco.params.LC$model[Group %in% c('Burbot'), PB := M_fish$burbot]
@@ -468,7 +468,7 @@ REco.params.LC$model[Group %in% c('Atlantic salmon'), EE := .1]
 REco.params.LC$model[Group %in% c('Burbot'), EE := 0.41] #Kao et al 2016 Lake Huron, for Burbot 1+ 
 REco.params.LC$model[Group %in% c('Walleye'), EE := 0.83] # Zhang et al., 2016 (Lake Erie)
 REco.params.LC$model[Group %in% c('Whitefish'), EE := .4] #Average values for Lake Huron (Kao et al 2016) are around .2, but average values for Lac La Biche (McGregor et al 2015) are much higher (~.6)
-REco.params.LC$model[Group %in% c('Cisco'), EE := .1] # no data
+REco.params.LC$model[Group %in% c('Cisco'), EE := .4] # no data. With .1, biomass always underestimated
 REco.params.LC$model[Group %in% c('Smelt'), EE := .8] # Average values vary a lot for smelt in the litterature... 
 REco.params.LC$model[Group %in% c('Alewife'), EE := .3] # values reported for several lakes, and again, really high variability.
 REco.params.LC$model[Group %in% c('Trout-perch'), EE := .61] # only one data reported in the literature reviewed Kao et al., 2014 (Lake Huron)
@@ -650,17 +650,15 @@ REco.params.LC$diet[Group == 'Phytoplankton', 'Zoo grazers' := 1]
 ### Run ecopath
 
 ```{r}
-# REco.params.LC$model$Biomass[2] =85
-# REco.params.LC$model$EE[2] =.8
-# REco.params.LC$model$Biomass[4] =4
-# REco.params.LC$model$EE[4] =NA
-# REco.params.LC$model$Biomass[18] =700
-# REco.params.LC$model$EE[18] =NA
 
 REco2 <- rpath(REco.params.LC, eco.name = 'Lake Champlain')
 REco2
 
+sum(REco2$TL[REco2$type<2] * REco2$BB[REco2$type<2]) / sum(REco2$BB[REco2$type<2])
+plot(REco2$TL[REco2$type<2][order(REco2$TL[REco2$type<2])],REco2$BB[REco2$type<2][order(REco2$TL[REco2$type<2])], type="l")
+plot(density(REco2$TL[REco2$type<2]* REco2$BB[REco2$type<2], )$y, type="l")
 
+data.frame(REco2$Group,REco2$BB)
 REco.params$model
 REco.params.LC$model
 REco2$QB
@@ -706,10 +704,14 @@ ggplot(REco2_df[-which(REco2_df$Group=="Detritus"),],aes(Group,BB, fill=summary)
   geom_bar(stat = "identity") +
   theme_bw() + labs(y="Biomass", fill='') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
+ggplot(REco2_df[-which(REco2_df$Group=="Detritus"),],aes(Group,log(BB))) +
+  geom_bar(stat = "identity") +
+  theme_bw() + labs(y="log Biomass", fill='') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 ```
 
 
-```{r}
+```{r do pretty webplot}
 # Get the diet data
 ewediet_w <- as.data.frame(REco.params.LC$diet[-which(REco.params.LC$diet$Group=="Import"),])
 ewediet_w[is.na(ewediet_w)] <- 0
@@ -734,7 +736,8 @@ net_w <- graph_from_data_frame(d=ewediet2_w, vertices=ewediet_nodes_w, directed=
 
 #set colors
 colrs <- wes_palette("Darjeeling1", n=length(V(net_w)$name), type="continuous")
-V(net_w)$color[order(ewediet_nodes_w$level)] <- colrs
+colrs <- colrs[order(ewediet_nodes_w$level)]
+V(net_w)$color <- colrs
 
 # Set some graphical parameters
 edge.start <- ends(net_w, es=E(net_w), names=F)[,2]
@@ -762,14 +765,14 @@ E(net_w)$label <- NA
 V(net_w)$label <- paste0(ewediet_nodes_w$id,"\n")
 V(net_w)$label <- NA
 
-webplot(REco2)
+webplot(REco2, highlight = "Adult lake trout")
 
 # size of dots scaled to biomass
 vertex.size <- abs(REco2$BB)
 vertex.size <- vertex.size / sqrt(sum(vertex.size^2)) 
 vertex.size <- 10 #right now just leave it fixed
 
-if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/6-Rpath/summary_interaction1.pdf"),width = 8, height = 8)
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/6-Rpath/summary_interaction1.pdf"),width = 6, height = 6)
 par(mar=c(1,4,0,5))
 par(xpd=T)
 plot.igraph(net_w,edge.color=adjustcolor(edge.col,alpha.f = .8), edge.curved=.1,
@@ -778,6 +781,7 @@ mticks <- approx(x=c(min(abs(ewediet_nodes_w$level)),
                      max(abs(ewediet_nodes_w$level))),
        y=c(-1,1), xout = pretty(abs(ewediet_nodes_w$level)))$y
 axis(2, at=mticks, labels = pretty(abs(ewediet_nodes_w$level)))
+mtext("Trophic level",2, line = 2.2)
 par(xpd=F)
 abline(h=mticks, lwd=.3, col=adjustcolor("black", alpha.f = .4), lty=2)
 par(xpd=T)
@@ -798,13 +802,23 @@ rsim.scenario: Prepares a balanced Rpath model and creates a scenario consisting
 
 ```{r}
 
-Rp1 <- rsim.scenario(REco2, Rpath.params = REco.params.LC, years = 1:100)
+Rp1 <- rsim.scenario(REco2, Rpath.params = REco.params.LC, years = 1:200)
 Rs1 <- rsim.run(Rp1)
 
 rsim.plot(Rs1, spname = Rp1$params$spname)
 
 
-adjust.forcing(Rp1, forcing, group = "Cisco", sim.year = 10:80, sim.month = 0,
-  bymonth = F, sample(seq(1,4,length.out = 30), size = 81))
+Rp1.1 <- adjust.forcing(Rp1, "byprey", group = "Zoo grazers", sim.year = 10:80, bymonth = F, value = 2)
+Rs1.1 <- rsim.run(Rp1.1)
+
+rsim.plot(Rs1.1, spname = Rp1$params$spname)
+
+
+Rp1.2 <- adjust.forcing(Rp1, "byprey", group = "Cisco", sim.year = 10:80, bymonth = F, value = sample(seq(3,4,length.out = 30), size = 11))
+Rs1.1 <- rsim.run(Rp1.1)
+
+rsim.plot(Rs1.1, spname = Rp1$params$spname)
+
+
 ```
 
