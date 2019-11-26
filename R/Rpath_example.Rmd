@@ -23,6 +23,9 @@ knitr::opts_chunk$set(
 #devtools::install_github("NOAA-EDAB/Rpath", dependencies = T)
 #devtools::install_github('NOAA-EDAB/Rpath', build_vignettes = TRUE)
 library(Rpath); library(data.table)
+library(reshape)
+library(ggplot2)
+library(wesanderson)
 
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
@@ -60,7 +63,7 @@ stanzas per stanza group.
 ```{r }
 #Groups and types for the R Ecosystem
 
-groups <- c('Seabirds', 'Whales', 'Seals', 'JuvRoundfish1', 'AduRoundfish1', 
+groups <- c('Seabirds', 'Whales', 'Seals', 'JuvRoundfish1', 'Foragefish1', 
             'JuvRoundfish2', 'AduRoundfish2', 'JuvFlatfish1', 'AduFlatfish1',
             'JuvFlatfish2', 'AduFlatfish2', 'OtherGroundfish', 'Foragefish1',
             'Foragefish2', 'OtherForagefish', 'Megabenthos', 'Shellfish',
@@ -235,7 +238,7 @@ REco.params$diet[, Seals           := c(rep(NA, 3), 0.05, 0.1, 0.05, 0.2, 0.005,
 REco.params$diet[, JuvRoundfish1   := c(rep(NA, 3), rep(c(1e-4, NA), 4), 1e-3, 
                                         rep(NA, 2), 0.05, 1e-4, NA, .02, 0.7785, 
                                         0.1, 0.05, NA, NA)]
-REco.params$diet[, AduRoundfish1   := c(rep(NA, 5), 1e-3, 0.01, 1e-3, 0.05, 1e-3, 
+REco.params$diet[, Foragefish1   := c(rep(NA, 5), 1e-3, 0.01, 1e-3, 0.05, 1e-3, 
                                         0.01, 0.29, 0.1, 0.1, 0.347, 0.03, NA, 
                                         0.05, 0.01, rep(NA, 3), NA)]
 REco.params$diet[, JuvRoundfish2   := c(rep(NA, 3), rep(c(1e-4, NA), 4), 1e-3, 
@@ -310,10 +313,10 @@ One of the advantages of R is its graphical ability. Users can feel free to deve
 ```{r}
 webplot(REco)
 webplot(REco, labels = T)
-webplot(REco, fleets = T, highlight = 'AduRoundfish1')
+webplot(REco, fleets = T, highlight = 'AduFlatfish1')
 webplot(REco, fleets = T, highlight = 'Detritus')
+webplot(REco, highlight = "Foragefish1", eco.name = "")
 ```
-
 
 # R Ecosim
 
@@ -325,6 +328,9 @@ Rsp0 <- rsim.params(REco, mscramble = 2, mhandle = 1000, preyswitch = 1,
   scrambleselfwt = 0, handleselfwt = 0, steps_yr = 12, steps_m = 1)
 
 Rp0 <- rsim.scenario(REco, Rpath.params = REco.params, years = 1:100)
+Rs0 <- rsim.run(Rp0)
+rsim.plot(Rs0, spname = Rp0$params$spname)
+
 # Rpath scenario for R Ecosystem 
 # 
 # $params contains the parameters from rpath
@@ -336,26 +342,55 @@ Rp0 <- rsim.scenario(REco, Rpath.params = REco.params, years = 1:100)
 # example:
 
 # new value given by argument value
-Rp0.1 <- adjust.forcing(Rp0, parameter = "byprey", group = c("AduRoundfish1"), sim.year = 10:80, sim.month = 0,  bymonth = F, value = 5)
+Rp0.1 <- adjust.forcing(Rp0, parameter = "bymort", group = c("Foragefish1"), sim.year = 15:70, sim.month = 0,  bymonth = F, value = 1.2)
 # twice the perturbation but only for 2 years
-Rp0.2 <- adjust.forcing(Rp0, parameter = "byprey", group = c("AduRoundfish1"), sim.year = 34:36, sim.month = 0,  bymonth = F, value = 10)
+Rp0.2 <- adjust.forcing(Rp0, parameter = "bymort", group = c("Foragefish1"), sim.year = c(20:22, 40:42), sim.month = 0,  bymonth = F, value = c(2.8))
+
+par(mfrow=c(1,1))
+plot(Rp0.2$forcing$bymort[,"Foragefish1"], type="l", ylab="relative mortality", xlab="month", ylim=c(0,3.3))
+lines(Rp0.1$forcing$bymort[,"Foragefish1"], lty=2)
+lines(Rp0$forcing$bymort[,"Foragefish1"], lwd=2)
+points(0,1,pch=16, col="coral3", cex=1.7)
+# plot(cumsum(Rp0.2$forcing$bymort[,"Foragefish1"]), type="l", ylab="cumulative mortality", xlab="month")
+# lines(cumsum(Rp0.1$forcing$bymort[,"Foragefish1"]), lty=2)
+# lines(cumsum(Rp0$forcing$bymort[,"Foragefish1"]), lwd=2)
+# points(0,1,pch=16, col="coral3", cex=1.7)
+legend("topright", legend = c("Steady-state","Business as usual", "Scenario 1", "Scenario 2"), lty = c(NA,1,2,1), lwd=c(NA,2,1,1), pch=c(16,NA,NA,NA), col=c("coral3","black","black","black"),bty='n')
+
 # change the parameter among the different possible forcings
 names(Rp0$forcing)
-Rp0.3 <- adjust.forcing(Rp0, parameter = "bymigrate", group = c("AduRoundfish1"), sim.year = 20:66, sim.month = 0,  bymonth = F, value = 0.1)
+Rp0.3 <- adjust.forcing(Rp0, parameter = "bymigrate", group = c("Foragefish1"), sim.year = 20:66, sim.month = 0,  bymonth = F, value = 0.1)
 # Change the value for ALL the species
 Rp0.4 <- adjust.forcing(Rp0, parameter = "bymigrate", group = Rp0$params$spname, sim.year =  34:36, sim.month = 0,  bymonth = F, value = 10)
+Rp0.5 <- adjust.forcing(Rp0, parameter = "byprey", group = c("Foragefish1"), sim.year = 20:80, sim.month = 0,  bymonth = F, value = rep(0:10, 10))
 
 # Run the scenario with modifications
 Rs0.1 <- rsim.run(Rp0.1)
 Rs0.2 <- rsim.run(Rp0.2)
 Rs0.3 <- rsim.run(Rp0.3)
 Rs0.4 <- rsim.run(Rp0.4)
+Rs0.5 <- rsim.run(Rp0.5)
+
+rsim.plot(Rs0, spname = paste0("Sp. ",seq_along(Rp0$params$spname)))
+rsim.plot(Rs0.1, spname = paste0("Sp. ",seq_along(Rp0$params$spname)))
+rsim.plot(Rs0.2, spname = paste0("Sp. ",seq_along(Rp0$params$spname)))
+rsim.plot(Rs0.3, spname = paste0("Sp. ",seq_along(Rp0$params$spname)))
+
+par(mfrow=c(1,2))
+plot(Rs0.1$out_BB[,14], type="l", xlab="Month", ylab="Biomass (t/km2)")
+plot(Rs0.1$out_BB[,15], type="l", xlab="Month", ylab="Biomass (t/km2)")
+Rs0.2$out_BB[1,15]
+
+webplot(REco, highlight = "Foragefish2", eco.name = "")
 
 rsim.plot(Rs0.1, spname = Rp0$params$spname)
 rsim.plot(Rs0.2, spname = Rp0$params$spname)
 rsim.plot(Rs0.3, spname = Rp0$params$spname)
 rsim.plot(Rs0.4, spname = Rp0$params$spname)
 
+par(mfrow=c(1,1))
+plot(Rp0.5$forcing$byprey[,"Foragefish1"], type="l", ylab="forcing", xlab="month", ylim=c(0,10))
+rsim.plot(Rs0.5, spname = Rp0$params$spname)
 
 # Try with adjust.forcing
 Rp0 <- rsim.scenario(REco, Rpath.params = REco.params, years = 1:100)
@@ -368,11 +403,107 @@ rsim.plot(Rs0.1, spname = Rp0$params$spname)
 
 # Adjust scenario parameters
 #adjust.scenario
-Rp1.1 <- adjust.scenario(Rsim.scenario = Rp0, parameter = "byprey", group = "AduRoundfish1", groupto = "bymigrate", value = 3)
+Rp1.1 <- adjust.scenario(Rsim.scenario = Rp0, parameter = "byprey", group = "Foragefish1", groupto = "bymigrate", value = 3)
 
 Rs1.1 <- rsim.run(Rp1.1)
 rsim.plot(Rs1.1, spname = Rp0$params$spname)
 
 
+
+
+```
+
+
+```{r plot side by side results of different scenario}
+myylim=c(0.2,1.05)
+
+colrs <- wes_palette("Darjeeling1", n=ncol(Rs0.1$annual_BB), type="continuous")
+
+
+out_BB <- as.data.frame(matrix(rep(NA,4*ncol(Rs0$annual_BB)), ncol=4))
+colnames(out_BB) <- c("Species", "BusinessAsUsual","Scenario1", "Scenario2")
+
+par(mfrow=c(1,3))
+
+# Business as usual
+plot(Rs0$annual_BB[,1],pch=NA, ylim=myylim, xlab="Year", ylab="Relative biomass")
+for (i in 1:ncol(Rs0$annual_BB)) {
+  lines(seq_along(Rs0$annual_BB[,i]),Rs0$annual_BB[,i]/Rs0$annual_BB[1,i],col=colrs[i])
+  out_BB[i,2] <- mean(Rs0$annual_BB[,i]/Rs0$annual_BB[1,i])
+}
+mtext("Business as usual", side = 3, adj=0)
+
+# Scenario 1
+plot(Rs0.1$annual_BB[,1],pch=NA, ylim=myylim, xlab="Year", ylab="Relative biomass")
+for (i in 1:ncol(Rs0.1$annual_BB)) {
+  lines(seq_along(Rs0.1$annual_BB[,i]),Rs0.1$annual_BB[,i]/Rs0.1$annual_BB[1,i],col=colrs[i])
+  out_BB[i,3] <- mean(Rs0.1$annual_BB[,i]/Rs0.1$annual_BB[1,i])
+}
+mtext("Scenario 1", side = 3, adj=0)
+
+# Scenario 2
+plot(Rs0.2$annual_BB[,1],pch=NA, ylim=myylim, xlab="Year", ylab="Relative biomass")
+for (i in 1:ncol(Rs0.2$annual_BB)) {
+  lines(seq_along(Rs0.2$annual_BB[,i]),Rs0.2$annual_BB[,i]/Rs0.2$annual_BB[1,i],col=colrs[i])
+  out_BB[i,4] <- mean(Rs0.2$annual_BB[,i]/Rs0.2$annual_BB[1,i])
+}
+mtext("Scenario 2", side = 3, adj=0)
+
+par(mfrow=c(1,3))
+which1 <- c(2,14,15)
+colrs <- wes_palette("Darjeeling1", n=length(which1), type="continuous")
+
+# Subset with only a few species
+# Business as usual
+plot(Rs0$annual_BB[,1],pch=NA, ylim=myylim, xlab="Year", ylab="Relative biomass")
+for (i in seq_along(which1)) {
+  lines(seq_along(Rs0$annual_BB[,which1[i]]),Rs0$annual_BB[,which1[i]]/Rs0$annual_BB[1,which1[i]],col=colrs[i], lwd=2)
+}
+#legend("bottomleft", legend = paste0("Sp. ", which1-1), col=colrs, lty=1, bty="n", lwd=2)
+mtext("Business as usual", side = 3, adj=0)
+
+# Scenario 1
+plot(Rs0.1$annual_BB[,1],pch=NA, ylim=myylim, xlab="Year", ylab="Relative biomass")
+abline(h=1, lty=2, col="grey", lwd=.5)
+for (i in seq_along(which1)) {
+  lines(seq_along(Rs0.1$annual_BB[,which1[i]]),Rs0.1$annual_BB[,which1[i]]/Rs0.1$annual_BB[1,which1[i]],col=colrs[i], lwd=2)
+}
+mtext("Scenario 1", side = 3, adj=0)
+legend("bottomleft", legend = paste0("Sp. ", which1-1), col=colrs, lty=1, bty="n", lwd=2)
+
+# Scenario 2
+plot(Rs0.2$annual_BB[,1],pch=NA, ylim=myylim, xlab="Year", ylab="Relative biomass")
+abline(h=1, lty=2, col="grey", lwd=.5)
+for (i in seq_along(which1)) {
+  lines(seq_along(Rs0.2$annual_BB[,which1[i]]),Rs0.2$annual_BB[,which1[i]]/Rs0.2$annual_BB[1,which1[i]],col=colrs[i], lwd=2)
+}
+mtext("Scenario 2", side = 3, adj=0)
+
+
+out_BB$Species <- paste0("Sp. ", 1:nrow(out_BB))
+
+
+# for (i in 1:ncol(Rs0.1$annual_BB)) {
+#   plot(seq_along(Rs0.1$annual_BB[,i]),Rs0.1$annual_BB[,i]/Rs0.1$annual_BB[1,i],col=colrs[i], type="l", ylim=myylim)
+#   mtext(paste(i, colnames(Rs0.1$out_BB)[i]),side=3)
+#   out_BB[i,3] <- mean(Rs0.1$annual_BB[,i]/Rs0.1$annual_BB[1,i])
+# }
+```
+
+```{r}
+webplot(REco, highlight = c("Seals"), eco.name = "")
+webplot(REco, highlight = 3, eco.name = "")
+webplot(REco, highlight = c("Foragefish1"), eco.name = "")
+webplot(REco, highlight = c("Foragefish2"), eco.name = "")
+webplot(REco, highlight = 14, eco.name = "")
+
+```
+
+
+```{r}
+out_BB2 <- melt(out_BB)
+
+ggplot(out_BB2, aes(Species, value, col=variable)) + geom_point(alpha=.8)
+# this plot shows a direct relationship between amount of forcing and result on the ecosystem
 ```
 
