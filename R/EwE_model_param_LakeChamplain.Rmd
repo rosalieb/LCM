@@ -450,7 +450,7 @@ grid.arrange(p3,p4,nrow=1)
 ```
 <br>`r fig_cap("secchi4", caption = "Secchi depth against AMO (summer and winter).")`
 
-```{r}
+```{r gam for secchi depth against meiv, echo=FALSE}
 head(dtlcm_secchi_summ2)
 library(mgcv)
 gam1 <- gam(value ~ s(meiv_summer) + variable, data=dtlcm_secchi_summ2)
@@ -490,7 +490,7 @@ With GLS:
 
 Residuals are not normally distributed.
 
-```{r}
+```{r gls secchi depth agains amo, echo=FALSE}
 library(nlme)
 M0 <- gls(value ~ amo_winter + variable + Year, data=dtlcm_secchi_summ2, na.action = na.omit)
 summary(M0)
@@ -503,7 +503,7 @@ plot(M0)
 
 **Compound symmetry** covariance matrix assumes that whatever the distance in time between two observations, their residual correaltion is the same (i.e., it doesn't change with increasing/decreasing time between observations). Constant covariance.
 + Often too simplistic for time series data.
-```{r}
+```{r compound symmetry gls for secchi depth against amo, echo=FALSE}
 
 M1<-gls(value ~ amo_winter + variable + Year, na.action = na.omit, correlation = corCompSymm(form=~Year|variable), data=dtlcm_secchi_summ2)
 
@@ -515,7 +515,7 @@ summary(M1)
 **AR1: Auto-regressive model of order 1** Models the residual at time s as a function of the residual of time s-1 along with noise.
 
 The parameter for this correlation function, $\rho$, is unknown and has to be estimated from the data. The further away two residuals are separated in time, the lower their correlation. 
-```{r}
+```{r ar1 for secchi-depth agains amo, echo=FALSE}
 #fit the model with AR-1 correlation function, corAR1
 M2<-gls(value ~ amo_winter + variable + Year, na.action = na.omit, correlation = corAR1(form=~Year|variable), data=dtlcm_secchi_summ2)
 
@@ -533,7 +533,7 @@ More complex structures based on the AR-1, using an auto-regressive moving avera
 
 Realize that the p and q parameters have to be estimated from the data - using values of p or q larger than 2 or 3 tend to give error messages related to convergence problems (i.e., the larger p and/or q are, the more parameters there will be to estimate, which can give you convergence problems). 
 
-```{r}
+```{r ARMA secchi depth against amo, echo=FALSE}
 #here, we'll define a bunch of ARMA(p,q) structures
 #Zuur says that it's kind of a black box. We're starting with these values, but we don't really know why.
 cs1 <- corARMA(c(0.2), p = 1, q = 0) #0.2 is a chosen starting value for p
@@ -556,7 +556,7 @@ AIC(M0,M1,M2,M3arma1,M3arma2,M3arma3)
 These models are not all nested, so we need to compare them using AIC (we cannot use likelihood ratio tests).
 Model below not working (no convergence).
 
-```{r}
+```{r gamm secchi depth against amo , echo=FALSE}
 BM1<-gamm(value ~ amo_winter +  variable + s(Year, by=variable),
           weights = varIdent(form = ~1|variable), data=dtlcm_secchi_summ2)
 ```
@@ -565,7 +565,7 @@ The `varIdent(form=~1|variable)` should in theory allows each time series (i.e.,
 
 The problem with this model is that the p-values assume independence, and because thet data are time series, this assumption may be violated. Adding an AR-1 residual auto-correlation structure can help with that.
 
-```{r}
+```{r gamm secchi depth against amo with AR1, echo=FALSE}
 
 #fit the same model with AR-1 temporal correlation
 BM2<-gamm(value ~ s(amo_winter) + variable,
@@ -1901,7 +1901,7 @@ cisco$ValcourIsland <- c(4,4,19,35,15,NA,8,4,7,2,3,5,9,3,1,0)
 cisco$MalletsBay    <- c(1,1,1,1,0,0,1,0,0,1,0,0,0,0,0,0)
 ```
 
-```{r}
+```{r cisco CPUE for 4 stations, echo=FALSE}
 cisco2 <- cbind(melt(cisco[,-1]), "Year"=rep(cisco$Year,4))
 colnames(cisco2) <- c("Station","CPUE","Year")
 ggplot(cisco2, aes(Year,CPUE,col=Station)) + geom_point() + geom_line()
@@ -3592,7 +3592,7 @@ ggplot(M_fish2, aes(T_env, lake_trout_ad/REco2$BB[REco2$Group=="Adult lake trout
   geom_point(aes(T_env, atlantic_salmon/REco2$BB[REco2$Group=="Atlantic salmon"]), col="pink") + labs(x="T environment",y="Mortality/Biomass") + theme_bw()
 
 ```
-`r fig_cap("varying T env impact on PB fish", caption="Mortality (pondered by biomass) as a function of water temperature, for 3 groups in the food web.")`
+<br>`r fig_cap("varying T env impact on PB fish", caption="Mortality (pondered by biomass) as a function of water temperature, for 3 groups in the food web.")`
 
 ## P/B for zooplankton (Stockwell and Johannsson 1997^[Stockwell, J.D., Johannsson, O.E., 1997. Temperature-dependent allometric models to estimate zooplankton production in temperate freshwater lakes. Can. J. Fish. Aquat. Sci. 54, 2350–2360. https://doi.org/10.1139/f97-141])
 
@@ -3619,7 +3619,8 @@ dailyPB_test <- data.frame("drywt" = seq(0.01,2,0.01),
 ggplot(dailyPB_test) + 
   geom_line(aes(drywt,temp11, colour=">10"), show.legend = T) +
   geom_line(aes(drywt,temp9, colour="<=10"), show.legend = T) +
-  labs(x="Dry weight (µg)", y="daily P/B") +
+  labs(x="Dry weight (µg)", y="daily P/B", title = "Variation in zooplankton P/B", 
+       subtitle = "(Stockwell and Johannsson, 1997)") +
   theme_bw() + 
   theme(
     legend.position = c(.95, .95),
@@ -3631,6 +3632,8 @@ ggplot(dailyPB_test) +
 
 
 ```
+<br>`r fig_cap("P/Bzoo_conceptual", caption="Variation in zooplankton P/B (equations in Stockwell and Johannsson, 1997)")`
+
 
 
 ## Export P/B
