@@ -1,0 +1,312 @@
+---
+title: "GIS exploration"
+author: "Rosalie Bruel"
+date: "2020-01-22 -- last updated on `r Sys.Date()` "
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    df_print: paged
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+fontsize: 11pt
+editor_options:
+  chunk_output_type: console
+  df_print: paged
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = dirname(getwd()))
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plotly)
+library(plyr) #for ddply
+library(dplyr)
+library(lubridate) # for date time
+library(changepoint) #changepoint analysis
+library(reshape2) # for melt
+library(Hmisc) # for err bar plot
+library(FSA);library(FSAdata) # Fisheries stock assessment methods and data
+library(leaflet)
+library(janitor)
+library(rgdal)
+library(raster)
+library(rnaturalearth)
+library(rasterVis) # for levelplot
+library(GISTools) # for North arrow in plot (function north.arrow())
+library(RColorBrewer)
+library(grid)
+library(gridExtra) # get two plots side by side
+library(knitr) # for kable
+library(stringr) # for str_replace()
+library(wesanderson) # colors
+library(ggraph) # for nodes plot
+library(igraph) # probably better for nodes graph because can also assign weigth
+library(tidygraph) # to transform dataframe in node datasets
+library(scales) # Get full number in x/y scales with scale_x_continuous(labels = comma)/scale_y_continuous(labels = comma) instead of 1.00e09 for example
+library(concurve) # plot p-value and s-value, see recommandations in Chow and Sander, 2019
+library(psych) # for pairs-panels (scaterplot matrix)
+
+
+# Captions with library captioner
+# https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
+# https://cran.r-project.org/web/packages/captioner/vignettes/using_captioner.html 
+fig_cap <- captioner::captioner()
+tab_cap <- captioner::captioner("Table")
+
+getpath4data <- function() {
+  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
+  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
+    if(Sys.getenv("USER")=="YOUR USER NAME") return("YOUR PATH")
+  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
+}
+
+# turn this to true so some stuffs are not run when I'm knitting (and vice versa)
+R_U_KNITTING = TRUE 
+```
+
+
+Using tuto <a href="https://translate.google.com/translate?hl=fr&sl=en&u=https://www.neonscience.org/raster-data-r&prev=search">here</a>.
+
+```{r message=FALSE, warning=FALSE}
+DEM <- raster(paste0(getpath4data(),"GIS/LCbathy.tif"))
+# calculate and save the min and max values of the raster to the raster object
+DEM <- setMinMax(DEM)
+
+#Get min and max cell values from raster #NOTE: this code may fail if the raster is too large
+# file is too large, but below would be the function cellStats
+#cellStats(DEM, range)
+
+#view coordinate reference system
+DEM@crs
+#nothing. Use coordinates from ne_countries, package sf
+world <- ne_countries(scale = "medium", returnclass = "sf")
+DEM <- projectRaster(DEM, crs = crs(world))
+DEM@crs
+
+# view raster extent
+DEM@extent
+
+# the distribution of values in the raster - making sure there are no really weird values
+hist(DEM, main="Distribution of elevation values", col= "purple")
+
+# plot the raster
+plot(DEM, main="Digital Elevation Model, Lake Champlain")
+
+# create a plot of our raster using function image() that works better for large object (because plot has a default of 100,000 pixels)
+# specify the range of values that you want to plot in the DEM # just plot pixels between 250 and 300 m in elevation
+image(DEM, zlim=c(-80,0))
+
+# we can specify the colors too
+col <- terrain.colors(5)
+par(new=T)
+image(DEM, zlim=c(-10,0), main="Digital Elevation Model (DEM)", col=col)
+
+# add a color map with 5 colors
+col=terrain.colors(5)
+# add breaks to the colormap (6 breaks = 5 segments) 
+brk <- c(-120, -80, -60, -40, -20, 0) 
+plot(DEM, col=col, breaks=brk, main="DEM with more breaks")
+
+#edit legend appearance
+# First, expand right side of clipping rectangle to make room for the legend
+# turn xpd off
+par(xpd = FALSE, mar=c(5.1, 4.1, 4.1, 4.5)) 
+# Second, plot w/ no legend 
+plot(DEM, col=col, breaks=brk, main="DEM with a Custom (but flipped) Legend", legend = FALSE) 
+# Third, turn xpd back on to force the legend to fit next to the plot. 
+par(xpd = TRUE) 
+# Fourth, add a legend - & make it appear outside of the plot 
+legend( par()$usr[2], 45, legend = c("Shallowest", "Shallower yet", "Middle","A bit deeper", "Deepest"), fill = rev(col))
+# Fifth, turn xpd = False)
+par(xpd = FALSE) 
+
+
+# Crop a figure
+#define the crop extent
+cropbox2 <-c(-73.35,-73.2,44.4,44.5)
+#crop the raster
+DEMcrop2 <- crop(DEM, cropbox2) 
+#plot cropped DEM
+plot(DEMcrop2)
+```
+
+
+
+```{r plot bathy with color, echo=FALSE, message=FALSE, warning=FALSE}
+# Define a colour ramp palette
+colr <- colorRampPalette(brewer.pal(11, 'RdYlBu'))
+
+p <- levelplot(bathy2, 
+          margin=TRUE,    # turn to F to suppress marginal graphics
+          colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-120,0,20))      # legend ticks and labels
+            ),    
+          par.settings=list(
+            axis.line=list(col='black') # turn to transparent to suppress axes and legend outline
+          ),
+          scales=list(draw=TRUE),  # turn to F to suppress axis labels
+          col.regions=colr,         # colour ramp
+          at=seq(-130, -1, len=130))  # colour ramp breaks
+
+# p$legend$top
+
+p 
+
+#pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LG_bathy.pdf"),width = 4, height = 9)
+pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LG_bathy.pdf"),width = 9, height = 7)
+p
+dev.off()
+
+# pdf(paste0(getwd(),"/Output/Figures/1-descriptive/LC_bathy_BW.pdf"),width = 4, height = 9)
+# plot(bathy2,
+#      main = "Bathymetric map of Lake Champlain",
+#      col = grey(1:100/100),
+#      axes = FALSE,
+#      box = FALSE)
+# dev.off()
+
+
+histogram(bathy2, main='Lake Champlain depth histogram', xlab='depth (m)')
+
+```
+
+
+```{r map for Lake Geneva, eval=FALSE, include=FALSE}
+colr <- colorRampPalette(brewer.pal(11, 'RdYlBu'))
+
+pchamp <- levelplot(DEM,  margin=TRUE,colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-320,0,20))      # legend ticks and labels
+            ),    
+          par.settings=list( axis.line=list(col='black') ),
+          scales=list(draw=TRUE), col.regions=colr, at=seq(-325, -1, len=101))
+
+pchamp 
+
+
+#hist plot for LC
+histogram(DEM, main='Lake Champlain depth histogram', xlab='depth (m)')
+
+```
+
+
+# Zebra mussels vs quagga mussel distribution
+
+```{r}
+col=terrain.colors(3)
+brk <- c(-120, -80, -50, 0) 
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/7-ZebraMussels/LC_ZM_QM_distribution .pdf"))
+par(xpd = FALSE, mar=c(5.1, 4.1, 4.1, 15)) 
+# Main plot
+plot(DEM, col=rev(col), breaks=brk, main="Distribution of quagga vs. zebra mussels", legend = FALSE, xlim=c(-73.6, -73.0), ylim=c(43.43, 45.18)) 
+scalebar(25, xy=c(-73.2, 43.6), type='bar', divs=2)
+north.arrow(-72.9, 43.77,len = .015, lab = "N", col="black")
+# Add legend
+legend(par()$usr[2], 45, bty = "n", 
+   legend=c("Potential distribution of\n zebra mussels (<50m)","Potential distribution of\n quagga mussels (<80m)", "Too deep for both species"), 
+   fill=col,
+   xpd = TRUE, ncol = 1, y.intersp=2)
+
+if(!R_U_KNITTING) dev.off()
+
+```
+
+## Comparison with Lake Michigan
+
+Bunnel et al 2018 report
+```{r}
+michigan <- raster("/Users/Rosalie/Desktop/Travail/QGIS/1 - Data SIG/michigan_lld/michigan_lld.tif")
+michigan <- projectRaster(michigan, crs = crs(world))
+michigan
+pmich <- levelplot(michigan,  margin=TRUE,colorkey=list(
+            space='left',  # where to plot legend
+            labels=list(at=seq(-320,0,20))      # legend ticks and labels
+            ),    
+          par.settings=list( axis.line=list(col='black') ),
+          scales=list(draw=TRUE), col.regions=colr, at=seq(-325, -1, len=101))
+
+pmich 
+
+histogram(michigan, main='Lake Michigan depth histogram', xlab='depth (m)',xlim=c(-300,0),ylim=c(0,1.05), breaks=300)
+
+col=terrain.colors(3)
+brk <- c(-300, -80, -50, 0) 
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/7-ZebraMussels/LMich_ZM_QM_distribution .pdf"))
+par(xpd = FALSE, mar=c(5.1, 4.1, 4.1, 10)) 
+# Main plot
+plot(michigan, col=rev(col), breaks=brk, main="Distribution of quagga vs. zebra mussels", legend = FALSE, xlim=c(-88.5, -84), ylim=c(41.1, 46.6)) 
+scalebar(100, xy=c(-86, 41.7), type='bar', divs=8)
+north.arrow(-85, 42.1,len = .07, lab = "N", col="black")
+# Add legend
+legend(par()$usr[2], 45, bty = "n", 
+   legend=c("Potential distribution of\n zebra mussels (<50m)","Potential distribution of\n quagga mussels (<80m)", "Too deep for both species"), 
+   fill=col,
+   xpd = TRUE, ncol = 1, y.intersp=2)
+
+if(!R_U_KNITTING) dev.off()
+
+
+str(michigan)
+hist(michigan, breaks=seq(-300,350,by=1))
+abline(v=0)
+
+```
+
+
+```{r}
+#from help here: https://gis.stackexchange.com/questions/293993/plotting-and-analyzing-extracted-elevation-data-in-r
+library(elevatr)
+library(raster)
+library(sf)
+library(USAboundaries)
+
+counties <- us_counties(map_date = "1930-01-01", resolution = "high", states = c("NY","VT"))
+
+counties_sf <- as(counties, "Spatial")
+elevation_data <-get_elev_raster(counties_sf, z=9, src = "aws")
+#map <- extract(elevation_data, counties)
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/1-descriptive/map_elevation_NY_VT.pdf"))
+plot(elevation_data, axes=TRUE)
+plot(st_geometry(counties), add=TRUE)
+plot(DEM, col="black", legend = FALSE, add = T) 
+scalebar(200, xy=c(-79, 40.5), type='bar', divs=4)
+north.arrow(-79.7, 40.5,len = .09, lab = "N", col="black")
+if(!R_U_KNITTING) dev.off()
+
+
+```
+
+Extract depth for each location
+```{r}
+xy <- xyFromCell(DEM, c(0:ncell(DEM)+1))
+xyz <- extract(DEM, xy, df = T)
+
+```
+
+
+Do stats for each countie: not working for me at the moment
+
+```{r eval=FALSE}
+library(fasterize)
+counties_sf$POLYID <- 1:nrow(counties_sf)
+polymap <- fasterize(counties_sf, elevation_data, field = "POLYID")
+## mask out elevation where there's no polygon
+elevation_data[is.na(values(polymap))] <- NA
+plot(elevation_data)
+
+## to get zonal stats
+library(dplyr)
+tibble(value = values(elevation_data), POLYID = values(polymap)) %>% 
+dplyr::filter(!is.na(value)) %>% group_by(POLYID) %>% 
+summarize(mean(value))
+```
+
