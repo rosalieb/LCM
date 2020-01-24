@@ -88,7 +88,7 @@ DEM <- setMinMax(DEM)
 #view coordinate reference system
 DEM@crs
 #nothing. Use coordinates from ne_countries, package sf
-world <- ne_countries(scale = "medium", returnclass = "sf")
+world <- ne_countries(scale="large", returnclass = "sf")
 DEM <- projectRaster(DEM, crs = crs(world))
 DEM@crs
 
@@ -202,6 +202,8 @@ histogram(DEM, main='Lake Champlain depth histogram', xlab='depth (m)')
 
 # Zebra mussels vs quagga mussel distribution
 
+## Lake Champlain
+
 ```{r}
 col=terrain.colors(3)
 brk <- c(-120, -80, -50, 0) 
@@ -265,27 +267,72 @@ abline(v=0)
 ```
 
 
+## Plot average abundance for each sampling site on map
+
 ```{r}
+ZM14_stats_sites_live <- read.delim(paste0(getwd(),"/Output/Data/zebra_mussels_2014_summary_data.txt"))
+ZM14_stats_sites_live$Avg_transformed <- log(ZM14_stats_sites_live$Avg)
+
+col=terrain.colors(3)
+brk <- c(-120, -80, -50, 0) 
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/7-ZebraMussels/LC_ZM_QM_distribution_with_2014_abundance.pdf"))
+par(xpd = FALSE, mar=c(5.1, 4.1, 4.1, 15)) 
+# Main plot
+plot(DEM, col=rev(col), breaks=brk, main="Distribution of quagga vs. zebra mussels", legend = FALSE, xlim=c(-73.6, -73.0), ylim=c(43.43, 45.18)) 
+scalebar(25, xy=c(-73.2, 43.6), type='bar', divs=2)
+north.arrow(-72.9, 43.77,len = .015, lab = "N", col="black")
+# Add legend
+legend(par()$usr[2], 45, bty = "n", 
+   legend=c("Potential distribution of\n zebra mussels (<50m)","Potential distribution of\n quagga mussels (<80m)", "Too deep for both species"), 
+   fill=col,
+   xpd = TRUE, ncol = 1, y.intersp=2)
+
+legend(par()$usr[2], 44.3, bty = "n",
+   legend=c(max(      ZM14_stats_sites_live$Avg/2, na.rm=T),
+                 mean(ZM14_stats_sites_live$Avg/2, na.rm=T),
+                  min(ZM14_stats_sites_live$Avg/2, na.rm=T)), 
+   pch=16, pt.cex=c(max(ZM14_stats_sites_live$Avg_transformed/2, na.rm=T),
+                 mean(ZM14_stats_sites_live$Avg_transformed/2, na.rm=T),
+                 min(ZM14_stats_sites_live$Avg_transformed/2, na.rm=T)),
+  xpd = TRUE, ncol = 1, y.intersp=1.2)
+
+# Add point abundance
+for (i in 1:nrow(ZM14_stats_sites_live)) {
+  points(ZM14_stats_sites_live$Lon[i],ZM14_stats_sites_live$Lat[i], pch=16, cex=ZM14_stats_sites_live$Avg_transformed[i]/2)
+}
+
+if(!R_U_KNITTING) dev.off()
+```
+
+
+# Elevation map
+
+(not run, extraction takes a while. See files for output figure.)
+```{r plot elevation map, message=FALSE, warning=FALSE, include=FALSE}
 #from help here: https://gis.stackexchange.com/questions/293993/plotting-and-analyzing-extracted-elevation-data-in-r
 
 counties <- us_counties(map_date = "1930-01-01", resolution = "high", states = c("NY","VT"))
+states <- us_states(map_date = "1930-01-01", resolution = "high", states = c("NY","VT"))
 
 counties_sf <- as(counties, "Spatial")
-elevation_data <-get_elev_raster(counties_sf, z=9, src = "aws")
+states_sf <- as(counties, "Spatial")
+elevation_data <-get_elev_raster(states, z=9, src = "aws")
 #map <- extract(elevation_data, counties)
-if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/1-descriptive/map_elevation_NY_VT.pdf"))
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/1-descriptive/map_elevation_NY_VT.pdf"), width = 6.87, height = 5)
 plot(elevation_data, axes=TRUE)
-plot(st_geometry(counties), add=TRUE)
-plot(DEM, col="black", legend = FALSE, add = T) 
+#plot(st_geometry(world), add=TRUE, lwd=.7)
+plot(st_geometry(states), add=TRUE)
+plot(DEM, col="#9CD3DB", legend = FALSE, add = T) 
+TeachingDemos::shadowtext(-73.3,44.6, labels = "Lake Champlain", col = "black",bg = "#9CD3DB", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=2)
 scalebar(200, xy=c(-79, 40.5), type='bar', divs=4)
 north.arrow(-79.7, 40.5,len = .09, lab = "N", col="black")
 if(!R_U_KNITTING) dev.off()
 
-
 ```
 
 Extract depth for each location
-```{r}
+```{r try extract depth for each location - not working rn, eval=FALSE, include=FALSE}
 # From help https://gis.stackexchange.com/questions/279079/extracting-value-of-raster-with-coordinates-using-r
 # xy <- xyFromCell(DEM, c(0:ncell(DEM)+1))
 # xy <- data.frame(xy)
@@ -293,27 +340,10 @@ Extract depth for each location
 # mbreak <- seq(1, dim(xy)[1], by=100000)
 # xyz <- extract(DEM, xy[1:100,], df=T)
 # xyz <- cbind(xyz, xy)
-xyz<-getValues(DEM)
-write.table(xyz, file = paste0(dirname(getwd()), "/Output/Data/LakeChamplain_bathy_xyz.txt"))
+# xyz<-getValues(DEM)
+# write.table(xyz, file = paste0(dirname(getwd()), "/Output/Data/LakeChamplain_bathy_xyz.txt"))
 
 
 ```
 
-
-Do stats for each countie: not working for me at the moment
-
-```{r eval=FALSE}
-library(fasterize)
-counties_sf$POLYID <- 1:nrow(counties_sf)
-polymap <- fasterize(counties_sf, elevation_data, field = "POLYID")
-## mask out elevation where there's no polygon
-elevation_data[is.na(values(polymap))] <- NA
-plot(elevation_data)
-
-## to get zonal stats
-library(dplyr)
-tibble(value = values(elevation_data), POLYID = values(polymap)) %>% 
-dplyr::filter(!is.na(value)) %>% group_by(POLYID) %>% 
-summarize(mean(value))
-```
 
