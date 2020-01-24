@@ -3,6 +3,9 @@ title: "Model parameter EwE Lake Champlain"
 author: "Rosalie Bruel"
 date: "created on 2019-07-11 -- last update: `r Sys.Date()`"
 output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
   html_document:
     df_print: paged
     fig_caption: yes
@@ -10,9 +13,6 @@ output:
     toc: yes
     toc_depth: 3
     toc_float: yes
-  pdf_document:
-    toc: yes
-    toc_depth: '3'
 fontsize: 11pt
 editor_options:
   chunk_output_type: console
@@ -68,12 +68,6 @@ tab_cap <- captioner::captioner("Table")
 getpath4data <- function() {
   if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
   if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
-  if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
-}
-
-getpath4data <- function() {
-  if(Sys.getenv("USER")=="Rosalie") return("/Volumes/-/Script R/LCM_GitHub_Data_LCM/")
-  if(Sys.getenv("USER")=="alexnaccarato") return("~/Desktop/Food-Web 2018-2019/LCM_GitHub_Data/")
     if(Sys.getenv("USER")=="YOUR USER NAME") return("YOUR PATH")
   if(Sys.getenv("USER")!="Rosalie"|Sys.getenv("USER")!="alexnaccarato") stop("You need to get the data.")
 }
@@ -113,14 +107,14 @@ for (i in 1:nrow(foodweb)) {
   if (foodweb$predator[i] %in% c("Sea Lamprey")) foodweb$level[i] = 6
 }
 
-graph <- as_tbl_graph(foodweb)
-ggraph(graph, "grid") + 
-  geom_edge_link() + 
-  geom_node_point() +
-  geom_node_label(aes(label = names(graph[1])), repel = TRUE)
+# graph <- as_tbl_graph(foodweb)
+# ggraph(graph, "grid") + 
+#   geom_edge_link() + 
+#   geom_node_point() +
+#   geom_node_label(aes(label = names(graph[1])), repel = TRUE)
 
 ```
-<br>`r fig_cap("node plot1", caption="Lake Champlain food web – species of interest")`
+
 
 ```{r plot food web with igraph, echo=FALSE, message=FALSE, warning=FALSE}
 ewediet <- read.delim(paste0(getpath4data(),"EwE_params/EwE_diet.txt"))
@@ -227,7 +221,7 @@ par(xpd=F)
 if(!R_U_KNITTING) dev.off()
 
 ```
-
+<br>`r fig_cap("node plot1", caption="Lake Champlain food web – species of interest")`
 
 For the Lake Champlain monitoring data, I'm using the data I processed for the Stats-a-thon. The idea was to get something a bit homogeneous in term of depths (hypolimnion and epilimnion data when lake stratified, and hypolimnion=epilimnion when lake mixed).
 
@@ -236,7 +230,57 @@ dtlcm <- read.delim(paste0(getpath4data(),"LCM_unique_param_step4.txt"))
 names(dtlcm)
 dtlcm$Year <- as.numeric(paste(year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))))
 
+dtlcm_metadata <- read.delim(paste0(getpath4data(),"LCM_station_metadata.txt"))
+
 ```
+
+```{r gradient of conditions, echo=FALSE}
+
+dtlcm_summ <-
+  dtlcm %>% 
+  group_by(StationID) %>% 
+  summarise(    Temperature_E  = mean(Temperature_E, na.rm=T),
+            Total.Phosphorus_E = mean(Total.Phosphorus_E,na.rm=T))
+
+# Basic density
+p1 <- ggplot(dtlcm_summ, aes(x=Temperature_E)) + 
+  geom_density(fill="grey") + 
+  geom_vline(aes(xintercept=mean(Temperature_E)),
+            color="blue", linetype="dashed", size=1) +
+  theme_bw() + labs(x="Mean water temperature (epilimnion)", subtitle=paste0(min(dtlcm$Year[is.na(dtlcm$Temperature_E)]), " - ", max(dtlcm$Year[is.na(dtlcm$Temperature_E)])," (April-November)"))
+
+p2 <- ggplot(dtlcm_summ, aes(x=Total.Phosphorus_E)) + 
+  geom_density(fill="grey") + 
+  geom_vline(aes(xintercept=mean(Total.Phosphorus_E)),
+            color="blue", linetype="dashed", size=1) +
+  theme_bw() + labs(x="Mean total phosphorus (epilimnion) ", subtitle=paste0(min(dtlcm$Year[is.na(dtlcm$Total.Phosphorus_E)]), " - ", max(dtlcm$Year[is.na(dtlcm$Total.Phosphorus_E)])," (April-November)"))
+
+#grid.arrange(p1,p2, nrow=1)
+
+p3 <- ggplot(dtlcm_metadata[dtlcm_metadata$Station %in% unique(dtlcm$StationID),], aes(x=Total.Depth)) + 
+  geom_density(fill="grey") + 
+  geom_vline(aes(xintercept=mean(Total.Depth)),
+            color="blue", linetype="dashed", size=1) +
+  theme_bw() + labs(x="Max depth (m)")
+
+grid.arrange(p3,p1,p2, nrow=1)
+
+ggplot(dtlcm_summ, aes(x=Temperature_E,y=Total.Phosphorus_E)) +
+  geom_point()
+
+# Violin plot
+ggplot(dtlcm_summ, aes(x=StationID,y=Temperature_E)) + 
+  geom_violin(fill="grey", trim = F) +
+  theme_bw()
+
+ggplot(dtlcm_summ, aes(x=StationID,y=Total.Phosphorus_E)) + 
+  geom_violin(fill="grey", trim = F) +
+  theme_bw()
+
+
+
+```
+
 
 
 ```{r read detailed plankton database, message=FALSE, warning=FALSE, include=FALSE}
@@ -267,7 +311,7 @@ dim(plktn2)
 names(plktn2)
 
 phyto <- plktn2[,c(1, 2, grep("Phyto_", names(plktn2)))]
-zoo   <- plktn2[,c(1, 2, grep("Zoo_",   names(plktn2)))]
+  zoo <- plktn2[,c(1, 2, grep("Zoo_",   names(plktn2)))]
 
 dim(zoo)
 dim(phyto)
@@ -554,9 +598,9 @@ AIC(M0,M1,M2,M3arma1,M3arma2,M3arma3)
 ```
 
 These models are not all nested, so we need to compare them using AIC (we cannot use likelihood ratio tests).
-Model below not working (no convergence).
+Model below not working (no convergence) -- not run.
 
-```{r gamm secchi depth against amo , echo=FALSE}
+```{r gamm secchi depth against amo, eval=FALSE, message=FALSE, warning=FALSE, include=TRUE}
 BM1<-gamm(value ~ amo_winter +  variable + s(Year, by=variable),
           weights = varIdent(form = ~1|variable), data=dtlcm_secchi_summ2)
 ```
@@ -745,34 +789,67 @@ ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_sm)) + geom_point() +
 
 ```
 
-## Biomass
+## Zooplankton biomass
 
-Calculate biomass 
+Calculate biomass.
+Potential paper for Calanoid? <a href="https://www.sciencedirect.com/science/article/pii/S0380133015000453">Improved estimates of calanoid copepod biomass in the St. Lawrence Great Lakes (Burgess et al, 2015)</a>.
+
 ```{r get biomass, message=FALSE, warning=FALSE}
 # Biomass values were obtained from the size_zoop table
 # When multiplier = 0, we're still working on collecting the data
-# Biomass values      <- old zoop counts  ug/m3    g/m3      g/km3        t/km3
-zoo$BOSMINA_biom      <- zoo$BOSMINA      * 1.76   / 1000000 * 1000000000 / 1000000
-zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 32.15  / 1000000 * 1000000000 / 1000000
-zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA * 6.32   / 1000000 * 1000000000 / 1000000
-zoo$LEPTO_biom        <- zoo$LEPTO        * 113.31 / 1000000 * 1000000000 / 1000000
+# Convert from µg/m3 to t/km3
+#           ug/m3   g/m3      g/km3        t/km3
+conversion =  1  / 1000000 * 1000000000 / 1000000
+# Work Alex Naccarato did over summer 2019. Values converted using average weight for different groups (e.g., several values in size_zoop for Daphnia).
+# Biomass values      <- old zoop counts    ug/m3  
+zoo$BOSMINA_biom      <- zoo$BOSMINA      * 1.76   * conversion
+zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * 32.15  * conversion
+zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA * 6.32   * conversion
+zoo$LEPTO_biom        <- zoo$LEPTO        * 113.31 * conversion
 zoo$Polyphemus_biom <- 
-         zoo$`Zoo_Polyphemus pediculus`   * 12.84  / 1000000 * 1000000000 / 1000000
+         zoo$`Zoo_Polyphemus pediculus`   * 12.84  * conversion
 zoo$Holopedium_biom <- 
-         zoo$`Zoo_Holopedium gibberum`    * 158.15 / 1000000 * 1000000000 / 1000000
-zoo$CYCLOP_biom       <- zoo$CYCLOP       * 16.52  / 1000000 * 1000000000 / 1000000
-zoo$CALANOID_biom     <- zoo$CALANOID     * 0.00   / 1000000 * 1000000000 / 1000000
-zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.2556 / 1000000 * 1000000000 / 1000000 
-zoo$COPEPOD_biom      <- zoo$COPEPOD      * 1.58   / 1000000 * 1000000000 / 1000000
-zoo$PREDATOR_biom     <- zoo$PREDATOR     * 94.77  / 1000000 * 1000000000 / 1000000
-zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * 1.86   / 1000000 * 1000000000 / 1000000
-zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 23.59  / 1000000 * 1000000000 / 1000000
-zoo$PARASITIC_biom    <- zoo$PARASITIC    * 0.00   / 1000000 * 1000000000 / 1000000
+         zoo$`Zoo_Holopedium gibberum`    * 158.15 * conversion
+zoo$CYCLOP_biom       <- zoo$CYCLOP       * 16.52  * conversion
+zoo$CALANOID_biom     <- zoo$CALANOID     * 0.00   * conversion
+zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.2556 * conversion
+zoo$COPEPOD_biom      <- zoo$COPEPOD      * 1.58   * conversion
+zoo$PREDATOR_biom     <- zoo$PREDATOR     * 94.77  * conversion
+zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * 1.86   * conversion
+zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * 23.59  * conversion
+zoo$PARASITIC_biom    <- zoo$PARASITIC    * 0.00   * conversion
 
+
+# Replacing that work and trying to automate it a bit
+# Biomass values      <- old zoop counts    ug/m3  
+zoo$BOSMINA_biom      <- zoo$BOSMINA      * mean(size_zoop$weight[grep("Bosmina", size_zoop$Genus)])   * conversion
+zoo$DAPHNIA_biom      <- zoo$DAPHNIA      * mean(size_zoop$weight[grep("Daphnia", size_zoop$Genus)])  * conversion
+zoo$DIAPHANOSOMA_biom <- zoo$DIAPHANOSOMA * mean(size_zoop$weight[grep("Diaphanosoma", size_zoop$Genus)])   * conversion
+zoo$SIDA_biom         <- zoo$`Zoo_Sida crystallina` * mean(size_zoop$weight[grep("Sida", size_zoop$Genus)])   * conversion
+zoo$LEPTO_biom        <- zoo$LEPTO        * mean(size_zoop$weight[grep("Leptodora", size_zoop$Genus)]) * conversion
+zoo$Polyphemus_biom <- 
+         zoo$`Zoo_Polyphemus pediculus`   * mean(size_zoop$weight[grep("Polyphemus", size_zoop$Genus)])  * conversion
+zoo$Holopedium_biom <- 
+         zoo$`Zoo_Holopedium gibberum`    * mean(size_zoop$weight[grep("Holopedium", size_zoop$Genus)]) * conversion
+zoo$CYCLOP_biom       <- zoo$CYCLOP       * mean(size_zoop$weight[grep("Cyclop", size_zoop$Genus)])  * conversion
+zoo$CALANOID_biom     <- zoo$CALANOID     * 0.00   * conversion
+zoo$ROTIFER_biom      <- zoo$ROTIFER      * 0.2556 * conversion
+zoo$COPEPOD_biom      <- zoo$COPEPOD      * mean(size_zoop$weight[grep("Copepod", size_zoop$Genus)])   * conversion
+
+# Unfortunately we are missing a lot of species weight length relationship (all Alona for example). 
+# Instead, use the grouping prior, and then use an average weight for each group?
+zoo$PREDATOR_biom     <- zoo$PREDATOR     * mean(size_zoop$weight[grep("Polyphemus|Leptodora|Holopedium", size_zoop$Genus)])  * conversion
+zoo$GRAZER_sm_biom    <- zoo$GRAZER_sm    * mean(size_zoop$weight[grep("Bosmina|Chydorus", size_zoop$Genus)])   * conversion
+zoo$GRAZER_lr_biom    <- zoo$GRAZER_lr    * mean(size_zoop$weight[grep("Daphnia|Sida|Diaphanosoma|Cyclops|Calanoid", size_zoop$Genus)])  * conversion
+zoo$PARASITIC_biom    <- zoo$PARASITIC    * 0.00   * conversion
+
+plot(zoo$PREDATOR, zoo$PREDATOR_biom)
+
+# Below is the start if we were to have the weight per species.
 # Group by very large groups (i.e. grazers, predators)
-zoo$PREDATOR_biom    <- rowSums(zoo[,grep("Polyphemus_biom|LEPTO_biom|Holopedium_biom",names(zoo))]) 
-zoo$GRAZER_sm_biom   <- rowSums(zoo[,grep("BOSMINA_biom|Alon_biom|Chyd_biom|ROTIFER_biom|leurox_biom|ladocer_biom",names(zoo))])  
-zoo$GRAZER_lr_biom   <- rowSums(zoo[,grep("DAPHNIA_biom|Sida|DIAPHANOSOMA_biom|CYCLOP_biom|CALANOID_biom|opep_biom|Eurycercus_biom|aupl_biom",names(zoo))])  
+# zoo$PREDATOR_biom    <- rowSums(zoo[,grep("Polyphemus_biom|LEPTO_biom|Holopedium_biom",names(zoo))]) 
+# zoo$GRAZER_sm_biom   <- rowSums(zoo[,grep("BOSMINA_biom|Alon_biom|Chyd_biom|ROTIFER_biom|leurox_biom|ladocer_biom",names(zoo))])  
+# zoo$GRAZER_lr_biom   <- rowSums(zoo[,grep("DAPHNIA_biom|SIDA_biom|DIAPHANOSOMA_biom|CYCLOP_biom|CALANOID_biom|opep_biom|Eurycercus_biom|aupl_biom|GRAZER_lr_biom",colnames(zoo))])  
 
 
 # Focus on main lake
@@ -780,10 +857,28 @@ zoo19 <- zoo[zoo$StationID==19,c("VisitDate", "StationID", "Year", "Month", "yda
                                    "PREDATOR_biom", "GRAZER_sm_biom", "GRAZER_lr_biom", "PARASITIC_biom")]
 
 
-plot(zoo19$VisitDate[zoo19$PREDATOR != 0],zoo19$PREDATOR[zoo19$PREDATOR != 0], pch=20, col=adjustcolor("black", alpha.f = .3) , xlab="Visit Date", ylab="Biomass, t/km2")
-points(zoo19$VisitDate[zoo19$GRAZER_lr != 0],zoo19$GRAZER_lr[zoo19$GRAZER_lr != 0], pch=20, col=adjustcolor("blue", alpha.f = .3) )
-points(zoo19$VisitDate[zoo19$GRAZER_sm != 0],zoo19$GRAZER_sm[zoo19$GRAZER_sm != 0], pch=20, col=adjustcolor("red", alpha.f = .3) )
-points(zoo19$VisitDate[zoo19$PARASITIC != 0],zoo19$PARASITIC[zoo19$PARASITIC != 0], pch=20, col=adjustcolor("green", alpha.f = .3) )
+plot(zoo19$VisitDate[zoo19$PREDATOR_biom != 0],zoo19$PREDATOR_biom[zoo19$PREDATOR_biom != 0], pch=20, col=adjustcolor("black", alpha.f = .3) , xlab="Visit Date", ylab="Biomass, t/km2")
+points(zoo19$VisitDate[zoo19$GRAZER_lr_biom != 0],zoo19$GRAZER_lr_biom[zoo19$GRAZER_lr_biom != 0], pch=20, col=adjustcolor("blue", alpha.f = .3) )
+points(zoo19$VisitDate[zoo19$GRAZER_sm_biom != 0],zoo19$GRAZER_sm_biom[zoo19$GRAZER_sm_biom != 0], pch=20, col=adjustcolor("red", alpha.f = .3) )
+points(zoo19$VisitDate[zoo19$PARASITIC_biom != 0],zoo19$PARASITIC_biom[zoo19$PARASITIC_biom != 0], pch=20, col=adjustcolor("green", alpha.f = .3) )
+
+ggplot(zoo19) +
+  geom_point(aes(VisitDate, PREDATOR_biom, colour="Predacious")) + 
+  geom_point(aes(VisitDate, GRAZER_lr_biom, colour="Large grazers")) + 
+  geom_point(aes(VisitDate, GRAZER_sm_biom, colour="Small grazers")) +
+  labs(x="Year", y="Biomass (t/km3)",
+       title = paste0("Zooplankton Biomass, station(s) ", paste(unique(zoo19$StationID), sep="-"))) +
+  theme_bw() + 
+  theme(
+    legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) +
+  scale_colour_manual(name="Type",
+                      values=c("Predacious"="black",
+                               "Large grazers"="coral3",
+                               "Small grazers"="deepskyblue3"))
 
 
 #head(plktn)
@@ -802,6 +897,13 @@ zoo19_month_Predator
 ```
 
 
+## Try to assign zooplankton biomass and species name with fuzzy matching
+
+```{r}
+agrep(gsub("Zoo_","",colnames(zoo)[9]),size_zoop$Genus,max = 15, ignore.case = TRUE)
+
+```
+
 
 # Mysis
 
@@ -817,7 +919,8 @@ Mysis data are available from `r paste(min(mysis$Year),"to",max(mysis$Year))`, u
 Lake Champlain Mysid net tows = 0.5 m net, whole water column tows. 
 To calculate the net area, we use the formula for the volume of a cylinder:<br>
 
-$V = r^2 * \pi $
+$V = r^2 * \pi$
+
 <br>
 
 ```{r get net area fo mysis tow}
@@ -942,8 +1045,11 @@ with (data=mysis_summ
 
 # Benthic invertebrates
 
+## Juvenile densities
+
 __Data:__ <br>
   * Monitoring data initiated during the initial colonization
+  * 2014 survey, data handed by Ellen on January 11, 2020.
 
 From the <a href="https://dec.vermont.gov/watershed/lakes-ponds/aquatic-invasives/monitoring/zebra-mussels">VTDEC website</a>:
 "The Vermont Department of Environmental Conservation (VTDEC), in cooperation with the Lake Champlain Basin Program, initiated the Lake Champlain Zebra Mussel Monitoring Program in 1994 to track the zebra mussel's distribution through the lake. Reports are provided annually.
@@ -987,6 +1093,239 @@ plot(rownames(ZMvel_summ),ZMvel_summ$STA19, xlab="Year", ylab="Seasonal mean den
 ZMvel_STA19 <- data.frame("Year"=c(1994:2005,2011:2018), "Density"=c(0,167,4734,4973,12056,11477,20713,19718,6359,7017,8133,17871,2051,7750,1953,2623,5487,8974,10926,7371))
 #lines(ZMvel_STA19$Year,ZMvel_STA19$Density, col="pink")
 #==> not exactly the same data, what's wrong? Ask Pete Stangel maybe
+
+```
+
+## Adult survey
+
+```{r zebra mussels from 2014 survey, echo=FALSE}
+ZM14 <- read.delim(paste0(getpath4data(),"data_from_Ellen/QZ_database_2014-07-28.txt"))
+summary(ZM14)
+
+i=2 # Longitude
+ZM14 <- 
+  mutate(ZM14, Lon = case_when(Site == "Missisquoi Bay" ~ c(45.022313, -73.133799)[i],
+                             Site == "Colchester Point" ~ c(44.566795, -73.312679)[i],
+                             Site == "Alburgh Passage" ~ c(44.862116, -73.294569)[i],
+                             Site == "Appletree Bay" ~ c(44.500161, -73.267250)[i],
+                             Site == "Arnold Bay" ~ c(44.147666, -73.369197)[i],
+                             Site == "Benson Landing" ~ c(43.728599, -73.368032)[i],
+                             Site == "Chipman Point" ~ c(43.800849, -73.375585)[i],
+                             Site == "Chipman Point Marina" ~ c(43.799592, -73.375258)[i],
+                             Site == "Collymer Point" ~ c(44.416279, -73.243882)[i],
+                             Site == "Crown Point Bridge" ~ c(44.031132, -73.425729)[i],
+                             Site == "Cumberland Bay" ~ c(44.702587, -73.408615)[i],
+                             Site == "Cumberland Head" ~ c(44.690977, -73.390591)[i],
+                             Site == "Eagle Mountain" ~ c(44.670408, -73.213337)[i],
+                             Site == "Gordon Landing" ~ c(44.688837, -73.348902)[i],
+                             Site == "Inland Sea" ~ c(44.730856, -73.225923)[i],
+                             Site == "Island Line Causeway" ~ c(44.556216, -73.303760)[i],
+                             Site == "Mallets Bay" ~ c(44.570940, -73.198126)[i],
+                             Site == "Rouses Point Bridge" ~ c(44.995481, -73.342855)[i],
+                             Site == "St. Albans Bay" ~ c(44.783680, -73.153395)[i],
+                             Site == "Texaco Beach" ~ c(44.457352, -73.224607)[i],
+                             Site == "Trembleau Point" ~ c(44.522325, -73.391025)[i],
+                             Site == "Wilcox Bay" ~ c(44.702352, -73.350381)[i]
+                             ))
+
+i=1 # Latitude
+ZM14 <- 
+  mutate(ZM14, Lat = case_when(Site == "Missisquoi Bay" ~ c(45.022313, -73.133799)[i],
+                             Site == "Colchester Point" ~ c(44.566795, -73.312679)[i],
+                             Site == "Alburgh Passage" ~ c(44.862116, -73.294569)[i],
+                             Site == "Appletree Bay" ~ c(44.500161, -73.267250)[i],
+                             Site == "Arnold Bay" ~ c(44.147666, -73.369197)[i],
+                             Site == "Benson Landing" ~ c(43.728599, -73.368032)[i],
+                             Site == "Chipman Point" ~ c(43.800849, -73.375585)[i],
+                             Site == "Chipman Point Marina" ~ c(43.799592, -73.375258)[i],
+                             Site == "Collymer Point" ~ c(44.416279, -73.243882)[i],
+                             Site == "Crown Point Bridge" ~ c(44.031132, -73.425729)[i],
+                             Site == "Cumberland Bay" ~ c(44.702587, -73.408615)[i],
+                             Site == "Cumberland Head" ~ c(44.690977, -73.390591)[i],
+                             Site == "Eagle Mountain" ~ c(44.670408, -73.213337)[i],
+                             Site == "Gordon Landing" ~ c(44.688837, -73.348902)[i],
+                             Site == "Inland Sea" ~ c(44.730856, -73.225923)[i],
+                             Site == "Island Line Causeway" ~ c(44.556216, -73.303760)[i],
+                             Site == "Mallets Bay" ~ c(44.570940, -73.198126)[i],
+                             Site == "Rouses Point Bridge" ~ c(44.995481, -73.342855)[i],
+                             Site == "St. Albans Bay" ~ c(44.783680, -73.153395)[i],
+                             Site == "Texaco Beach" ~ c(44.457352, -73.224607)[i],
+                             Site == "Trembleau Point" ~ c(44.522325, -73.391025)[i],
+                             Site == "Wilcox Bay" ~ c(44.702352, -73.350381)[i]
+                             ))
+
+head(ZM14)
+
+
+ggplot(ZM14, aes(Length_mm,Width_mm, color=Live_Dead)) + geom_point() +
+  geom_smooth() + 
+  xlim(quantile(ZM14$Length_mm, c(0.0005,0.9995))) +
+  ylim(quantile(ZM14$Width_mm, c(0.0005,0.9995))) +
+  labs(x="Length (mm)", y = "Width (mm)",color='') +
+  theme_bw() + scale_color_hue(l=40, c=35) +
+    theme(legend.position="bottom")
+
+
+rbin::rbin_manual(ZM14, response = Width_mm, predictor = Length_mm, cut_points = seq(2,40,by=2))
+
+
+ggplot(ZM14, aes(Length_mm)) + 
+  geom_histogram(aes(y=..density..),binwidth=2,fill="#006666",color="white",alpha=0.7) + 
+  geom_density() + 
+  facet_wrap(~Site)+
+  geom_rug() +
+  labs(x='Length (mm)') + 
+  theme_bw()
+
+ZM14_live_dead <- as.data.frame(with(ZM14, tapply(rep(1,nrow(ZM14))
+  ,list("Sites"=Site,"Live_Dead#"=Live_Dead), sum, na.rm=T)))
+ZM14_live_dead$Site <- rownames(ZM14_live_dead)
+ZM14_live_dead_melt <- melt(ZM14_live_dead)
+
+
+```
+
+
+`r tab_cap("ZM_sample_type", "Way each individual were collected at each station.")` <br>
+```{r ZM summary sample type for each station, echo=FALSE, message=FALSE, warning=FALSE}
+ZM14_sample_type1 <- as.data.frame(with(ZM14, tapply(rep(1,nrow(ZM14))
+  ,list("Sample_Type"=Sample_Type,"Site"=Site), sum, na.rm=T)))
+rbind(ZM14_sample_type1, "*Number of techniques used"=apply(ZM14_sample_type1, 2, function(x) sum(!is.na(x))))
+
+```
+
+Ponar technique gets a lot of dead mussels because there might be dead mussels on the sediment. Dive sample involved Ellen diving and scraping off mussels from a quaddrat. These mussels would almost always be alive.
+<br> `r tab_cap("ZM_dead_live_sample_type", "Live or dead mussels per sampling type.")` <br>
+```{r ZM live or dead depending on sampling technique, echo=FALSE, message=FALSE, warning=FALSE}
+as.data.frame(with(ZM14, tapply(rep(1,nrow(ZM14))
+  ,list("Sample_Type"=Sample_Type,"Live_Dead"=Live_Dead), sum, na.rm=T)))
+
+ggplot(ZM14_live_dead_melt, aes(Site,value, fill=variable)) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  coord_flip() +
+  scale_fill_manual("",values = c("Dead"="#cc3399","Live"="#008080","N/A"="grey")) +
+  theme_bw() +
+  labs(x="Count")
+```
+<br> `r fig_cap("ZM_count_per_site", "Count of mussels per monitoring site.")`
+
+
+Look at the number of methods / samples per sites.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Same number of Rep is used accross sites.
+summary(ZM14$Site[ZM14$Rep==1]) 
+# Create a new column with site name and number replicate
+ZM14$SiteRep <- paste(ZM14$Site, ZM14$Rep, sep="_")
+
+
+ZM14_sample_type2 <- as.data.frame(with(ZM14, tapply(rep(1,nrow(ZM14))
+  ,list("Sample_Type"=Sample_Type,"Site"=SiteRep), sum, na.rm=T)))
+ZM14_summ_sample <- apply(ZM14_sample_type2, 2, function(x) sum(!is.na(x)))
+ZM14_summ_sample[order(ZM14_summ_sample, decreasing = T)]
+
+```
+
+`r english::Words(length(ZM14_summ_sample[ZM14_summ_sample>1]))` sites have replicate numbers that refers to more than one sampling technique. I can't pool the data for: `r paste("<br>- ", names(ZM14_summ_sample[ZM14_summ_sample>1]), collapse="")`
+
+
+Below I created summary table of the number of mussels per replicate. Some sites have many replicates (e.g., Missisquoi Bay), some have only one (e.g., Gordon Landing). I added as color the percentage of live vs. dead zebra mussels on first plot, 
+
+```{r number of mussels per sites}
+#Look at total number of mussels per site ####
+ZM14_summ_sites <- as.data.frame(with(ZM14, tapply(rep(1,nrow(ZM14))
+  ,list("SiteRep"=SiteRep,"Site"=Site), sum, na.rm=T)))
+
+ZM14_stats_sites <- data.frame("Site" = colnames(ZM14_summ_sites),
+                               "Avg"  = colMeans(ZM14_summ_sites, na.rm=T),
+                               "sd"   = apply(ZM14_summ_sites, 2, function(x) sd(x,na.rm=T)),
+                               "min"   = apply(ZM14_summ_sites, 2, function(x) min(x,na.rm=T)),
+                               "max"   = apply(ZM14_summ_sites, 2, function(x) max(x,na.rm=T)),
+                               "median"   = apply(ZM14_summ_sites, 2, function(x) median(x,na.rm=T)),
+                               "n"   = apply(ZM14_summ_sites, 2, function(x) sum(!is.na(x))))
+
+# Percentage mussels alive
+ZM14_live_dead_per_live <- ZM14_live_dead$Live/rowSums(ZM14_live_dead[,c("Dead", "Live", "N/A")], na.rm=T)
+ZM14_live_dead_per_live[is.na(ZM14_live_dead_per_live)] <-0
+
+# Prep for plot
+ZM14_summ_sites_melt <- melt(cbind(rownames(ZM14_summ_sites),ZM14_summ_sites))
+mcol <- rep(NA, nrow(ZM14_summ_sites_melt))
+for (i in 1:length(unique(ZM14_summ_sites_melt$variable))) {
+    mcol[ZM14_summ_sites_melt$variable==unique(ZM14_summ_sites_melt$variable)[i]] <- ZM14_live_dead_per_live[which(names(ZM14_live_dead_per_live)==unique(ZM14_summ_sites_melt$variable)[i])]  }
+ZM14_summ_sites_melt$percent_live <- mcol
+
+#head(ZM14_summ_sites_melt)
+p <- ggplot(ZM14_summ_sites_melt, aes(factor(variable), value, fill=percent_live*100))
+p <- p + geom_boxplot() +
+  labs(x="Sites", y="Number of zebra mussels", subtitle = "a. Zebra mussels collected per site (live and dead)", fill="Percentage zebra \nmussels alive") + 
+  coord_flip() + theme_bw() +
+    theme(legend.position="bottom") +scale_fill_gradient(low="#DC143C", high="#4169E1")
+#p
+#ggsave(paste0(getwd(),"/Output/Figures/7-ZebraMussels/Number_zm_per_site.pdf"))
+
+#Number of live mussels per sites, fill = type of sampling method####
+ZM14_summ_sites_live <- as.data.frame(with(ZM14[ZM14$Live_Dead=="Live",], tapply(rep(1,nrow(ZM14[ZM14$Live_Dead=="Live",]))
+  ,list("SiteRep"=SiteRep,"Site"=Site), sum, na.rm=T)))
+
+# Type of method
+ZM14_summ_method <- as.data.frame(with(ZM14, tapply(rep(1,nrow(ZM14))
+  ,list("Sites"=SiteRep,"Sample_Type"=Sample_Type), sum, na.rm=T)))
+
+ZM14_summ_method <- melt(cbind("Site"=rownames(ZM14_summ_method),ZM14_summ_method))
+ZM14_summ_method <- ZM14_summ_method[!is.na(ZM14_summ_method$value),]
+head(ZM14_summ_method)
+
+ZM14_stats_sites_live <- data.frame("Site" = colnames(ZM14_summ_sites_live),
+                               "Avg"  = colMeans(ZM14_summ_sites_live, na.rm=T),
+                               "sd"   = apply(ZM14_summ_sites_live, 2, function(x) sd(x,na.rm=T)),
+                               "min"   = apply(ZM14_summ_sites_live, 2, function(x) min(x,na.rm=T)),
+                               "max"   = apply(ZM14_summ_sites_live, 2, function(x) max(x,na.rm=T)),
+                               "median"   = apply(ZM14_summ_sites_live, 2, function(x) median(x,na.rm=T)),
+                               "n"   = apply(ZM14_summ_sites_live, 2, function(x) sum(!is.na(x))))
+
+ZM14_summ_sites_live_melt <- melt(cbind(rownames(ZM14_summ_sites_live),ZM14_summ_sites_live))
+mcol <- rep(NA, nrow(ZM14_summ_sites_live_melt))
+for (i in 1:length(unique(ZM14_summ_sites_live_melt$variable))) {
+    mcol[ZM14_summ_sites_live_melt$variable==unique(ZM14_summ_sites_live_melt$variable)[i]] <- paste(ZM14_summ_method$variable[which(paste(ZM14_summ_method$Site)==paste(unique(ZM14_summ_sites_live_melt$`rownames(ZM14_summ_sites_live)`)[i]))])
+    }
+ZM14_summ_sites_live_melt$Sample_type <- mcol
+
+
+
+#head(ZM14_summ_sites_live_melt)
+p1 <- ggplot(ZM14_summ_sites_live_melt, aes(factor(variable), value, fill=Sample_type, color=Sample_type))  + geom_boxplot() +
+  labs(x="Sites", y="Number of zebra mussels", title = "b. Live zebra mussels collected per site", fill="Sampling method", col="") + 
+  coord_flip() + theme_bw() +
+    theme(legend.position="bottom") + scale_fill_manual(values=adjustcolor(wes_palette("Darjeeling1",n =  length(unique(ZM14_summ_sites_live_melt$Sample_type)), type="continuous"), alpha.f = .5)) + scale_color_manual(values=wes_palette("Darjeeling1",n =  length(unique(ZM14_summ_sites_live_melt$Sample_type)), type="continuous")) + guides(col=FALSE)
+#p1
+#ggsave(paste0(getwd(),"/Output/Figures/7-ZebraMussels/Number_live_zm_per_sample.pdf"),p1)
+
+p2 <- grid.arrange(p,p1+scale_x_discrete(position = "top"),ncol=2)
+#ggsave(paste0(getwd(),"/Output/Figures/7-ZebraMussels/Summary_Number_ZM.pdf"),p2, width = 11, height = 5)
+
+```
+
+
+Now I'd like to plot these average number per sites
+
+```{r}
+ZM14_stats_sites_live$Sample_type <- rep(NA, nrow(ZM14_stats_sites_live))
+ZM14_stats_sites_live$Lon   <- rep(NA, nrow(ZM14_stats_sites_live))
+ZM14_stats_sites_live$Lat  <- rep(NA, nrow(ZM14_stats_sites_live))
+  
+for (i in 1:nrow(ZM14_stats_sites_live)) {
+  temporary <- summary(ZM14$Sample_Type[ZM14$Site==ZM14_stats_sites_live$Site[i]])
+    ZM14_stats_sites_live$Sample_type[i] <- paste(
+      names(temporary[temporary==max(temporary, na.rm=T)])
+    )
+    rm(temporary)
+    
+    ZM14_stats_sites_live$Lon[i] <- ZM14$Lon[ZM14$Site==ZM14_stats_sites_live$Site[i]][1]
+    ZM14_stats_sites_live$Lat[i] <- ZM14$Lat[ZM14$Site==ZM14_stats_sites_live$Site[i]][1]
+}
+
+#write.table(ZM14_stats_sites_live, file = "Output/Data/zebra_mussels_2014_summary_data.txt", sep="\t")
 
 ```
 
@@ -3248,7 +3587,7 @@ summary_ls <- list(
   "Cisco" = data.frame("Year"=cisco$Year,"CPUE"=cisco$JuniperIsland),
   "Alewife" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(c(2016:2018)))),
   "Walleye" = NA,
-  "Stocked juvenile lake trout" = data.frame("Year"=1972:2016, "Stocked"=as.vector(t(stklkt_summ["TOTAL",as.numeric(paste(colnames(stklkt_summ))) %in% 1972:2016]))),
+  "Stocked juvenile lake trout" = data.frame("Year"=1972:2016, "Stocked"=as.vector(stklkt_summ[as.numeric(paste(rownames(stklkt_summ))) %in% 1972:2016, "TOTAL"])),
   "Lake trout" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
   "Atlantic salmon" = NA,
   "Burbot" = data.frame("Year"=c(1982:1998),"Density"=rep(0.5,length(c(1982:1998)))),
@@ -3278,7 +3617,7 @@ for (i in 1:length(summary_ls)) {
     if(names(summary_ls[i])=="Phytoplankton") whichyear= msubset$Year[msubset$Year %in% 2006:2015]
     if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake trout", "Sea lamprey","Burbot")) whichyear= NULL
     if(names(summary_ls[i])=="Smelt") whichyear= msubset$Year[msubset$Year %in% 1998:2015]
-    if(names(summary_ls[i])=="stocked lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
+    if(names(summary_ls[i])=="Stocked juvenile lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
     
     msubset[,1] <- as.numeric(paste(msubset[,1]))
     msubset[,2] <- as.numeric(paste(msubset[,2]))
@@ -3329,7 +3668,7 @@ for (i in 1:length(summary_ls)) {
   #if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
   
   # Add a different point if work still in progress
-  if(names(summary_ls[i])%in%c("Burbot","Atlantic Salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
+  if(names(summary_ls[i])%in%c("Burbot","Atlantic salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
 }
 rect(2000,0.7,2002,i+0.3, lty=2, lwd=.5)
 
@@ -3468,7 +3807,7 @@ for (i in 1:length(summary_ls)) {
   if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
   
   # Add a different point if work still in progress
-  if(names(summary_ls[i])%in%c("Burbot","Atlantic Salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
+  if(names(summary_ls[i])%in%c("Burbot","Atlantic salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
 }
 rect(2000,0.7,2002,i+0.3, lty=2, lwd=.5)
 
@@ -3587,9 +3926,12 @@ for (i in 1:length(Tenvt)) {
 
 M_fish3 <- cbind("T_env"=M_fish2[,1],data.frame(lapply(M_fish2[,-1], function(X) X/X[1])))
 
-ggplot(M_fish2, aes(T_env, lake_trout_ad/REco2$BB[REco2$Group=="Adult lake trout"])) + geom_point() +
+if(!R_U_KNITTING) {
+  ggplot(M_fish2, aes(T_env, lake_trout_ad/REco2$BB[REco2$Group=="Adult lake trout"])) + geom_point() +
   geom_point(aes(T_env, alewife/REco2$BB[REco2$Group=="Alewife"]), col="blue") +
   geom_point(aes(T_env, atlantic_salmon/REco2$BB[REco2$Group=="Atlantic salmon"]), col="pink") + labs(x="T environment",y="Mortality/Biomass") + theme_bw()
+}
+
 
 ```
 <br>`r fig_cap("varying T env impact on PB fish", caption="Mortality (pondered by biomass) as a function of water temperature, for 3 groups in the food web.")`
