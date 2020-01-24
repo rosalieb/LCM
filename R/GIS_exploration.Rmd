@@ -36,6 +36,9 @@ library(leaflet)
 library(janitor)
 library(rgdal)
 library(raster)
+library(elevatr) # for elevation USA
+library(sf)
+library(USAboundaries) # counties and states delimitation USA
 library(rnaturalearth)
 library(rasterVis) # for levelplot
 library(GISTools) # for North arrow in plot (function north.arrow())
@@ -264,10 +267,6 @@ abline(v=0)
 
 ```{r}
 #from help here: https://gis.stackexchange.com/questions/293993/plotting-and-analyzing-extracted-elevation-data-in-r
-library(elevatr)
-library(raster)
-library(sf)
-library(USAboundaries)
 
 counties <- us_counties(map_date = "1930-01-01", resolution = "high", states = c("NY","VT"))
 
@@ -287,8 +286,16 @@ if(!R_U_KNITTING) dev.off()
 
 Extract depth for each location
 ```{r}
-xy <- xyFromCell(DEM, c(0:ncell(DEM)+1))
-xyz <- extract(DEM, xy, df = T)
+# From help https://gis.stackexchange.com/questions/279079/extracting-value-of-raster-with-coordinates-using-r
+# xy <- xyFromCell(DEM, c(0:ncell(DEM)+1))
+# xy <- data.frame(xy)
+# dim(xy)
+# mbreak <- seq(1, dim(xy)[1], by=100000)
+# xyz <- extract(DEM, xy[1:100,], df=T)
+# xyz <- cbind(xyz, xy)
+xyz<-getValues(DEM)
+write.table(xyz, file = paste0(dirname(getwd()), "/Output/Data/LakeChamplain_bathy_xyz.txt"))
+
 
 ```
 
