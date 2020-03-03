@@ -112,6 +112,8 @@ image(DEM, zlim=c(-10,0), main="Digital Elevation Model (DEM)", col=col)
 
 # add a color map with 5 colors
 col=terrain.colors(5)
+col=colorspace::diverge_hcl(5)
+
 # add breaks to the colormap (6 breaks = 5 segments) 
 brk <- c(-120, -80, -60, -40, -20, 0) 
 plot(DEM, col=col, breaks=brk, main="DEM with more breaks")
@@ -139,6 +141,29 @@ DEMcrop2 <- crop(DEM, cropbox2)
 plot(DEMcrop2)
 ```
 
+Smelt map 
+```{r smelt map}
+col=colorspace::diverge_hsv(5, s = .8)
+
+pdf(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.pdf"),width = 6, height = 9)
+png(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.png"),width = 4, height = 9)
+plot(DEM, col=col, main="") 
+# plot (add smelt sampling coordinates on top of it)
+smelt_coord <- read.csv(file = paste0(getpath4data(), "smelt_coord.csv"))
+smelt_coord$Basin <- c("Main", "NEArm", "Main", "Malletts", rep("Main", 6), "NEArm")
+points(smelt_coord$Longitude[smelt_coord$Basin=="Main"],
+       smelt_coord$Latitude[smelt_coord$Basin=="Main"], pch=16)
+points(smelt_coord$Longitude[smelt_coord$Basin=="NEArm"],
+       smelt_coord$Latitude[smelt_coord$Basin=="NEArm"], pch=17)
+points(smelt_coord$Longitude[smelt_coord$Basin=="Malletts"],
+       smelt_coord$Latitude[smelt_coord$Basin=="Malletts"], pch=15)
+legend("topleft", legend = c("Main Lake", "Malletts Bay", "Northeastern Arm"), pch= c(16,15,17), bty="n")
+scalebar(25, xy=c(-73.2, 43.6), type='bar', divs=2)
+north.arrow(-72.9, 43.77,len = .015, lab = "N", col="black")
+
+dev.off()
+
+```
 
 
 ```{r plot bathy with color, echo=FALSE, message=FALSE, warning=FALSE}
@@ -198,6 +223,28 @@ pchamp
 histogram(DEM, main='Lake Champlain depth histogram', xlab='depth (m)')
 
 ```
+
+# Map for Ben
+
+```{r}
+
+# add breaks to the colormap (6 breaks = 5 segments) 
+brk <- seq(-26, 0, by=2) 
+shadesOfGrey <- colorRampPalette(c("grey100","grey16"))
+col=shadesOfGrey(length(brk))
+cropbox2 <-c(-73.33,-73.27,44.64,44.68)
+#crop the raster
+DEMcrop_Ben <- crop(DEM, cropbox2) 
+#plot cropped DEM
+
+pdf(paste0("/Users/Rosalie/Downloads/Ben_Map_bw.pdf"), height=6, width=6.45)
+plot(DEMcrop_Ben, col=col)
+scalebar(2, xy=c(-73.299, 44.643), type='bar', divs=2, label = c("0","1","2 km"))
+dev.off()
+
+
+```
+
 
 
 # Zebra mussels vs quagga mussel distribution
@@ -343,7 +390,79 @@ Extract depth for each location
 # xyz<-getValues(DEM)
 # write.table(xyz, file = paste0(dirname(getwd()), "/Output/Data/LakeChamplain_bathy_xyz.txt"))
 
+xy <- xyFromCell(DEM, c(0:ncell(DEM)+1))
+xyzlist <- list(x=xy[,'x'],y=xy[,'y'],z=as.matrix(r))
+xyzlist <- list(x=coords[,'x'],y=coords[,'y'],z=as.matrix(r))
+xyz <- as.matrix(DEM[1:5])
+
+xyz <- raster()
+xyz[] <- runif(ncell(xyz))
+```
+
+
+# Try getting area per depth
+
+```{r}
+DEM_hist <- hist(DEM, main="Distribution of elevation values", col= "purple", plot=F)
+sum(DEM_hist$counts)
+ncell(DEM)
+
+mich_hist <-hist(michigan, main="Distribution of elevation values", col= "purple", plot=F, breaks=seq(-300,350,5))
+
+
+points(DEM_hist$mids,DEM_hist$counts)
+
+DEM_hist$percent_above <- rep(NA, length(DEM_hist$count))
+for (i in 2:length(DEM_hist$breaks)) DEM_hist$percent_above[i-1] <- sum(DEM_hist$counts[DEM_hist$mids>DEM_hist$breaks[i]])/sum(DEM_hist$counts)
+
+mich_hist$percent_above <- rep(NA, length(mich_hist$count))
+for (i in 2:length(mich_hist$breaks)) mich_hist$percent_above[i-1] <- sum(mich_hist$counts[mich_hist$mids>mich_hist$breaks[i]&mich_hist$mids<0])/sum(mich_hist$counts[mich_hist$mids<0])
+
+
+plot(mich_hist$mids, (1-mich_hist$percent_above*100), type="l", xlab="depth (m)", ylab="percentage")
+lines(DEM_hist$mids, (1-DEM_hist$percent_above)*100)
+abline(v=-50)
+abline(v=-80)
+
+sum(mich_hist$counts[mich_hist$mids>-80&mich_hist$mids<0]) / sum(mich_hist$counts[mich_hist$mids>-50&mich_hist$mids<0])
+
+sum(DEM_hist$counts[DEM_hist$mids>-80&DEM_hist$mids<0]) /
+sum(DEM_hist$counts[DEM_hist$mids>-50&DEM_hist$mids<0])
 
 ```
 
+# Extract volume of each bays
+
+Total volume of the lake is $26 km^3$ (Data given in Howe et al 2006).  
+Total surface of the lake is $1227 km^2$. Now I'll try counting the pixel per bays.
+
+```{r extract volume of each bays}
+l_area = 1227
+
+DEM_missisquoi
+
+# Missisquoi
+e_missisquoi <- as(extent(-73.3, -73.0, 44.97, 45.2), 'SpatialPolygons')
+crs(e_missisquoi) <- "+proj=longlat +datum=WGS84 +no_defs"
+DEM_missisquoi <- crop(DEM, e_missisquoi)
+
+plot(DEM_missisquoi)
+
+ncell(DEM_missisquoi) / ncell(DEM) * l_area
+
+# South lake
+e_slake <- as(extent(-73.5, -73.0, 43.2, 44.2), 'SpatialPolygons')
+crs(e_slake) <- "+proj=longlat +datum=WGS84 +no_defs"
+DEM_slake <- crop(DEM, e_slake)
+plot(DEM_slake)
+ncell(DEM_slake) / ncell(DEM) * l_area
+
+# Main lake
+e_mlake <- as(extent(-73.5, -73.0, 44.2, 44.6), 'SpatialPolygons')
+crs(e_mlake) <- "+proj=longlat +datum=WGS84 +no_defs"
+DEM_mlake <- crop(DEM, e_mlake)
+plot(DEM_mlake)
+ncell(DEM_mlake) / ncell(DEM) * l_area
+
+```
 
