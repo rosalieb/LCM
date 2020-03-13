@@ -354,7 +354,7 @@ REco.params.LC$model[Group %in% c('Stocked lake trout'), Biomass := 85]
 # REco.params.LC$model[Group %in% c('Zoo (predacious)'), Biomass := 300]
 # REco.params.LC$model[Group %in% c('Zoo grazers'), Biomass := 500]
 # REco.params.LC$model[Group %in% c('Mysis'), Biomass := 0.4] # 0.4 g/m2 estimated from Jason's density data, and Rosie's weight data from Cheasapeake Bay. Biomass prior to 1995 was 1.2 g/m2. g/m2 and t/km2 is the same. Kitchell et al have a biomass of 0.18494 g/m2 for Lake Superior.
-# REco.params.LC$model[Group %in% c('Phytoplankton'), Biomass := 700]
+ REco.params.LC$model[Group %in% c('Phytoplankton'), Biomass := 700*9000]
 
 ```
 
@@ -374,14 +374,14 @@ REco.params.LC$model[Group %in% c('Burbot'), PB := M_fish$burbot]
 REco.params.LC$model[Group %in% c('Walleye'), PB := M_fish$walleye]
 REco.params.LC$model[Group %in% c('Whitefish'), PB := M_fish$whitefish]
 REco.params.LC$model[Group %in% c('Cisco'), PB := M_fish$cisco]
-REco.params.LC$model[Group %in% c('Smelt'), PB := M_fish$smelt]
-REco.params.LC$model[Group %in% c('Alewife'), PB := M_fish$alewife]
+REco.params.LC$model[Group %in% c('Smelt'), PB := M_fish$smelt+0.3] # increasing production rate for smelt to see if the model calculates a lower biomass 
+REco.params.LC$model[Group %in% c('Alewife'), PB := M_fish$alewife+0.1] # increasing production rate for smelt to see if the model calculates a lower biomass
 REco.params.LC$model[Group %in% c('Trout-perch'), PB := M_fish$trout_perch]
 REco.params.LC$model[Group %in% c('Sculpin'), PB := M_fish$sculpin]
 REco.params.LC$model[Group %in% c('Sculpin'), PB := .3] # random value for now
 REco.params.LC$model[Group %in% c('Benthic invertebrates'), PB := 3]
 REco.params.LC$model[Group %in% c('Zoo (predacious)'), PB := 13]
-REco.params.LC$model[Group %in% c('Zoo grazers'), PB := 13]
+REco.params.LC$model[Group %in% c('Zoo grazers'), PB := 13+32] # Increasing production rate from 13 to 45 to see if the model calculates a lower biomass 
 REco.params.LC$model[Group %in% c('Mysis'), PB := 3]
 REco.params.LC$model[Group %in% c('Phytoplankton'), PB := 300]
 REco.params.LC$model[Group %in% c('Fleet1'), PB := NA]
@@ -461,9 +461,9 @@ for (i in 1:length(REco.params.LC$model$EE)) {
 REco.params.LC$model$EE <- as.numeric(paste(REco.params.LC$model$EE))
 # BUT, values reported vary A LOT according to different studies. Sometimes, they vary because age-class changes (make sense), but a lot of times, I don't understand the reasons behind having these parameters vary that much.
 REco.params.LC$model[Group %in% c('Sea Lamprey'), EE := 0] #(Kao et al., 2016 Lake Huron)
-REco.params.LC$model[Group %in% c('Adult lake trout'), EE := .83] # For fish age 0-0.5 year Kao et al., 2016 (Lake Huron)
-REco.params.LC$model[Group %in% c('Juvenile lake trout'), EE := 0.12] # For fish age 1-4 years Kao et al., 2016 (Lake Huron)
-REco.params.LC$model[Group %in% c('Stocked lake trout'), EE := 0.1] # For fish age 5+ year Kao et al., 2016 (Lake Huron)
+#REco.params.LC$model[Group %in% c('Adult lake trout'), EE := .83] # For fish age 0-0.5 year Kao et al., 2016 (Lake Huron)
+#REco.params.LC$model[Group %in% c('Juvenile lake trout'), EE := 0.12] # For fish age 1-4 years Kao et al., 2016 (Lake Huron)
+#REco.params.LC$model[Group %in% c('Stocked lake trout'), EE := 0.1] # For fish age 5+ year Kao et al., 2016 (Lake Huron)
 REco.params.LC$model[Group %in% c('Atlantic salmon'), EE := .1]
 REco.params.LC$model[Group %in% c('Burbot'), EE := 0.41] #Kao et al 2016 Lake Huron, for Burbot 1+ 
 REco.params.LC$model[Group %in% c('Walleye'), EE := 0.83] # Zhang et al., 2016 (Lake Erie)
@@ -475,7 +475,7 @@ REco.params.LC$model[Group %in% c('Trout-perch'), EE := .61] # only one data rep
 REco.params.LC$model[Group %in% c('Sculpin'), EE := .57] # Kao et al., 2018 (Lake Michigan)
 REco.params.LC$model[Group %in% c('Benthic invertebrates'), EE := 0.46] # 0.46 in Lake Huron (Kao et al., 2014)
 REco.params.LC$model[Group %in% c('Zoo (predacious)'), EE := .8] # 0.82 for Bythotrephes (Kao et al., 2018, Lake Michigan). 0.87 for predatory cladoceran (Kao et al., 2016, Lake Huron), but also .42 and .3 in the same lake?
-REco.params.LC$model[Group %in% c('Zoo grazers'), EE := .23] #Herbivorous cladocerans Zhang et al., 2016 (Lake Erie). Value much higher when all groups are considered together, while individually, they are smaller.
+REco.params.LC$model[Group %in% c('Zoo grazers'), EE := .7] #0.23 for Herbivorous cladocerans Zhang et al., 2016 (Lake Erie). Value much higher when all groups are considered together, while individually, they are smaller. Trying a random higher value .7
 REco.params.LC$model[Group %in% c('Mysis'), EE := .95] # In Rogers et al 2014 for Lake Michigan
 REco.params.LC$model[Group %in% c('Phytoplankton'), EE := 0.75] # 0.75 for Kitchell et al., 2000, Lake Superior, 0.79 for Kao et al 2018 (Lake Michigan). There is some edible and non-edible phytoplankton
 REco.params.LC$model[Group %in% c('Detritus'), EE := 0.1] # depends on settled/pelagic/sedimented detritus. Higher values for pelagic detritus. Here, I'm using values in the range of those reported for settled detritus in Lake Huron (Kao et al, 2016)
@@ -526,11 +526,10 @@ REco.params.LC$stanzas$stgroups[, Wmat     := c(1.8/32)] # weight at maturity / 
 #Individual stanza parameters
 REco.params.LC$stanzas$stindiv[, First   := c(0,4,24)]
 REco.params.LC$stanzas$stindiv[,  Last    := c(3,23,400)]
-REco.params.LC$stanzas$stindiv[,  Z       := c(M_fish$lake_trout_stk,
-                                               M_fish$lake_trout_juv,
-                                               M_fish$lake_trout_ad)]
+REco.params.LC$stanzas$stindiv[,  Z       := c(M_fish$lake_trout_stk+0.1,
+                                               M_fish$lake_trout_juv+0.1,
+                                               M_fish$lake_trout_ad+0.1)] # Add 0.1 to see if it reduces the need for huge smelt and zoo biomass
 REco.params.LC$stanzas$stindiv[,  Leading := c(T,F,F)]
-
 
 ```
 
@@ -557,7 +556,7 @@ The data entered in the diet list is the same as the data entered in the diet co
 
 ```REco.params.LC$diet[Group == 'Smelt', 'Adult lake trout' := 0.1]```
 
-```{r}
+```{r set diet}
 # Sea Lamprey diet
 REco.params.LC$diet[Group == 'Adult lake trout', 'Sea Lamprey' := 0.4]
 REco.params.LC$diet[Group == 'Atlantic salmon', 'Sea Lamprey' := 0.4]
@@ -609,9 +608,10 @@ REco.params.LC$diet[Group == 'Zoo (predacious)', 'Cisco' := 0.2]
 REco.params.LC$diet[Group == 'Benthic invertebrates', 'Cisco' := 0.2]
 
 # Smelt
-REco.params.LC$diet[Group == 'Zoo grazers', 'Smelt' := 0.6]
+REco.params.LC$diet[Group == 'Zoo grazers', 'Smelt' := 0.4]
 REco.params.LC$diet[Group == 'Zoo (predacious)', 'Smelt' := 0.3]
 REco.params.LC$diet[Group == 'Smelt', 'Smelt' := 0.1]
+REco.params.LC$diet[Group == 'Mysis', 'Smelt' := 0.2]
 
 # Alewife
 REco.params.LC$diet[Group == 'Zoo grazers', 'Alewife' := 0.7]
@@ -642,7 +642,143 @@ REco.params.LC$diet[Group == 'Phytoplankton', 'Benthic invertebrates' := 1]
 # Zoo grazers
 REco.params.LC$diet[Group == 'Phytoplankton', 'Zoo grazers' := 1]
 
+# Diagnostic stats and plot for diet ####
+### Make sure everything rounds up to 1 #
+REco.params.LC$diet <- cbind(REco.params.LC$diet[,1],
+  sapply( REco.params.LC$diet[,-1], function(x) x / sum(x, na.rm=T)))
 
+
+###  Plot the diet to have a visual idea #
+diet_melt <- melt(REco.params.LC$diet)
+diet_melt <- diet_melt[!is.na(diet_melt$value),]
+# Cumulative sum of diet to get label position
+diet_melt <- ddply(diet_melt, "variable",
+                   transform, label_ypos=1-cumsum(value))
+diet_melt <- transform(diet_melt, Group_ID=as.numeric(factor(Group)))
+id=as.numeric(factor(sample))
+head(diet_melt)
+diet_melt$Group_ID
+
+ggplot(diet_melt,aes(variable, value, fill=Group)) + 
+  geom_bar(stat="identity", colour=adjustcolor("white", alpha.f = .4)) +
+  geom_text(aes(y=label_ypos, label=Group_ID), vjust=0, 
+            color="white", size=2.5) +
+  labs(x="Species", y="Diet proportion") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ 
+```
+
+##### Mixed trophic impact (Libralato et al 2006)
+
+Given the mass-balance model of a trophic network, the mixed trophic impact is estimated for each pair of functional groups (i, j, interacting directly or not) of the trophic web, by means of the net impact matrix. According to Ulanowicz and Puccia (1990), the net impact of i on j ($q_{ij}$) is given by the difference between positive effects, quantified by the fraction of the prey i in the diet of the predator j ($d_{jj}$), and negative effects, evaluated through the fraction of total consumption of i used by predator j ($f_{ij}$). Therefore the resulting matrix of the net impacts, Q, has elements: <br>
+$q_{ij}=d_{ji}−f_{ij}$ (2) <br>
+
+The mixed trophic impact $m_{ij}$ is then estimated by the product of all the net impacts qij for all the possible pathways in the trophic web that link the functional groups i and j. Ulanowicz and Puccia (1990) demonstrated that the matrix of the mixed trophic impacts, M, can be obtained by the inverse of the matrix Q, as it is calculated in EwE (Christensen et al., 2004). Table 1 shows the elements of such matrix M derived from a food web representing the ecosystem off the coast of Newfoundland (Bundy, 2001). <br>
+The elements mij of the matrix M quantify the direct and indirect impacts that each (impacting) group i has on any (impacted) group j of the food web (Ulanowicz and Puccia, 1990). Positive/negative values of $m_{ij}$ indicate the increase/decrease of biomass of the group j due to a slight increase of biomass of the impacting group i. Thus, the mixed trophic impacts represent the first order partial deriva- tives, in term of biomass, of the Ecopath master equation (1). This can be illustrated by Ecosim simulations, as shown below. <br>
+Moreover, from Eq. (2) one can tell that negative elements of matrix M indicate a prevailing of negative effects, i.e. the effects of the predator on the prey; analogously, positive elements of M indicate prevailing effects of the prey on the predator. Therefore, negative elements of M can be associated to prevailing top-down effects and positive ones to bottom-up effects.
+<br>
+
+```{r mixed trophic impact calculation}
+mdiet <- as.data.frame(REco.params.LC$diet)
+mdiet[is.na(mdiet)] <- 0
+
+# Net impact matrix
+qmatrix <- mdiet
+qmatrix[,-1] <- NA
+# prey i
+# predator j
+
+for (j in 2:ncol(mdiet)) {
+  for (i in 1:(nrow(mdiet)-2)) {
+    # dji= positive effect, fraction of the prey i in the diet of the predator j
+    # fij= negative effects, fraction of total consumption of i used by predator j
+    #                  qij        =      dji    −     fij
+    if(mdiet[i,j]>0) qmatrix[i,j] <- mdiet[i,j] - mdiet[i,j]/sum(mdiet[i,-1], na.rm=T)
+  }
+}
+
+min(qmatrix[,-1], na.rm=T)
+max(qmatrix[,-1], na.rm=T)
+plot(colMeans(qmatrix[,-1], na.rm=T));abline(h=0)
+plot(rowMeans(qmatrix[,-1], na.rm=T));abline(h=0)
+
+# Mixed impact matrix
+mmatrix <- mdiet
+mmatrix[,-1] <- NA
+
+# Using some code taken from package enaR, function enaMTI https://rdrr.io/cran/enaR/man/enaMTI.html
+Flow <- mdiet[1:(ncol(mdiet)-1),-1]
+I <- Flow * 0
+diag(I) <- 1
+Q <- qmatrix[1:(ncol(qmatrix)-1),-1]
+Q[is.na(Q)] <- 0
+dom1Q <- abs(eigen(Q)$values[1])
+library(MASS)
+M <- ginv(as.matrix(I) - as.matrix(Q)) - I
+
+# code for relationalChange
+# https://rdrr.io/github/SEELab/enaR/src/R/relationalChange.r
+# r <- relationalChange(Q, M)
+# IR <- r$Integral.Relations
+# r.table <- r$Relations.Table
+# names(r.table) <- c("From", "To", "Net (direct)", 
+#                 "Mixed (integral)", "changed")
+# rownames(r.table) <- c(1:dim(r.table)[1])
+
+level_order <- c('Sea Lamprey', 'Adult lake trout','Juvenile lake trout', 'Stocked lake trout', 'Atlantic salmon', 'Burbot', 'Walleye', 'Whitefish', 'Cisco', 'Smelt', 'Alewife', 'Trout-perch', 'Sculpin', 'Zoo (predacious)', 'Mysis', 'Benthic invertebrates', 'Zoo grazers', 'Phytoplankton')
+
+mmatrix <- data.frame("prey" = rep(colnames(M), nrow(M)),melt(M))
+
+head(mmatrix[order(mmatrix$value, decreasing = T),])
+
+p1 <- ggplot(mmatrix, aes(factor(prey, level=level_order), factor(variable, level=rev(level_order)), fill= value)) +geom_tile() +
+  labs(x="impacting", y="impacted", subtitle = "Mixed trophic impact matrix", fill="Indirect effects") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  scale_fill_gradient2(midpoint=0,  low="red", mid="white",
+                  high="blue")
+p1
+ggsave(paste0(getwd(),"/Output/Figures/6-Rpath/MixedTrophicImpactMatrix_LChamplain.pdf"), width = 6.36, height = 5.12, plot = p1)
+
+
+# Index of keystoneness
+
+# Pi = contribution of the functional group to the total biomass of the food web  
+Pi <- REco2$BB[1:ncol(M)]/sum(REco2$BB[1:ncol(M)])
+Pi <- Pi[order(REco2$Group[1:ncol(M)])]
+
+# epsilon i = measure of the overall effect of each group i
+epsi <- rep(NA, nrow(M))
+for(i in 1:nrow(M)) {
+  epsi[i] <- sum(M[i,-i]^2)
+  epsi[i] <- sqrt(epsi[i])
+}
+epsi <- epsi[order(level_order)]
+  
+KSi = log(epsi*(1 - Pi))
+
+KSi <- data.frame("Group"= level_order[order(level_order)],
+           "Pi" = Pi,
+           "epsi" = epsi,
+           "KSi"= KSi)
+
+KSi <- KSi[order(KSi$KSi),]
+
+ggplot(KSi, aes(factor(Group, level=rev(level_order)), KSi)) + geom_point() +
+  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+
+```
+
+```{r}
+library(enaR)
+data(troModels)
+mti <- enaMTI(troModels[[6]])
+attributes(mti)
+mti$M
+mti$G
+mti$FP
+mti$Q
+
+enaMTI
 
 ```
 
@@ -650,9 +786,10 @@ REco.params.LC$diet[Group == 'Phytoplankton', 'Zoo grazers' := 1]
 ### Run ecopath
 
 ```{r}
+REco.params.LC$model[Group %in% c('Phytoplankton'), Biomass := 700*9000]
 
 REco2 <- rpath(REco.params.LC, eco.name = 'Lake Champlain')
-REco2
+REco2$BB
 
 sum(REco2$TL[REco2$type<2] * REco2$BB[REco2$type<2]) / sum(REco2$BB[REco2$type<2])
 plot(REco2$TL[REco2$type<2][order(REco2$TL[REco2$type<2])],REco2$BB[REco2$type<2][order(REco2$TL[REco2$type<2])], type="l")
@@ -662,6 +799,7 @@ data.frame(REco2$Group,REco2$BB)
 REco.params$model
 REco.params.LC$model
 REco2$QB
+REco2$BB
 REco.params.LC$model$QB
 ```
 
@@ -694,9 +832,9 @@ webplot(REco2, fleets = F, highlight = 'Phytoplankton')
 ```
 
 
-```{r}
+```{r some diagnosis plot}
 #Some plot output
-REco2_df <- data.frame("Group"= REco2$Group,"BB"=REco2$BB)
+REco2_df <- data.frame("Group"= REco2$Group,"BB"=REco2$BB, "TL"=REco2$TL)
 REco2_df$summary <- ifelse(REco2_df$BB > 0, "Positive biomass", "Negative biomass")
 REco2_df$Group <- factor(REco2_df$Group,levels = c(REco2$Group))
 
@@ -707,6 +845,12 @@ ggplot(REco2_df[-which(REco2_df$Group=="Detritus"),],aes(Group,BB, fill=summary)
 ggplot(REco2_df[-which(REco2_df$Group=="Detritus"),],aes(Group,log(BB))) +
   geom_bar(stat = "identity") +
   theme_bw() + labs(y="log Biomass", fill='') + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(REco2_df[-which(REco2_df$Group=="Detritus"),],aes(TL,log(BB), label = Group)) + 
+  geom_point() +
+  geom_text(hjust = 0, nudge_x = 0.05) + 
+  stat_smooth()
+
 
 ```
 
@@ -820,5 +964,215 @@ Rs1.1 <- rsim.run(Rp1.1)
 rsim.plot(Rs1.1, spname = Rp1$params$spname)
 
 
+```
+
+
+# Messy way to increase LT biomass to see how the relative biomass increase.
+
+```{r Messy way to increase LT biomass to see how the relative biomass increase.}
+ratios <- seq(-0.4,0.2,by=0.1)
+output_LT_changes <- data.frame("Biomass_initial"= REco2$BB)#/REco2$BB)
+
+for (i in ratios) {
+  param_edits <- REco.params.LC
+  
+  #Edit stanzas
+  #Group parameters
+  param_edits$stanzas$stgroups[, VBGF_Ksp := c(0.05)]
+  W_lt_at_maturity <- 10^(-5.519 + log10(45) * 3.17882)
+  param_edits$stanzas$stgroups[, Wmat     := c(1.8/32)] # weight at maturity / max weight? 
+  
+  #Individual stanza parameters
+  param_edits$stanzas$stindiv[, First   := c(0,4,24)]
+  param_edits$stanzas$stindiv[,  Last    := c(3,23,400)]
+  param_edits$stanzas$stindiv[,  Z       := c(M_fish$lake_trout_stk,
+                                                 M_fish$lake_trout_juv+i,
+                                                 M_fish$lake_trout_ad)] # Add 0.1 to see if it reduces the need for huge smelt and zoo biomass
+  param_edits$stanzas$stindiv[,  Leading := c(T,F,F)]
+  
+   param_edits <- rpath.stanzas(param_edits)
+  
+  # param_edits$model[Group %in% c('Adult lake trout'), "Biomass"] <- REco.params.LC$model[Group %in% c('Adult lake trout'), Biomass]*i
+  REco3 <- rpath(param_edits, eco.name = 'Lake Champlain')
+  print(paste("Adult lake trout biomass:",
+              REco2$BB[REco2$Group=='Adult lake trout'], " - ",
+              REco3$BB[REco3$Group=='Adult lake trout']))
+  
+  output_LT_changes <- cbind(output_LT_changes, as.vector(REco3$BB))#/REco2$BB))
+
+}
+colnames(output_LT_changes) <-  c(0, ratios)
+output_LT_changes <- output_LT_changes[,-1]
+#output_LT_changes <- output_LT_changes/output_LT_changes[,which(colnames(output_LT_changes)=="0")]
+
+output_LT_changes <- t(output_LT_changes)
+colnames(output_LT_changes) <- REco2$Group
+
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/6-Rpath/test_change_LT_biomass2.pdf"),width = 10, height = 10)
+layout(matrix(1:ncol(output_LT_changes), ncol=4))
+for (i in 1:(ncol(output_LT_changes)-1)) {
+  plot(as.numeric(paste(rownames(output_LT_changes))),output_LT_changes[,i], type="l", main=paste(colnames(output_LT_changes)[i]), xlab="Change in mortality of juvenile lake trout", ylab=paste(colnames(output_LT_changes)[i],"biomass"))
+  points(as.numeric(paste(rownames(output_LT_changes))),output_LT_changes[,i], pch=ifelse(output_LT_changes[,i]>=0, 16, 1), cex=2, col=c(rep("cyan2",4), "black","red", "red"))
+}
+if(!R_U_KNITTING) dev.off()
+
+output_LT_changes_melt <- melt(output_LT_changes)
+
+ggplot(output_LT_changes_melt, aes(Var1, value)) + geom_point() + facet_wrap(~Var2)
+
+```
+
+# Messy way to increase LT biomass to see how the relative biomass increase, by changing stocking.
+
+```{r Messy way to increase LT biomass to see how the relative biomass increase, by changing stocking.}
+ratios <- seq(65,125,by=10)
+output_LT_changes <- data.frame("Biomass_initial"= REco2$BB)#/REco2$BB)
+
+ggplot(data.frame("Index"=1:length(ratios),"Stocking"=ratios*1000, "type"=c("<","<","=",">",">",">",">")), aes(Index,Stocking, fill=type)) +
+  geom_bar(stat = "identity") + geom_hline(yintercept = 85000) +
+  labs(x="Scenarios", y="Equivalent yearling", title = "Different scenarios tested", fill="Comparison\nto present\nstocking")  + theme_bw() + scale_fill_manual(values = c("tomato","grey","deepskyblue2" ))
+  
+
+for (i in ratios) {
+  param_edits <- REco.params.LC
+   # Change the initial biomass
+  param_edits$model[Group %in% c('Stocked lake trout'), Biomass := i]
+  # And force some other biomass
+  # param_edits$model[Group %in% c('Atlantic salmon'), Biomass := REco2$BB[REco2$Group=="Atlantic salmon"]]
+  #   param_edits$model[Group %in% c('Burbot'), Biomass := REco2$BB[REco2$Group=="Burbot"]]
+  # param_edits$model[Group %in% c('Sea Lamprey'), Biomass := REco2$BB[REco2$Group=="Sea Lamprey"]]
+  param_edits$model[Group %in% c('Juvenile lake trout'), Biomass := NA]
+  param_edits$model[Group %in% c('Adult lake trout'), Biomass := NA]
+  
+  #Edit stanzas
+  #Group parameters
+  param_edits$stanzas$stgroups[, VBGF_Ksp := c(0.05)]
+  W_lt_at_maturity <- 10^(-5.519 + log10(45) * 3.17882)
+  param_edits$stanzas$stgroups[, Wmat     := c(1.8/32)] # weight at maturity / max weight? 
+  
+  #Individual stanza parameters
+  param_edits$stanzas$stindiv[, First   := c(0,4,24)]
+  param_edits$stanzas$stindiv[,  Last    := c(3,23,400)]
+  param_edits$stanzas$stindiv[,  Z       := c(M_fish$lake_trout_stk,
+                                                 M_fish$lake_trout_juv,
+                                                 M_fish$lake_trout_ad)] # Add 0.1 to see if it reduces the need for huge smelt and zoo biomass
+  param_edits$stanzas$stindiv[,  Leading := c(T,F,F)]
+  
+ 
+   param_edits <- rpath.stanzas(param_edits)
+  
+  # param_edits$model[Group %in% c('Adult lake trout'), "Biomass"] <- REco.params.LC$model[Group %in% c('Adult lake trout'), Biomass]*i
+  REco3 <- rpath(param_edits, eco.name = 'Lake Champlain')
+  print(paste("Adult lake trout biomass:",
+              REco2$BB[REco2$Group=='Adult lake trout'], " - ",
+              REco3$BB[REco3$Group=='Adult lake trout']))
+  
+  output_LT_changes <- cbind(output_LT_changes, as.vector(REco3$BB))#/REco2$BB))
+
+}
+colnames(output_LT_changes) <-  c(0, ratios)
+output_LT_changes <- output_LT_changes[,-1]
+#output_LT_changes <- output_LT_changes/output_LT_changes[,which(colnames(output_LT_changes)=="0")]
+
+output_LT_changes <- t(output_LT_changes)
+colnames(output_LT_changes) <- REco2$Group
+
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/6-Rpath/test_change_LT_biomass3.pdf"),width = 10, height = 10)
+layout(matrix(1:ncol(output_LT_changes), ncol=4))
+for (i in 1:(ncol(output_LT_changes)-1)) {
+  plot(as.numeric(paste(rownames(output_LT_changes))),output_LT_changes[,i], type="l", main=paste(colnames(output_LT_changes)[i]), xlab="Change in biomass of stocked lake trout", ylab=paste(colnames(output_LT_changes)[i],"biomass"))
+  points(as.numeric(paste(rownames(output_LT_changes))),output_LT_changes[,i], pch=ifelse(output_LT_changes[,i]>=0, 16, 1), cex=2, col=c(rep("tomato",2), "grey",rep("deepskyblue2",4)))
+}
+if(!R_U_KNITTING) dev.off()
+
+output_LT_changes_melt <- melt(output_LT_changes)
+
+ggplot(output_LT_changes_melt, aes(Var1, value)) + geom_point() + facet_wrap(~Var2)
+
+```
+
+
+# Messy way to balance LT biomass in response to higher natural recruitment.
+
+```{r Messy way to balance LT biomass in response to higher natural recruitment.}
+ratios <- seq(-0.3,-0.1,by=0.1)
+stockingchange <- seq(85,30, by = -15)
+output_LT_stock_mort_changes <- data.frame("Biomass_initial"= REco2$BB)#/REco2$BB)
+
+for (i in ratios) {
+  for (j in stockingchange) {
+    param_edits <- REco.params.LC
+  
+  #Edit stanzas
+  #Group parameters
+  param_edits$stanzas$stgroups[, VBGF_Ksp := c(0.05)]
+  W_lt_at_maturity <- 10^(-5.519 + log10(45) * 3.17882)
+  param_edits$stanzas$stgroups[, Wmat     := c(1.8/32)] # weight at maturity / max weight? 
+  
+  #Individual stanza parameters
+  param_edits$stanzas$stindiv[, First   := c(0,4,24)]
+  param_edits$stanzas$stindiv[,  Last    := c(3,23,400)]
+  param_edits$stanzas$stindiv[,  Z       := c(M_fish$lake_trout_stk,
+                                                 M_fish$lake_trout_juv+i,
+                                                 M_fish$lake_trout_ad)] # Add 0.1 to see if it reduces the need for huge smelt and zoo biomass
+  param_edits$stanzas$stindiv[,  Leading := c(T,F,F)]
+  
+  # Change the initial biomass
+  param_edits$model[Group %in% c('Stocked lake trout'), Biomass := j]
+  
+  param_edits <- rpath.stanzas(param_edits)
+  
+  # param_edits$model[Group %in% c('Adult lake trout'), "Biomass"] <- REco.params.LC$model[Group %in% c('Adult lake trout'), Biomass]*i
+  REco3 <- rpath(param_edits, eco.name = 'Lake Champlain')
+  print(paste("Adult lake trout biomass:",
+              REco2$BB[REco2$Group=='Adult lake trout'], " - ",
+              REco3$BB[REco3$Group=='Adult lake trout']))
+  
+  output_LT_stock_mort_changes <- cbind(output_LT_stock_mort_changes, as.vector(REco3$BB))#/REco2$BB))
+  }
+
+}
+colnames(output_LT_stock_mort_changes) <-  c( paste(rep(ratios, each=length(stockingchange)),c(85,rep(stockingchange, length(ratios))), sep="_"))
+output_LT_stock_mort_changes <- output_LT_stock_mort_changes[,-1]
+#output_LT_stock_mort_changes <- output_LT_stock_mort_changes/output_LT_stock_mort_changes[,which(colnames(output_LT_stock_mort_changes)=="0")]
+
+output_LT_stock_mort_changes <- t(output_LT_stock_mort_changes)
+colnames(output_LT_stock_mort_changes) <- REco2$Group
+
+
+if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/6-Rpath/test_change_LT_biomass_stocking_biomass.pdf"),width = 10, height = 10)
+layout(matrix(1:ncol(output_LT_changes), ncol=4))
+for (i in 1:(ncol(output_LT_changes)-1)) {
+  plot(rep(ratios, each=length(stockingchange)),output_LT_changes[,i], type="l", main=paste(colnames(output_LT_changes)[i]), xlab="Change in mortality of juvenile lake trout", ylab=paste(colnames(output_LT_changes)[i],"biomass"))
+  points(as.numeric(paste(rownames(output_LT_changes))),output_LT_changes[,i], pch=ifelse(output_LT_changes[,i]>=0, 16, 1), cex=2, col=c(rep("cyan2",4), "black","red", "red"))
+}
+if(!R_U_KNITTING) dev.off()
+
+output_LT_changes_melt <- melt(output_LT_changes)
+
+ggplot(output_LT_changes_melt, aes(Var1, value)) + geom_point() + facet_wrap(~Var2)
+
+```
+
+
+
+
+# transfer energy trophic level (Hive plot)
+
+```{r hive plot}
+#library HiveR not working
+#library(HiveR)
+
+#Tweak using igraph
+plot.igraph(net_w,edge.color=adjustcolor(edge.col,alpha.f = .8), edge.curved=2,
+                  layout=-as.matrix(matrix(c(rep(0,nrow(mylayout_w)),mylayout_w[,2]), ncol=2),vertex.size=vertex.size))
+
+
+
+tl <- data.frame("Group" = REco2$Group, "TL" = REco2$TL)
+
+hive1 <- edge2HPD(edge_df = dataSet.ext)
 ```
 
