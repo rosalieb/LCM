@@ -55,6 +55,33 @@ library(scales) # Get full number in x/y scales with scale_x_continuous(labels =
 library(concurve) # plot p-value and s-value, see recommandations in Chow and Sander, 2019
 library(psych) # for pairs-panels (scaterplot matrix)
 
+# Function to draw North arrow
+#https://gis.stackexchange.com/questions/243743/alternative-north-arrow-using-r-gistools-package
+northarrow <- function(loc,size,bearing=0,cols,cex=1,...) {
+  # checking arguments
+  if(missing(loc)) stop("loc is missing")
+  if(missing(size)) stop("size is missing")
+  # default colors are white and black
+  if(missing(cols)) cols <- rep(c("white","black"),8)
+  # calculating coordinates of polygons
+  radii <- rep(size/c(1,4,2,4),4)
+  x <- radii[(0:15)+1]*cos((0:15)*pi/8+bearing)+loc[1]
+  y <- radii[(0:15)+1]*sin((0:15)*pi/8+bearing)+loc[2]
+  # drawing polygons
+  for (i in 1:15) {
+    x1 <- c(x[i],x[i+1],loc[1])
+    y1 <- c(y[i],y[i+1],loc[2])
+    polygon(x1,y1,col=cols[i])
+  }
+  # drawing the last polygon
+  polygon(c(x[16],x[1],loc[1]),c(y[16],y[1],loc[2]),col=cols[16])
+  # drawing letters
+  b <- c("","N","","")
+  #b <- c("E","N","W","S")
+  for (i in 0:3) text((size+par("cxy")[1])*cos(bearing+i*pi/2)+loc[1],
+                      (size+par("cxy")[2])*sin(bearing+i*pi/2)+loc[2],b[i+1],
+                      cex=cex)
+}
 
 # Captions with library captioner
 # https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
@@ -141,27 +168,68 @@ DEMcrop2 <- crop(DEM, cropbox2)
 plot(DEMcrop2)
 ```
 
-Smelt map 
-```{r smelt map}
-col=colorspace::diverge_hsv(5, s = .8)
+# Smelt paper map 
 
-pdf(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.pdf"),width = 6, height = 9)
-png(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.png"),width = 4, height = 9)
-plot(DEM, col=col, main="") 
+```{r smelt map}
+# Read limit LC basin
+lcb = st_read(paste0(getpath4data(),"GIS/LCB_boundary_2013/LCB_boundary_2013.shp"))
+lcb <- st_transform(lcb, crs = crs(world))
+plot(lcb, axes=T, col=adjustcolor("grey", alpha.f = .3), main="Lake Champlain Basin")
+lcb_df <- as.data.frame(lcb$geometry) 
+lcb_df <- unlist(lcb_df)
+lcb_df <- data.frame("lon" = lcb_df[1:(length(lcb_df)/2)], 
+                     "lat" = lcb_df[(length(lcb_df)/2+1):length(lcb_df)])
+plot(lcb_df, type="l")
+par(new=T)
+plot(DEM, col=col, main="")#, axes="F", add = TRUE) 
+lines(lcb_df)
+
+
+brk <- c(-122,-100, -80, -60, -50, -40, -30, -20, -10,0) 
+#brk <- c(-120, -80, -60, -40, -20, 0) 
+
+col=colorspace::diverge_hcl(c(length(brk)-1), l = 60)
+col=colorspace::diverge_hsv(c(length(brk)-1), s = .8)
+colr <- colorRampPalette(brewer.pal(11, 'RdYlBu'))
+col=rev(colr(length(brk)))
+#plot(1:10,1:10, pch=16, cex=4, col=col)
+
+#pdf(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.pdf"),width = 6, height = 9)
+if(!R_U_KNITTING) png(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.png"), width = 5.5, height = 7.5, units = "in", res = 120)
+par(mar=c(5.1,5.1,2.1,2.1))
+plot(DEM, col=col, main="", axes="F") 
+axis(1, at =  seq(-74.5,-72, by=.5), labels = paste0(abs(seq(-74.5,-72, by=.5)), "°W"))
+axis(2, at =  seq(43,45, by=.5), labels = paste0(seq(43,45, by=.5), "°N"), las=1)
+mtext("Longitude", side = 1, line = 2.5)
+mtext("Latitude", side = 2, line = 3.6)
+#levelplot(DEMcrop_Ben, par.settings = BuRdTheme, contour=TRUE)
 # plot (add smelt sampling coordinates on top of it)
 smelt_coord <- read.csv(file = paste0(getpath4data(), "smelt_coord.csv"))
 smelt_coord$Basin <- c("Main", "NEArm", "Main", "Malletts", rep("Main", 6), "NEArm")
+smelt_coord <- smelt_coord[order(smelt_coord$Latitude, decreasing = T),]
+points(smelt_coord$Longitude[smelt_coord$Basin=="Main"],
+       smelt_coord$Latitude[smelt_coord$Basin=="Main"], pch=16, cex=1.2, col="white")
+points(smelt_coord$Longitude[smelt_coord$Basin=="NEArm"],
+       smelt_coord$Latitude[smelt_coord$Basin=="NEArm"], pch=17, cex=1.2, col="white")
+points(smelt_coord$Longitude[smelt_coord$Basin=="Malletts"],
+       smelt_coord$Latitude[smelt_coord$Basin=="Malletts"], pch=15, cex=1.2, col="white")
+
 points(smelt_coord$Longitude[smelt_coord$Basin=="Main"],
        smelt_coord$Latitude[smelt_coord$Basin=="Main"], pch=16)
 points(smelt_coord$Longitude[smelt_coord$Basin=="NEArm"],
        smelt_coord$Latitude[smelt_coord$Basin=="NEArm"], pch=17)
 points(smelt_coord$Longitude[smelt_coord$Basin=="Malletts"],
        smelt_coord$Latitude[smelt_coord$Basin=="Malletts"], pch=15)
-legend("topleft", legend = c("Main Lake", "Malletts Bay", "Northeastern Arm"), pch= c(16,15,17), bty="n")
-scalebar(25, xy=c(-73.2, 43.6), type='bar', divs=2)
-north.arrow(-72.9, 43.77,len = .015, lab = "N", col="black")
+TeachingDemos::shadowtext(smelt_coord$Longitude-0.045, smelt_coord$Latitude-0.015, 1:nrow(smelt_coord), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.15, cex=1.1)
+legend("bottomleft", legend = c("Main Lake", "Malletts Bay", "Northeast Arm"), pch= c(16,15,17), cex=.9)
+scalebar(25, xy=c(-73.18, 43.6), type='bar', divs=2, below = "kilometers")
+northarrow(loc=c(-73.0, 43.78), size = .09)
 
-dev.off()
+if(!R_U_KNITTING) dev.off()
+par(mar=c(5.1,4.1,4.1,2.1))
+
+# for legend within paper
+# paste("(",1:nrow(smelt_coord),") ", smelt_coord$Station, sep="", collapse = ", ")
 
 ```
 
@@ -237,8 +305,17 @@ cropbox2 <-c(-73.33,-73.27,44.64,44.68)
 DEMcrop_Ben <- crop(DEM, cropbox2) 
 #plot cropped DEM
 
+levelplot(DEMcrop_Ben, par.settings = BuRdTheme, contour=TRUE)
+
+contour_ben <- rasterToContour(DEMcrop_Ben)
+str(contour_ben)
+plot(DEMcrop_Ben)
+plot(contour_ben, add=TRUE)
+as.data.frame(contour_ben)
+
 pdf(paste0("/Users/Rosalie/Downloads/Ben_Map_bw.pdf"), height=6, width=6.45)
 plot(DEMcrop_Ben, col=col)
+plot(contour_ben, add=TRUE)
 scalebar(2, xy=c(-73.299, 44.643), type='bar', divs=2, label = c("0","1","2 km"))
 dev.off()
 
@@ -463,6 +540,37 @@ crs(e_mlake) <- "+proj=longlat +datum=WGS84 +no_defs"
 DEM_mlake <- crop(DEM, e_mlake)
 plot(DEM_mlake)
 ncell(DEM_mlake) / ncell(DEM) * l_area
+
+```
+
+# Contour lines
+
+```{r}
+xyz <- read.delim("/Users/Rosalie/Desktop/Travail/QGIS/LakeChamplainBathy/VT_Lake_Champlain_Bathymetry.txt")
+xyz$Z <- xyz$DEPTH_FT/3.281
+xyz <- xyz[order(xyz$X, decreasing = F),]
+contourLines(x = xyz$X, y = xyz$Y, z = xyz$Z, nlevels = 10)
+#not working: error message reads Error in contourLines(x = xyz$X, y = xyz$Y, z = xyz$Z, nlevels = 10) :   increasing 'x' and 'y' values expected
+
+# https://stackoverflow.com/questions/8406507/how-can-i-calculate-the-area-within-a-contour-in-r
+library(sos)
+findFn("area polygon compute")
+library(splancs)
+with(clines[[9]],areapl(cbind(x,y)))
+with(DEM,areapl(cbind(x,y)))
+areapl(poly = cbind(x= c(1:10,10:1), y=c(rep(1,10), rep(2,10))))
+# Area enclosed by contour lines https://www.mathworks.com/matlabcentral/answers/132216-how-do-i-calculate-area-enclosed-by-contour-lines
+
+# [x, y, z] = peaks; 
+# [C, h] = contour(x, y, z, 20);
+# ch = get(h,'children');
+# area = zeros(numel(ch),1);
+# for i = 1:numel(ch)
+#     x = get(ch(i),'xdata');
+#     y = get(ch(i),'ydata');
+#     [x,y] = poly2cw(x,y);
+#     area(i) = polyarea(x,y);
+# end
 
 ```
 
