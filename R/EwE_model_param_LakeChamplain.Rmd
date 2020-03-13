@@ -32,6 +32,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # tmp$packages_non_used
 # tmp$summary_functions_plot
 library(ggplot2)
+library(patchwork) # to easily arrange plot
+library(stickylabeller) # to get a, b, c, or fancy names in facet_wrap
 library(plotly)
 library(plyr) #for ddply
 library(dplyr)
@@ -57,6 +59,8 @@ library(tidygraph) # to transform dataframe in node datasets
 library(scales) # Get full number in x/y scales with scale_x_continuous(labels = comma)/scale_y_continuous(labels = comma) instead of 1.00e09 for example
 library(concurve) # plot p-value and s-value, see recommandations in Chow and Sander, 2019
 library(psych) # for pairs-panels (scaterplot matrix)
+library(TTR) # for moving average 
+library(matrixStats) # for sd per row - states of matrix in general
 
 
 # Captions with library captioner
@@ -75,7 +79,7 @@ getpath4data <- function() {
 # Source functions for fulton cond factor, relative condition, and relative weight
 # Compute_FultonK
 source("https://raw.githubusercontent.com/rosalieb/miscellaneous/master/R/Compute_FultonK.R")
-# RelCond_Fisheries
+# RelCond_Fisheries 
 source("https://raw.githubusercontent.com/rosalieb/miscellaneous/master/R/RelCond_Fisheries.R")
 # RelWeight_Fisheries
 source("https://raw.githubusercontent.com/rosalieb/miscellaneous/master/R/RelWeight_Fisheries.R")
@@ -146,6 +150,7 @@ net <- graph_from_data_frame(d=ewediet2, vertices=ewediet_nodes, directed=T)
 colrs <- wes_palette("Darjeeling1", n=length(unique(V(net)$level)), type="continuous")
 V(net)$color <- colrs[V(net)$level+6]
 colrs <- wes_palette("Darjeeling1", n=length(V(net)$name), type="continuous")
+#colrs<- c("grey",colrs[2],rep("grey", length(V(net)$name)-2))
 V(net)$color <- colrs
 
 edge.start <- ends(net, es=E(net), names=F)[,2]
@@ -774,7 +779,7 @@ ggplotly(pzoo)
 ```
 `r fig_cap("zoop_evol", caption = "Evolution of zooplankton abundance in Lake Champlain")`
 
-```{r View abundance per station, fig.cap = c(cap1,cap2,cap3),echo=FALSE, message=FALSE, warning=FALSE}
+```{r View abundance per station, fig.cap = c(cap1,cap2,cap3, cap4),echo=FALSE, message=FALSE, warning=FALSE}
 cap1 = fig_cap("zoop_pred", caption = "Evolution of predators zooplankton abundance in Lake Champlain")
 ggplot(data = zoo, aes(x = VisitDate, y = PREDATOR)) + geom_point() +
   facet_wrap(~as.factor(zoo$StationID)) + ylim(0,20000)
@@ -786,6 +791,41 @@ ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_lr)) + geom_point() +
 cap3=fig_cap("zoop_smgraz", caption = "Evolution of small grazers zooplankton abundance in Lake Champlain")
 ggplot(data = zoo, aes(x = VisitDate, y = GRAZER_sm)) + geom_point() +
   facet_wrap(~as.factor(zoo$StationID)) + ylim(0,250000)
+
+
+#
+cap4=fig_cap("zoop_proportion", caption = "Relative change in zooplankton species")
+zoo_clean <- zoo[,c("Year" ,"Month", "StationID", "BOSMINA","DAPHNIA","DIAPHANOSOMA", "CYCLOP" ,"CALANOID" , "ROTIFER"   ,"COPEPOD" ,"PREDATOR", "GRAZER_lr", "GRAZER_sm")]
+zoo_clean <- zoo[,c("Year" ,"Month", "StationID","PREDATOR", "GRAZER_lr", "GRAZER_sm")]
+
+zoo_clean <- cbind("Year"= rep(zoo$Year,3),
+                   "Month"=rep(zoo$Month,3),
+                   melt(zoo_clean[,3:6]))
+
+zoo_clean <- cbind("Year"= rep(zoo$Year,81),
+                   "Month"=rep(zoo$Month,81),
+                   melt(zoo[,2:83]))
+
+ggplot(zoo_clean, aes(fill=variable, y=value, x=Year)) + 
+    geom_bar(position="fill", stat="identity", show.legend = F) + facet_wrap(~StationID) +
+  scale_fill_manual(values = wes_palette("Darjeeling1", length(unique(zoo_clean$variable)), type = "continuous")) + theme_classic()
+
+#ggsave(paste0(getwd(),"/Output/Figures/10-Zooplankton/Zooplankton_Community_composition_change.pdf"), width=8, height=7)
+
+if(!R_U_KNITTING) {
+  for (i in seq_along(unique(zoo_clean$StationID))) {
+    p <- 
+      ggplot(zoo_clean[zoo_clean$StationID==unique(zoo_clean$StationID)[i],], aes(fill=variable, y=value, x=Year)) + 
+    geom_bar(position="fill", stat="identity") + 
+      xlim(min(zoo_clean$Year), max(zoo_clean$Year)) +
+    scale_fill_manual(values = wes_palette("Darjeeling1", length(unique(zoo_clean$variable)), type = "continuous")) + theme_classic()
+
+ ggsave(plot = p, filename = paste0(getwd(),"/Output/Figures/10-Zooplankton/Zooplankton_Community_composition_change_Station",unique(zoo_clean$StationID)[i],".pdf"), width=18, height=7)
+ 
+ p <- ggplotly(p)
+ htmlwidgets::saveWidget(p, paste0(getwd(),"/Output/Figures/10-Zooplankton/Zooplankton_Community_composition_change_Station",unique(zoo_clean$StationID)[i],".html"))
+  }
+}
 
 ```
 
@@ -1000,7 +1040,7 @@ lines(mysis_summ$Year[-c(1:cpts(ans))], c(lm2$coefficients[1]+mysis_summ$Year[-c
 
 ```
 <br>
-`r fig_cap("mysis abundance 2", caption="Average (and sd) mysis density per year. Linear regression for the two periods detected.")`
+`r fig_cap("mysis_abundance_2", caption="Average (and sd) mysis density per year. Linear regression for the two periods detected.")`
 
 
 ## Get biomass in grams
@@ -1329,6 +1369,101 @@ for (i in 1:nrow(ZM14_stats_sites_live)) {
 
 ```
 
+
+Left to do:  
+We have abundances per replicate, but how to convert that to an area? We need the surface area of the ponar, and the video sample, et al.
+
+Converting everything in number / km^2^
+
+```{r}
+
+# petite ponar 152 x 152 mm * 10^-12 (mm2 to km2)
+zm_ponar    <- 152 * 152    * 1e-12 
+zm_bigrock <- 1#
+zm_rocksample <- 1
+zm_underdocks <- 1
+zm_gillnet <- 1
+zm_trawl <- 1
+zm_benthicsample <- 1
+
+
+ZM14_stats_sites_live %>% 
+  mutate(Avg_number_km2  = case_when(
+    Sample_type == "Ponar"  ~ Avg/zm_ponar,
+    Sample_type == "Big Rock"  ~ Avg/zm_bigrock,
+    Sample_type == "Rock Sample"  ~ Avg/zm_rocksample,
+    Sample_type == "Under Docks"  ~ Avg/zm_underdocks,
+    Sample_type == "Gillnet"  ~ Avg/zm_gillnet,
+    Sample_type == "Bottom Trawl"  ~ Avg/zm_trawl,
+    Sample_type == "Benthic Sample"  ~ Avg/zm_benthicsample
+        ))
+
+
+```
+
+
+```{r width and length per site}
+#ggplot(ZM14, aes(Length_mm, Width_mm)) + geom_point()
+# First way to look at it, do an average per site (no consideration of the rplicates.
+ZM14_summ_sites_live_length_1 <- with(ZM14[ZM14$Live_Dead=="Live",], tapply(Length_mm
+  ,list("Site"=Site), mean, na.rm=T))
+ZM14_summ_sites_live_width_1 <- with(ZM14[ZM14$Live_Dead=="Live",], tapply(Width_mm
+  ,list("Site"=Site), mean, na.rm=T))
+
+ZM14_summ_sites_live_length_width_method1 <- 
+  data.frame("Site"=names(ZM14_summ_sites_live_length_1),
+             "Length_mm" = ZM14_summ_sites_live_length_1,
+             "Width_mm" = ZM14_summ_sites_live_width_1)
+
+# Second way to look at it, do an average per replicate, then average per site.
+ZM14_summ_sites_live_length <- as.data.frame(with(ZM14[ZM14$Live_Dead=="Live",], tapply(Length_mm
+  ,list("SiteRep"=SiteRep,"Site"=Site), mean, na.rm=T)))
+ZM14_summ_sites_live_length_2 <- colMeans(ZM14_summ_sites_live_length, na.rm = T)
+
+ZM14_summ_sites_live_width <- as.data.frame(with(ZM14[ZM14$Live_Dead=="Live",], tapply(Width_mm
+  ,list("SiteRep"=SiteRep,"Site"=Site), mean, na.rm=T)))
+ZM14_summ_sites_live_width_2 <- colMeans(ZM14_summ_sites_live_width, na.rm = T)
+
+temp1 <- melt(cbind(rownames(ZM14_summ_sites_live_length),ZM14_summ_sites_live_length))
+colnames(temp1) <- c("SiteRep", "Site", "Length_mm")
+temp2 <- melt(cbind(rownames(ZM14_summ_sites_live_width),ZM14_summ_sites_live_width))
+colnames(temp2) <- c("SiteRep", "Site", "Width_mm")
+ZM14_summ_sites_live_length_width <- cbind(temp1, "Width_mm"=temp2$Width_mm)
+ZM14_summ_sites_live_length_width <- ZM14_summ_sites_live_length_width[!is.na(ZM14_summ_sites_live_length_width[,3]) ,]
+
+
+#head(ZM14_summ_sites_live_length_width)
+p1 <- ggplot(ZM14_summ_sites_live_length_width, aes(Length_mm, Width_mm, color=Site))  + geom_point() +
+  labs(x="Length(mm)", y="Width (mm)", title = "a. Width-Length relationship zebra mussels per site", col="")  + theme_bw() +
+    theme(legend.position="bottom")
+
+p2 <- ggplot(ZM14_summ_sites_live_length_width, aes(Site, Length_mm))  + geom_boxplot() +
+  labs(x="", y="Length (mm)", title = "b. Zebra mussel length per site") + 
+  coord_flip() + theme_bw() 
+
+p3 <- ggplot(ZM14_summ_sites_live_length_width, aes(Site, Width_mm))  + geom_boxplot() +
+  labs(x="", y="Width (mm)", title = "c. Zebra mussel width per site") + 
+  coord_flip() + theme_bw()
+  
+
+p4 <- grid.arrange(p1,p2,p3,ncol=3)
+p4
+
+#ggsave(paste0(getwd(),"/Output/Figures/7-ZebraMussels/Length_width_zebra_mussels_per_site_1.pdf"),p4, width=14,height=6)
+
+
+# Difference between two methods (do the whole mean, or first do average per replicate)
+ZM14_diff_mean_width_length <- data.frame("Site" = names(ZM14_summ_sites_live_length_1),
+"Diff_Length"= as.vector(ZM14_summ_sites_live_length_1-ZM14_summ_sites_live_length_2),
+"Diff_Width"= as.vector(ZM14_summ_sites_live_width_1-ZM14_summ_sites_live_width_2))
+
+ZM14_diff_mean_width_length <-melt(ZM14_diff_mean_width_length)
+
+ggplot(ZM14_diff_mean_width_length, aes(Site,value, fill=variable)) +
+  geom_bar(stat = "identity", position=position_dodge()) +
+  coord_flip() + theme_bw() 
+
+```
 
 
 # Sculpin
@@ -1756,6 +1891,7 @@ __Data:__
 smelt <- read.csv(file = paste0(getpath4data(),"data_from_Ellen/MasterFileSmeltBio1984-2015-2-24-16.csv"))
 smelt <- smelt[smelt$Species == "Rainbow Smelt",]
 smelt$Station <- gsub("-"," ",smelt$Station)
+smelt$Age <- as.numeric(paste(smelt$Age))
 head(smelt)
 ```
 
@@ -1787,7 +1923,7 @@ coord_map <- leaflet() %>%
 coord_map
 ```
 
-### Number of fish caught per year
+### Number of fish caught per year for biological variables
 
 Note that there are no data for 1986, 1988, and 1989.
 
@@ -1802,6 +1938,7 @@ colnames(summ_smelt_catches1) <- c("Year", "num_fish")
 ggplot(data = summ_smelt_catches1, mapping = aes(x = Year, y = num_fish)) + 
   geom_bar(stat = "summary") + 
   labs(x = "Year", y = "Number of Fish Sampled") + 
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 cap1 <- fig_cap("number smelt sampled per year", caption="Number of rainbow smelt sampled per year.")
 
@@ -1810,18 +1947,32 @@ station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
   ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
 station_number_sampled[is.na(station_number_sampled)] <- 0
 cap2 <- tab_cap("number smelt sampled per year per station", caption="Number of rainbow smelt sampled per year and per station.")
+station_number_sampled <- na_if(station_number_sampled, 0)
 kable(station_number_sampled)
+
 ```
+
+### Quick info about age structure of the smelt sampled
+
+"The age distribution of rainbow smelt was skewed heavily, such that age-1 to age-4 fish comprised 98% of all fish and the remaining 2% was composed of age 5 and older fish and some YOY which are not fully recruited to the gear." (Euclide, Pientka, Marsden, 2020^[Euclide, P.T., Pientka, B., Ellen Marsden, J., 2020. Genetic versus demographic stock structure of rainbow smelt in a large fragmented lake. Journal of Great Lakes Research. https://doi.org/10.1016/j.jglr.2020.02.009])
+
+Repeating the stats on the whole dataset just to see if I find comparable results.  
+No age were available for `r nrow(smelt) - nrow(smelt[smelt$Age<=4,]) + nrow(smelt[smelt$Age>4,])` fish (`r round((nrow(smelt) - nrow(smelt[smelt$Age<=4,]) + nrow(smelt[smelt$Age>4,]))/nrow(smelt)*100, 1)`%). 
+
+`r round(nrow(smelt[smelt$Age<=4&!is.na(smelt$Age),])/nrow(smelt[!is.na(smelt$Age),])*100, 1)`% of fish that were aged were comprised in the 1-4 year interval, `r round(nrow(smelt[smelt$Age>4&!is.na(smelt$Age),])/nrow(smelt[!is.na(smelt$Age),])*100, 1)`% of fish that were age were 5 years or older. 
+
+The distribution is indeed really skewed.
+
 
 ### Evolution of sampled stations
 
 The table of 0's and 1's indicates whether or not a station was sampled for a particular year.
 
-```{r stations sampled per yr, echo=FALSE, message=FALSE, warning=FALSE, fig.cap=c(cap1)}
+```{r stations sampled per yr, echo=FALSE, message=FALSE, warning=FALSE, fig.cap=c(cap1, cap2)}
 # Data frame which includes the years, list of the stations sampled during that year, and number of stations sampled that year
 summ_smelt_catches2 <- smelt %>% 
   group_by(Year) %>% 
-  summarise(list_stations = list(unique(Station)), num_stations = length(unlist(list_stations)))
+  summarise(list_stations = list(unique(Station)), num_stations = length(unlist(list_stations)), num_fish = length(Year))
 
 # Bar plot showing the number of stations sampled per year
 ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_stations)) +
@@ -1830,6 +1981,16 @@ ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_st
   scale_y_continuous(breaks = c(seq(1, 10, 1))) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 cap1 <- fig_cap("number station sampled smelt per year", caption = "Number of stations sampled for rainbow smelt per year.")
+
+# Bar plot showing the number of stations sampled per year
+ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_fish/num_stations)) +
+  geom_hline(yintercept=200, linetype="dashed", color = "grey") +
+  geom_bar(stat = "summary") +
+  labs(x = "Year", y = "Average number of individual data per stations per year")   +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+cap2 <- fig_cap("number smelt weighted by number station sampled per year", caption = "Average number of fish per station sampled.")
 
 # Table which displays which stations were sampled when
 station_which_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
@@ -1854,6 +2015,212 @@ station_total_sampled <- station_number_sampled %>% summarise_all(list(sum))
 kable(station_total_sampled)
 ```
 
+Get a summary figure for smelt paper of average number of fish surveyed by station per year.
+
+```{r Get a summary figure for smelt paper of average number of fish surveyed by station per year, echo=FALSE, message=FALSE, warning=FALSE}
+ 
+smelt_summ_bio <- as.data.frame((with(smelt, tapply(rep(1,nrow(smelt)),list( "Station"=Station,"Year"=Year), sum))))
+smelt_summ_bio$Basin <- smelt$Basin[!duplicated(smelt$Station)][order(smelt$Station[!duplicated(smelt$Station)])]
+
+
+smelt_summ_bio <-cbind("Station"=rep(rownames(smelt_summ_bio, ncol(smelt_summ_bio))),melt(smelt_summ_bio, variable.name = "Year", value.name = "Num_fish"))
+smelt_summ_bio <- smelt_summ_bio[!is.na(smelt_summ_bio$Num_fish),]
+
+ggplot(smelt_summ_bio, aes(as.numeric(paste(Year)), Num_fish, color=Basin, pch=Basin)) + 
+  geom_hline(yintercept=200, linetype="dashed", color = "grey") + 
+  geom_point(alpha=.8, cex=2) +
+  scale_color_manual(values=c("grey", "tomato", "black")) +
+  theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x="Year", y="Number of fish with biological\ndata collected")
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Number_fish_bio_data.png"), width = 6, height=3)
+
+
+```
+
+
+
+## Length distribution by survey
+
+Can we identify year class?
+
+```{r look at smelt size frequency per stations and per year}
+#head(smelt)
+pal <- wes_palette("GrandBudapest1", 12, type="continuous")
+pal <- c("grey", pal[c(1,5,9,2,6,10,3,8,4,11,7)])
+for (i in seq_along(unique(smelt$Station))) {
+  #plot
+  ggplot(data = smelt[smelt$Station==unique(smelt$Station)[i],], mapping = aes(x = Length, fill=Age)) +
+    geom_histogram(binwidth=5) +
+    geom_vline(xintercept = mean(smelt$Length, na.rm=T)) +
+    geom_vline(xintercept = mean(smelt$Length[smelt$Station==unique(smelt$Station)[i]], na.rm=T), lty=2) +
+    labs(x = "Length (mm)", y = "Frequency")  + 
+    xlim(min(smelt$Length, na.rm=T), max(smelt$Length,na.rm=T)) + 
+    facet_wrap(~Year, scales = "free") +
+    scale_fill_manual(values=pal) +
+    theme_bw()
+  
+  #Save plot
+  ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Length_frequency_per_site_",unique(smelt$Station)[i],".pdf"))
+}
+
+for (i in seq_along(unique(smelt$Basin))) {
+  #plot
+  ggplot(data = smelt[smelt$Basin==unique(smelt$Basin)[i],], mapping = aes(x = Length, fill=Age)) +
+    geom_histogram(binwidth=5) +
+    geom_vline(xintercept = mean(smelt$Length, na.rm=T)) +
+    geom_vline(xintercept = mean(smelt$Length[smelt$Basin==unique(smelt$Basin)[i]], na.rm=T), lty=2) +
+    labs(x = "Length (mm)", y = "Frequency")  + 
+    xlim(min(smelt$Length, na.rm=T), max(smelt$Length,na.rm=T)) + 
+    facet_wrap(~Year, scales = "free") +
+    scale_fill_manual(values=pal) +
+    theme_bw()
+  
+  #Save plot
+  ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Length_frequency_per_basin_",unique(smelt$Basin)[i],".pdf"))
+}
+
+```
+
+Get for each year, the average length, and for each year class, the number of fish, the frequency of length for each year class
+
+```{r work more on smelt year class, echo=FALSE, message=FALSE, warning=FALSE}
+smelt$Year <- as.numeric(paste(smelt$Year))
+smelt$Age <- as.numeric(paste(smelt$Age))
+
+# Initiate
+Basins <- c("Lake Champlain", "Main Lake", "Malletts Bay", "Northeast Arm")
+smelt_length_freq <- list()
+
+# start loop
+for (j in seq_along(Basins)) {
+  if(Basins[j] == "Lake Champlain") temp1 <- smelt else temp1 <- smelt %>% filter(Basin2 == Basins[j])
+  for (i in unique(smelt$Year)) {
+      temp2 <- temp1 %>% 
+      filter(Year  == i)
+    for (k in unique(smelt$Age)) {
+     temp3 <- temp2 %>%
+    filter(Age == k)
+     
+    temp4 <-
+       data.frame(
+        "Basin" = Basins[j],
+        "Year"  = i,
+        "Age"   = k,
+        "number" = nrow(temp3),
+        "mean_length" =  mean(temp3$Length, na.rm=T),
+        "median_length" =  median(temp3$Length, na.rm=T),
+        "sd_length" =  sd(temp3$Length, na.rm=T),
+        "mean_weight" =  mean(temp3$Weight, na.rm=T),
+        "mean_condition" =  mean(temp3$condition, na.rm=T))
+     
+     if(nrow(temp4) > 0) {
+       if (!Basins[j] %in%  names(smelt_length_freq)) { # If the first row hasn't been created yet, create it
+        smelt_length_freq[[Basins[j]]] <- temp4
+     } else { # otherwise, just rbind new values
+       smelt_length_freq[[Basins[j]]] <- rbind(
+         smelt_length_freq[[Basins[j]]], temp4)
+     }
+     }
+    }
+  }
+}
+
+summary(smelt_length_freq$`Lake Champlain`)
+summary(smelt_length_freq$`Main Lake`)
+
+ggplot(smelt_length_freq$`Lake Champlain`, aes(Year, mean_length))  + geom_line(smelt_length_freq$`Lake Champlain`, mapping = aes(Year, mean_length, color=as.factor(Age))) + geom_point() + theme_bw() +
+  labs(subtitle = "Mean length per age class per year (rainbow smelt)")
+
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Mean_length_per_age_class_smelt.png"), width = 6, height=4.5)
+
+
+
+```
+
+```{r Smelt number of year class per year and per basins, echo=FALSE, message=FALSE, warning=FALSE}
+# Look at number of year class per year and per basins
+
+Basins <- c("Lake Champlain", "Main Lake", "Malletts Bay", "Northeast Arm")
+
+for(j in 2:length(Basins)) {
+  mdf <- smelt_length_freq[[Basins[j]]]
+
+  temp1 <- data.frame("Year" = unique(mdf$Year)[order(unique(mdf$Year))],
+                      "Basin" = rep(Basins[j], length(unique(mdf$Year))),
+    "Number_year_class" = with(mdf, tapply(ifelse(number>0,1,0),list("Year"=Year), sum, na.rm=T)),
+    "Max_year_class" = with(mdf, tapply(Age,list("Year"=Year), max, na.rm=T)),
+    "Number_individuals" = with(mdf, tapply(number,list("Year"=Year), sum, na.rm=T)))
+  
+  if(j == 2) mdf_summ <- temp1 else  mdf_summ <- rbind(mdf_summ, temp1)
+
+}
+
+
+mdf_summ$Number_stations_sampled <- 
+melt(with(smelt_summ_bio, tapply(rep(1, nrow(smelt_summ_bio)),list("Year"=Year, "Basin"= Basin), sum, na.rm=T)))$value
+
+# Plot it
+p1 <- ggplot(mdf_summ, aes(Year, Number_year_class, fill=Number_individuals/Number_stations_sampled))  +
+  geom_hline(yintercept = seq(0,8,2), lwd=.2, col=adjustcolor("grey", alpha.f = .8)) +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_bar(stat = "identity", position="dodge", 
+           col="black", lwd=.2) +
+  theme_bw() +
+  scale_y_continuous(
+      name   = "Number of year classes",
+      breaks = seq(0, max(mdf_summ$Number_year_class), 1),
+      minor_breaks = seq(0, max(mdf_summ$Number_year_class), 1)
+      ) +
+  scale_x_continuous(
+      breaks =  seq(1984,2016,2)
+      ) + 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  facet_wrap(~Basin, ncol = 1,
+              labeller = label_glue('({.l}) {Basin}')) +
+  scale_fill_gradient2(low = muted("red"),
+  mid = grey(.8),
+  high = muted("blue"),
+  midpoint = 200, name="Number of\nindividuals\ncollected\nper stations") +
+  labs(subtitle = "B")
+  #guides(fill = guide_legend(title.position = "top"), 
+  #                            title="Basin")) +
+  # scale_fill_manual(values = c("tomato", grey(.7), grey(.9), grey(.5))) 
+  
+   
+
+# ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Number_year_class2.png"),p1, width = 6, height=5)
+
+p2 <- ggplot(smelt, aes(x=Age)) + 
+  #geom_histogram(binwidth=1, col="grey", fill="lightgray" ) +
+  geom_bar(aes(y = (..count..)/sum(..count.. ~Basin2))) + 
+  facet_wrap(~Basin2, ncol=1,
+              labeller = label_glue('({.l}) {Basin2}')) +
+  # stat_bin(binwidth=1, geom="text", colour="black", size=2.5,
+  #          aes(label=..count.., group=Basin2, y=..count..),
+  #          position=position_stack(vjust=1)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_x_continuous(
+  labels = scales::number_format(accuracy = 1)
+  ) +
+  scale_y_continuous(
+    labels = scales::percent
+    ) +
+  labs(y = "Percentage", subtitle = "A")
+p2
+
+# ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Age_structure_smelt.png"),  p2, width = 7, height=3)
+
+
+p3 <- grid.arrange(p2, p1, widths=c(1,2.5))
+
+# ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Description_Smelt_bio_dataset.png"), p3, width = 8, height=5)
+```
+
+
 ## Length/weigth/condition evolution
 
 ### Weigth/length relationship
@@ -1876,14 +2243,62 @@ grid.arrange(p1,p2,nrow=1)
 
 It appears that the condition of rainbow smelt has stayed realtively constant over time in Lake Champlain. The trendlines show an average condition of roughly 0.5 to 0.7 over time.
 
-```{r condition by station, warning = FALSE}
+```{r condition by station, echo=FALSE, message=FALSE, warning=FALSE, fig.cap=c(cap1, cap2)}
 # Grid of plots which display the condition of rainbow smelt over time at each station
-ggplot(aes(y=condition, x=Year), data=smelt )+
-  ylim(0,6)+
-  geom_point()+
-  #geom_line() +
-  geom_smooth(method="gam", formula = y ~ s(x)) +
-  facet_wrap(~Station)
+smelt <- smelt %>% mutate(Basin2 = case_when(
+                      Basin == "Main Lake" ~ "Main Lake",
+                      Basin == "Northeast" ~ "Northeast Arm",
+                      Basin == "Malletts" ~ "Malletts Bay"))
+smelt$Basin2 <- as.factor(smelt$Basin2)
+
+
+ggplot(smelt[smelt$condition<2&smelt$condition>0&!is.na(smelt$condition),], aes(x=Year, y=condition) )+
+  geom_point(alpha=.2)+ 
+  geom_smooth(color="tomato") +
+  geom_vline(xintercept = 2003, lty=2) +
+  facet_wrap(~Basin2, drop=TRUE, ncol=1,
+             labeller = label_glue('({.l}) {Basin2}')) +  
+  theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  labs(y="Condition")
+cap1 <- "Condition of individuals for stations in the (a) Main Lake, (b) Mallets Bay, and (c) the Northeast Arm. Each point is an individual. Line shows the best fit to the data (model gam, y ~ s(x, bs = 'cs')). Vertical line indicates alewife invasion, in 2003."
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_condition_per_basin.png"), width = 3, height=7)
+
+smelt_condition <- as.data.frame(with(smelt[smelt$condition<2&smelt$condition>0,], tapply(condition,list("Year"=Year, "Basin"=Basin2), mean, na.rm=T)))
+  
+smelt_condition_w <- data.frame("Year" = as.numeric(paste(rownames(smelt_condition))))
+smelt_condition_w$MainLake_5yr <- NA
+smelt_condition_w$MallettsBay_5yr <- NA
+smelt_condition_w$NortheastArm_5yr <- NA
+
+for (i in 6:(nrow(smelt_condition)-2)) {
+  smelt_condition_w$MainLake_5yr[i] <- sum(smelt_condition$`Main Lake`[(i-2):(i+2)])/5
+  smelt_condition_w$MallettsBay_5yr[i] <- sum(smelt_condition$`Malletts Bay`[(i-2):(i+2)])/5
+  smelt_condition_w$NortheastArm_5yr[i] <- sum(smelt_condition$`Northeast Arm`[(i-2):(i+2)])/5
+}
+
+colnames(smelt_condition_w) <- c("Year", colnames(smelt_condition))
+
+smelt_condition_w <- smelt_condition_w[!is.na(smelt_condition_w[,2]),]
+
+smelt_condition_w <- melt(smelt_condition_w, id.vars = "Year", variable.name = "Basin", value.name = "condition")
+
+smelt_condition <- (cbind("Year" = rep(as.numeric(paste(rownames(smelt_condition))), ncol(smelt_condition)), melt(smelt_condition, variable.name = "Basin", value.name = "condition")))
+
+ggplot(smelt_condition_w, aes(Year, condition)) + 
+  geom_hline(yintercept = mean(smelt_condition_w$condition), alpha=.3) +
+  #geom_smooth(color="tomato") +
+  geom_line(color="black") +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_point(smelt_condition, mapping=aes(Year, condition), alpha=.4) +
+  #geom_point(smelt_condition[smelt_condition$Year==1987,], mapping=aes(Year, CPUE), pch=4, col = "tomato") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  facet_wrap(~Basin, ncol = 1,
+             labeller = label_glue('({.l}) {Basin}'))
+cap2 <- "Mean condition (dots) and 5-years running average condition (line) of individuals for stations in the (a) Main Lake, (b) Mallets Bay, and (c) the Northeast Arm. Vertical line indicates alewife invasion, in 2003. Horizontal line shows the average condition across basins."
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_condition_per_basin_running_average.png"), width = 3, height=7)
+
 ```
 <br>
 `r fig_cap("smelt condition over year", caption="Evolution of smelt condition in Lake Champlain, by monitoring station.")`
@@ -1918,8 +2333,8 @@ Using Rosalie's code from LT analysis and Derek Ogle's tutorial.
 par(mfrow=c(1,2))
 plot(smelt$Weight ~ smelt$Length ,xlab="Total Length (mm)", ylab = "Weight (g)", main = "", pch=20)
 
-smelt$logW <- log(smelt$Weight)
-smelt$logL <- log(smelt$Length)
+smelt$logW <- log10(smelt$Weight)
+smelt$logL <- log10(smelt$Length)
 
 lm1 <- lm(logW~logL,data = smelt)
 fitPlot(lm1,xlab="Log Total Length (mm)", ylab = "Log Weight (g)", main="")
@@ -1930,22 +2345,6 @@ The relationship is not linear without log-transforming the data. Here, we have 
 
 ```{r summary model smelt W ~ L, message = FALSE, warning = FALSE}
 summary(lm1)
-# test the concurve package
-# randomframe <- curve_gen(lm1, "logL")
-# tibble::tibble(randomframe)
-# ggconcurve(type = "consonance", randomframe)
-
-# Try a model with a random distribution to see how the range of values vary
-# smelt2 <- smelt
-# smelt2$logL <- smelt$logL+rep(1:10,length.out = nrow(smelt))
-# lm2 <- lm(logW~logL,data = smelt2)
-# fitPlot(lm2,xlab="Log Total Length (mm)", ylab = "Log Weight (g)", main="")
-# randomframe2 <- curve_gen(lm2, "logL")
-# summary(lm2)
-# randomframe2 <- curve_gen(lm1, "logL")
-# ggconcurve(type = "consonance", randomframe2)
-
-
 ```
 
 ### Test whether rainbow smelt exhibit isometric or allometric growth
@@ -2012,13 +2411,13 @@ fitPlot(lm2,xlab="Log Length (mm)",ylab="Log Weight (g)", legend = "topleft",mai
 ```
 
 
-#### Across stations
+#### Across Basins
 
-Include stations as a factor.  
+Include basins as a factor.  
 
 ```{r does weigth length relationship for smelt change across stations, message = FALSE, warning = FALSE}
-smelt$fstations <- factor(smelt$Station)
-lm3 <- lm(logW~logL*fstations, data = smelt)
+smelt$fBasin <- factor(smelt$Basin)
+lm3 <- lm(logW~logL*fBasin, data = smelt)
 ``` 
 
 The analysis of variable table is constructed by submitting the saved lm object to anova() as such:
@@ -2027,7 +2426,7 @@ The analysis of variable table is constructed by submitting the saved lm object 
 anova(lm3)
 ```
 
-These results indicate that the interaction terms is significant (p = 2.2e-16). There is evidence to conclude that there is difference in slopes in the length-weight relationship between years. The p-value for the indicator variable suggests that there is a difference in intercepts between the three sites (p = 2.2e-16). 
+These results indicate that the interaction terms is significant (p = 2.2e-16). There is evidence to conclude that there is difference in slopes in the length-weight relationship between basins The p-value for the indicator variable suggests that there is a difference in intercepts between the three basins (p = 2.2e-16). 
 
 Plots and confidence intervals should be constructed for the model with the interaction term, as it was significant. The confidence intervals, constructed with:
 ```{r confint model 3, message = FALSE, warning = FALSE}
@@ -2041,17 +2440,22 @@ In <a href=http://www.dnr.state.mi.us/publications/pdfs/ifr/manual/smii%20chapte
   *  a = -5.12117 <br/>
   *  b =  2.96408 <br/>
 We found (see results for lm1):  <br/>
-  *  a = -5.05001<br/>
-  *  b =  2.88230<br/>
+  *  a = `r as.numeric(lm1$coefficients[1])`<br/>
+  *  b =  `r as.numeric(lm1$coefficients[2])`<br/>
 There are some discrepancies between the two, but they're fairly close.  <br/>
 
 To convert them to the initial equation W = aL<sup>b</sup>:  
 ```{r conclusion a and b parameters for rainbow smelt, message = FALSE, warning = FALSE}
-(a = exp(lm1$coefficients[1]))
+(a = 10^(lm1$coefficients[1]))
 (b = lm1$coefficients[2])
+
+a=10^(-5.12117)
+b=2.96408
+L=c(60,100)
+a*L^b
 ```
 
-Therefore, the intial equation is W = 0.000009405 x L<sup>2.88230</sup>
+Therefore, the intial equation is W = `r 10^(lm1$coefficients[1])` x L<sup>`r as.numeric(lm1$coefficients[2])`</sup>.
 
 ***
 
@@ -2178,6 +2582,215 @@ a_and_b_summary <- data.frame(age_group, a, b)
 kable(a_and_b_summary)
 ```
 
+
+## Comparison of a and b parameters with other systems
+
+Other a and b parameters were retrieved from <a href="https://www.fishbase.se/popdyn/LWRelationshipList.php?ID=253&GenusName=Osmerus&SpeciesName=mordax&fc=80">Fish Base</a>.
+
+The units of length and weight in FishBase are <a href="https://www.fishbase.in/manual/fishbasethe_length_weight_table.htm">centimeter and gram</a>, respectively. Thus when length-weight relationships are not in cm-g, the intercept 'a' is transformed as follows: 
+a'(cm, g) = a (mm, g)x10^b
+a'(cm, g) = a (cm, kg)x1000
+a'(cm, g) = a (mm, mg)x10^b/1000
+a'(cm, g) = a (mm, kg) x 10^b x 1000
+
+```{r read smelt a b for other systems and compare with lake Champlain }
+# From Lake Champlain ####
+
+# Total length ####
+# Re-do it all to be sure
+smelt$logW <- log10(smelt$Weight)
+smelt$logL <- log10(smelt$Length)
+
+lm1   <- lm(logW~logL,data = smelt)
+lm_MB <- lm(logW~logL,data = smelt[smelt$Basin=="Malletts",])
+lm_ML <- lm(logW~logL,data = smelt[smelt$Basin=="Main Lake",])
+lm_NE <- lm(logW~logL,data = smelt[smelt$Basin=="Northeast",])
+
+ab <- data.frame("Country" = rep("USA",4),
+                 "Lake" = c(rep("Lake Champlain", 4)),
+           "Basin" = c("Lake Champlain", "Malletts Bay", "Main Lake", "Northeast"),
+           "log10a" = c(lm1$coefficients[1],lm_MB$coefficients[1],lm_ML$coefficients[1],lm_NE$coefficients[1]),
+           "b" = c(lm1$coefficients[2],lm_MB$coefficients[2],lm_ML$coefficients[2],lm_NE$coefficients[2]),
+           "sd_a_min" = c(confint(lm1)[1,1],confint(lm_MB)[1,1],confint(lm_ML)[1,1],confint(lm_NE)[1,1]),
+           "sd_a_max" = c(confint(lm1)[1,2],confint(lm_MB)[1,2],confint(lm_ML)[1,2],confint(lm_NE)[1,2]),
+           "sd_b" = c(hoCoef(lm1,1,3)[4],hoCoef(lm_MB,2,3)[4],hoCoef(lm_ML,2,3)[4],hoCoef(lm_NE,2,3)[4]))
+
+# Conversion of a' to get to the same value than on fish base
+# a'(cm, g) = a (mm, g)x10^b
+ab$a <- 10^(ab$log10a)*10^ab$b
+ab$sd_a_min <- 10^(ab$sd_a_min)*10^ab$b
+ab$sd_a_max <- 10^(ab$sd_a_max)*10^ab$b
+
+
+# Standard length ####
+# Re-do it all to be sure
+smelt$logW <- log10(smelt$Weight)
+smelt$logL <- log10(smelt$Length*0.789)
+
+lm1   <- lm(logW~logL,data = smelt)
+lm_MB <- lm(logW~logL,data = smelt[smelt$Basin=="Malletts",])
+lm_ML <- lm(logW~logL,data = smelt[smelt$Basin=="Main Lake",])
+lm_NE <- lm(logW~logL,data = smelt[smelt$Basin=="Northeast",])
+
+ab <- data.frame("Country" = rep("USA",5),
+                 "Lake" = c(rep("Lake Champlain", 4), "Lake Superior"),
+           "Basin" = c("Lake Champlain", "Malletts Bay", "Main Lake", "Northeast", "Chequamegon Bay"),
+           "log10a" = c(lm1$coefficients[1],lm_MB$coefficients[1],lm_ML$coefficients[1],lm_NE$coefficients[1], -5.12117),
+           "b" = c(lm1$coefficients[2],lm_MB$coefficients[2],lm_ML$coefficients[2],lm_NE$coefficients[2], 2.96408),
+           "sd_a_min" = c(confint(lm1)[1,1],confint(lm_MB)[1,1],confint(lm_ML)[1,1],confint(lm_NE)[1,1],NA),
+           "sd_a_max" = c(confint(lm1)[1,2],confint(lm_MB)[1,2],confint(lm_ML)[1,2],confint(lm_NE)[1,2],NA),
+           "sd_b" = c(hoCoef(lm1,1,3)[4],hoCoef(lm_MB,2,3)[4],hoCoef(lm_ML,2,3)[4],hoCoef(lm_NE,2,3)[4],NA))
+
+# Conversion of a' to get to the same value than on fish base
+# a'(cm, g) = a (mm, g)x10^b
+ab$a <- 10^(ab$log10a)*10^ab$b
+ab$sd_a_min <- 10^(ab$sd_a_min)*10^ab$b
+ab$sd_a_max <- 10^(ab$sd_a_max)*10^ab$b
+
+
+
+# From Fish Base ####
+abfb <- read.delim(paste0(getpath4data(), "GIS/Smelt_a_b_param_fish_base.txt"), sep = "\t")
+abfb$sex <- as.factor(abfb$sex)
+
+# Keep only the lakes
+abfb <- abfb[abfb$IsLake,]
+
+
+mycol <- wes_palette("Darjeeling1", 4, type="continuous")
+
+
+p <- ggplot(abfb, aes(a,b, color= Lake, fill=length_type)) + 
+  xlim(0.002,0.018) +
+  ylim(2.7,3.15) +
+  geom_vline(xintercept = mean(abfb$a[abfb$length_type=="TL"]), lty=2) +
+  geom_vline(xintercept = mean(abfb$a[abfb$length_type=="SL"]), lty=2) +
+  geom_hline(yintercept = 3, lty=2) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "bottom",
+        plot.margin = unit(c(1.5,1.5,0.2,0.2), "cm")) +  # Make room for the grob
+  geom_errorbar(abfb[!is.na(abfb$sd_a_min),], mapping = aes(ymin=b-sd_b, ymax=b+sd_b), width=.0002) +
+  geom_errorbarh(abfb[!is.na(abfb$sd_a_min),], mapping = aes(xmax = sd_a_max, xmin = sd_a_min),height=0.01) +
+  scale_color_manual(values=mycol) +
+  scale_fill_manual(values=c(adjustcolor("black", alpha.f = .1), 
+                             "black")) +
+  geom_point(abfb[abfb$length_type=="SL",], mapping = aes(x=a,y=b,shape=factor(abfb[abfb$length_type=="SL","sex"])), cex=2.9, color="black")  +
+  geom_point(aes(shape=factor(abfb$sex)), cex=2)  +
+   guides(color = guide_legend(ncol=2,byrow=TRUE, title.position = "top"),
+          fill  = guide_legend(ncol=1,byrow=TRUE, title.position = "top", title = "Length type", override.aes = list(color=c('black','white'),fill=c("grey","grey"), shape=c(22,22), cex=3)),
+          shape = guide_legend(ncol=1,byrow=TRUE, title = "Sex", title.position = "top", override.aes = list(color="grey"))) +
+  geom_text(abfb[abfb$Lake=="Lake Champlain",], mapping = aes(a,b, label = code), col="black", check_overlap = T, nudge_x = c(-0.0006,-0.0012,-0.00005,-0.0007), 
+            nudge_y = c(0.01,0.0,-0.04,0.01), cex=2)
+#  annotate("text", x=0.016, y=3.2, label= "plumper fish, \na > median") +
+#  annotate("text", x=0.003, y=3.2, label= "plumper fish, \na < median")
+
+#  geom_label(ab[ab$Lake=="Lake Champlain",], mapping = aes(a,b, label = Basin))
+
+myannotation <- data.frame("x" = c(mean(abfb$a[abfb$length_type=="TL"], na.rm=T)-0.0015, mean(abfb$a[abfb$length_type=="SL"],na.rm=T)-0.0015,0.02,0.019,0.02), 
+                  "y" = c(3.20,  3.20, 3.16, 2.989, 2.92),
+                  "label" = c("average TL", "average SL", "plumper fish\nwhen growing", "allometric\n  growth", "leaner fish\nwhen growing"),
+                  "rot" = c(0,0,270,340,270))
+
+for (i in 1:nrow(myannotation))  {
+p <- p + annotation_custom(
+      grob = textGrob(label = myannotation$label[i], hjust = 0, gp = gpar(cex = .7), rot =  myannotation$rot[i]),
+      ymin = myannotation$y[i],#-.5,      # Vertical position of the textGrob
+      ymax = myannotation$y[i],#+.5,
+      xmin = myannotation$x[i],#-0.01,         # Note: The grobs are positioned outside the plot area
+      xmax = myannotation$x[i])#+0.01)
+ }    
+
+# Code to override clipping
+gt <- ggplot_gtable(ggplot_build(p))
+gt$layout$clip[gt$layout$name == "panel"] <- "off"
+gt <- gt
+grid.draw(gt)
+
+ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_a_b_parameters.png"), width = 5, height=5,   plot = gt)
+
+# Compare a and b parameters on Total length across years and basins ####
+# Re-do it all to be sure
+smelt$logW <- log10(smelt$Weight)
+smelt$logL <- log10(smelt$Length)
+
+smelt$Year <- as.numeric(paste(smelt$Year))
+ab_per_yr <- NULL
+
+for (i in unique(smelt$Year)) {
+  lm1   <- lm(logW~logL,data = smelt[smelt$Year==i,])
+  
+  if(nrow(smelt[smelt$Basin=="Malletts"&smelt$Year==i,])>0) {
+    lm_MB <- lm(logW~logL,data = smelt[smelt$Basin=="Malletts"&smelt$Year==i,])
+    out_temporary_MB <- c(lm_MB$coefficients[1], lm_MB$coefficients[2], confint(lm_MB)[1,1], confint(lm_MB)[1,2], hoCoef(lm_MB,2,3)[4])
+    } else {
+    out_temporary_MB <- rep(NA,5)
+  }
+  
+  if(nrow(smelt[smelt$Basin=="Main Lake"&smelt$Year==i,])>0) {
+    lm_ML <- lm(logW~logL,data = smelt[smelt$Basin=="Main Lake"&smelt$Year==i,])
+    out_temporary_ML <- c(lm_ML$coefficients[1], lm_ML$coefficients[2], confint(lm_ML)[1,1], confint(lm_ML)[1,2], hoCoef(lm_ML,2,3)[4])
+    } else {
+    out_temporary_ML <- rep(NA,5)
+  }
+  
+  if(nrow(smelt[smelt$Basin=="Northeast"&smelt$Year==i,])>0) {
+    lm_NE <- lm(logW~logL,data = smelt[smelt$Basin=="Northeast"&smelt$Year==i,])
+    out_temporary_NE <- c(lm_NE$coefficients[1], lm_NE$coefficients[2], confint(lm_NE)[1,1], confint(lm_NE)[1,2], hoCoef(lm_NE,2,3)[4])
+    } else {
+    out_temporary_NE <- rep(NA,5)
+  }
+  
+  ab <- data.frame("Country" = rep("USA",4),
+                   "Lake" = c(rep("Lake Champlain", 4)),
+             "Basin" = c("Lake Champlain", "Malletts Bay", "Main Lake", "Northeast"),
+             "Year" = rep(i,4),
+             "n_individual" = c(nrow(smelt[smelt$Year==i,]),
+                                nrow(smelt[smelt$Basin=="Malletts"&smelt$Year==i,]),
+                                nrow(smelt[smelt$Basin=="Main Lake"&smelt$Year==i,]),
+                                nrow(smelt[smelt$Basin=="Northeast"&smelt$Year==i,])),
+             "mean_length" = c(mean(smelt[smelt$Year==i,"Length"], na.rm=T),
+                                mean(smelt[smelt$Basin=="Malletts"&smelt$Year==i,"Length"], na.rm=T),
+                                mean(smelt[smelt$Basin=="Main Lake"&smelt$Year==i,"Length"], na.rm=T),
+                                mean(smelt[smelt$Basin=="Northeast"&smelt$Year==i,"Length"], na.rm=T)),
+             "log10a" = c(lm1$coefficients[1], out_temporary_MB[1], out_temporary_ML[1], out_temporary_NE[1]),
+             "b" = c(lm1$coefficients[2],out_temporary_MB[2], out_temporary_ML[2], out_temporary_NE[2]),
+             "sd_a_min" = c(confint(lm1)[1,1],out_temporary_MB[3], out_temporary_ML[3], out_temporary_NE[3]),
+             "sd_a_max" = c(confint(lm1)[1,2],out_temporary_MB[4], out_temporary_ML[4], out_temporary_NE[4]),
+             "sd_b" = c(hoCoef(lm1,1,3)[4], out_temporary_MB[5], out_temporary_ML[5], out_temporary_NE[5]))
+  
+  # Conversion of a' to get to the same value than on fish base
+  # a'(cm, g) = a (mm, g)x10^b
+  ab$a <- 10^(ab$log10a)*10^ab$b
+  ab$sd_a_min <- 10^(ab$sd_a_min)*10^ab$b
+  ab$sd_a_max <- 10^(ab$sd_a_max)*10^ab$b
+  
+  # Save results
+  if(is.null(ab_per_yr)) ab_per_yr <- ab else ab_per_yr <- rbind(ab_per_yr,ab)
+}
+
+head(ab_per_yr)
+
+p1 <- ggplot(ab_per_yr, aes(Year, mean_length, color=Basin)) + theme_bw() + 
+  geom_smooth(se = F) + geom_point() +
+  geom_vline(xintercept = 2003, lty=2)
+p2 <- ggplot(ab_per_yr, aes(Year, n_individual, color=Basin)) + theme_bw() + 
+  geom_smooth(se = F) + geom_point() +
+  geom_vline(xintercept = 2003, lty=2)
+p3 <- ggplot(ab_per_yr, aes(Year, a, color=Basin)) + theme_bw() + 
+  geom_smooth(se = F) + 
+  geom_point() +
+  geom_vline(xintercept = 2003, lty=2)
+p4 <- ggplot(ab_per_yr, aes(Year, b, color=Basin)) + theme_bw() + 
+  geom_smooth(se = F) + 
+  geom_point() +
+  geom_vline(xintercept = 2003, lty=2)
+
+(p1/p2/p3/p4)
+
+```
+
+
+
 ## Get smelt biomass evolution
 
 First, select fish sampled in the main lake. Juniper Island is a location with consistent sampling. The site is 70-90 m deep. In deeper sites, trawl was lowered to approximately 35 m depth. The net was towed at the maximum depth for 10 minutes, allowing it to stabilize. The net was then raised about 3 m and towed for an additional 5 minutes. This step is repeated until the net was 10 m below the surface, and then it is hauled back to the boat. Thus, in deep-water sites such as Juniper Island, each trawl consisted of nine steps and lasted for 55 minutes. Four trawls per night were conducted at each sites. <br>
@@ -2192,6 +2805,144 @@ smelt_sub_summ$Year <- as.numeric(paste(rownames(smelt_sub_summ)))
 ggplot(smelt_sub_summ, aes(Year, CPUE)) + geom_point() + geom_line()
 ```
 
+
+## Following meeting with Bernie
+
+Patrick Blachard and I met with Bernie Pientka (VTDFW, Essex Junction, VT) on February 21, 2020.
+
+Up until now, I was using the MasterFileBio....xls, that only has the fish that were sampled for aging (and weight and length).
+
+There is also a MasterFileTrawl...xls, that has catches.
+
+```{r explore the dataset MasterFileTrawl, echo=FALSE, message=FALSE, warning=FALSE}
+smelt_trawl <- read.delim(paste0(getpath4data(), "data_from_Bernie/MasterFileTrawlCPUE1987-2015.txt"))
+
+# Create log scales
+myseq <- c(0:10,seq(20,100,10),seq(200,1000,100),seq(2000, 10000, 1000))
+myseqlab <- function(x,seq) {
+  seq[!seq %in% x] <- "" 
+  return(seq)
+}
+
+p1 <- ggplot(smelt_trawl, aes(Year, CPUE)) + 
+  geom_hline(yintercept = 0, lwd=.3, alpha=.3) +
+  geom_smooth(color="tomato") +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_point() +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + xlim(1986,2015) +
+  facet_wrap(~Basin, scales="free", ncol = 1,
+             labeller = label_glue('({.l}) {Basin}'))
+
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_CPUE_per_basin.png"), width = 3, height=7)
+
+p1.2 <- ggplot(smelt_trawl, aes(Year, log(CPUE))) + 
+  #geom_hline(yintercept = 0, lwd=.3, alpha=.3) +
+  geom_smooth(color="tomato") +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_point(alpha=.5) +
+  theme_bw() +
+  #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + xlim(1986,2015) +
+  facet_wrap(~Basin, ncol = 1,
+             labeller = label_glue('({.l}) {Basin}')) + 
+  scale_y_continuous(
+    name   = "CPUE",
+    breaks = log(c(0,10,100,1000,5000)),
+    labels = c(0,10,100,1000,5000),
+    minor_breaks = log(myseq), 
+    sec.axis = sec_axis(~ ., name = "log(CPUE)"))  
+ # scale_y_continuous(sec.axis = sec_axis(~ exp(.), name = "CPUE", breaks = c(0,10,35,120,400,1500,5000)))
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_logCPUE_per_basin2.png"), width = 3, height=5.5)
+
+x <- c(1:100)
+y <- c(1:100)
+p1 <- qplot(x, y)
+p1 + theme(panel.grid.minor = element_line(colour="white", size=0.5)) +
+    scale_y_continuous(minor_breaks = myseq, breaks = seq(0, 100, 10))
+
+ggplot(smelt_trawl, aes(Year, CPUE)) + geom_point() +
+  theme_bw() +
+  facet_wrap(~Station)
+
+
+smelt_trawl_summ <- as.data.frame(with(smelt_trawl,
+                            tapply(CPUE,list(Year, Basin), mean, na.rm=T)))
+
+smelt_trawl_w <- data.frame("Year" = as.numeric(paste(rownames(smelt_trawl_summ))))
+smelt_trawl_w$MainLake_5yr <- NA
+smelt_trawl_w$MallettsBay_5yr <- NA
+smelt_trawl_w$NortheastArm_5yr <- NA
+
+for (i in 4:(nrow(smelt_trawl_summ)-2)) {
+  smelt_trawl_w$MainLake_5yr[i] <- sum(smelt_trawl_summ$`Main Lake`[(i-2):(i+2)])/5
+  smelt_trawl_w$MallettsBay_5yr[i] <- sum(smelt_trawl_summ$`Malletts Bay`[(i-2):(i+2)])/5
+  smelt_trawl_w$NortheastArm_5yr[i] <- sum(smelt_trawl_summ$`Northeast Arm`[(i-2):(i+2)])/5
+}
+
+colnames(smelt_trawl_w) <- c("Year", colnames(smelt_trawl_summ))
+
+smelt_trawl_w <- smelt_trawl_w[!is.na(smelt_trawl_w[,2]),]
+
+smelt_trawl_w <- melt(smelt_trawl_w, id.vars = "Year", variable.name = "Basin", value.name = "CPUE")
+
+smelt_trawl_summ <- cbind("Year"= rep(as.numeric(paste(rownames(smelt_trawl_summ))), ncol(smelt_trawl_summ)),melt(smelt_trawl_summ, variable.name = "Basin", value.name = "CPUE"))
+
+p2 <- ggplot(smelt_trawl_w, aes(Year, CPUE)) + 
+  geom_hline(yintercept = 0, lwd=.3, alpha=.3) +
+  #geom_smooth(color="tomato") +
+  geom_line(color="black") +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_point(smelt_trawl_summ, mapping=aes(Year, CPUE), alpha=.4) +
+  geom_point(smelt_trawl_summ[smelt_trawl_summ$Year==1987,], mapping=aes(Year, CPUE), pch=4, col = "tomato") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + xlim(1986,2015) +
+  facet_wrap(~Basin, ncol = 1,
+             labeller = label_glue('({.l}) {Basin}'))
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_CPUE_per_basin_running_average.png"), width = 3, height=7)
+
+
+p3 <- ggplot(smelt_trawl_w, aes(Year, log(CPUE))) + 
+  #geom_hline(yintercept = log(0), lwd=.3, alpha=.3) +
+  #geom_smooth(color="tomato") +
+  geom_line(color="black") +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_point(smelt_trawl_summ, mapping=aes(Year, log(CPUE)), alpha=.4) +
+  geom_point(smelt_trawl_summ[smelt_trawl_summ$Year==1987,], mapping=aes(Year, log(CPUE)), pch=4, col = "tomato") +
+  theme_bw() +
+  #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + xlim(1986,2015) +
+  facet_wrap(~Basin, ncol = 1,
+             labeller = label_glue('({.l}) {Basin}'))  + 
+    scale_y_continuous(
+    name   = "CPUE",
+    breaks = log(c(0,10,100,1000, 5000)),
+    labels = c(0,10,100,1000, 5000),
+    minor_breaks = log(myseq), 
+    sec.axis = sec_axis(~ ., name = "log(CPUE)"))  
+  # scale_y_continuous(sec.axis = sec_axis(~ exp(.), name = "CPUE", breaks = c(0,10,35,120,400,1500,5000)))
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_logCPUE_per_basin_running_average2.png"), width = 3, height=5.5)
+
+library(ecp)
+for (i in seq_along(unique(smelt_trawl_summ$Basin))) {
+  changepoint_found <- 
+    e.divisive(as.matrix(smelt_trawl_summ[smelt_trawl_summ$Basin==unique(smelt_trawl_summ$Basin)[i],"CPUE"]), min.size = 3, sig.lvl = .7)$order.found[-c(1:2)]
+  
+  print(paste0("Changepoint for basin ", unique(smelt_trawl_summ$Basin)[i], " were found in ", paste(smelt_trawl_summ[smelt_trawl_summ$Basin==unique(smelt_trawl_summ$Basin)[i],"Year"][changepoint_found], collapse = ", "), " (changepoint ranked from most significant to least significant)."))
+}
+
+
+
+(p1 | p2)
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_CPUE_per_basin_summary.pdf"), width = 6, height=7)
+
+```
+
+
+```{r forage yoy}
+forage_yoy <- read.delim(paste0(getpath4data(), "data_from_Bernie/MasterYOYBio2008-2015.txt"))
+head(forage_yoy)
+dim(forage_yoy)
+summary(forage_yoy)
+```
 
 
 # Alewife
@@ -3228,12 +3979,214 @@ ggplotly(barplot_MainLake)
 
 # Burbot
 
+Maybe extract data from whole dataset sent by Bernie Pientka?
+
+```{r read gillnet data and extract burbot data then run some early analyses, message=FALSE, warning=FALSE, include=FALSE}
+gillnet <- read.delim(paste0(getpath4data(), "data_from_Bernie/Gillnetdata82-97-updated 2-20-20.txt"))
+head(gillnet)
+
+summary(gillnet$SPECIES)
+
+burbot <- gillnet[gillnet$SPECIES==493,]
+head(burbot)  
+
+ggplot(burbot, aes(YEARSET, LENGTH, col=DAYSET)) + geom_point(alpha=.4) +
+  geom_smooth() + facet_wrap(~MESHSIZE, scales="free")
+  theme_bw()
+
+summary(as.factor(burbot$MESHSIZE))
+
+burbot$Date <- as.Date(paste(burbot$DAYSET, burbot$MONTHSET, burbot$YEARSET, sep="-"), format = "%d-%m-%y")
+
+summary(as.factor(burbot$YEARSET))
+
+any(is.na(burbot$NET))
+any(is.na(burbot$MESHSIZE))
+
+
+
+#Just checking whether each net as a different net_size associated
+burbot$NET_MESHSIZE <- paste(burbot$NET,burbot$MESHSIZE,sep="_")
+other_var <- aggregate(data=burbot, NET_MESHSIZE ~ NET, function(x) length(unique(x)))
+
+head(other_var)
+# Yes, because otherwise NET_MESHSIZE ~ NET should be equal to 1 
+# Example for NET == 08:
+burbot$NET_MESHSIZE[burbot$NET==08]
+
+
+
+# Getting metadata, the number of observations per net and per date set.
+burbot_mt <- as.data.frame(with(burbot, tapply(rep(1, nrow(burbot)),list("Date"=Date,"Net"=NET_MESHSIZE), sum, na.rm=T)))
+
+# Creating a Year column
+burbot_mt$Year <- as.numeric(substr(rownames(burbot_mt),1,4))
+
+# Melt the data
+burbot_mt <- cbind("Date"=rep(rownames(burbot_mt, ncol(burbot_mt))),melt(burbot_mt, id.vars  = "Year", variable.name = "Net"))
+# Remove NAs: net were never all used at once
+burbot_mt <- burbot_mt[!is.na(burbot_mt$value),]
+# Reorder by date
+burbot_mt <- burbot_mt[order(burbot_mt$Date),]
+
+# Structure of the data: Date, Year, Net, and the number of burbot caught per net.
+head(burbot_mt)
+
+summary(as.factor(burbot_mt$Year))
+summary(burbot_mt$value)
+
+
+```
+
+
+## Number of burbot caught
+
+Data about burbot come from Gillnet surveys, carried out between 19`r paste(min(gillnet$YEARPULL, na.rm=T), max(gillnet$YEARPULL, na.rm=T), sep="-19")`. Species code for burbot is 493.
+
+`r nrow(burbot)` burbot were collected over this period.
+
+There is a column in the dataset called "NET", are these the individual net used? Can I use them to calculate the effort? The number of fish caught per net varies between `r min(burbot_mt$value)` and `r max(burbot_mt$value)`
+
+
+```{r explore metadata of catch for burbot, echo=FALSE, message=FALSE, warning=FALSE}
+# Plot showing the number of burbot per net.
+ggplot(burbot_mt, aes(as.factor(Year),value)) + geom_boxplot() +
+  labs(x = "Year", y = "Number of burbot per net") +
+  theme_bw() + labs(subtitle="Distribution of the number of burbot caught per year and per net. \nFrom 1990, more burbot are caught per net. Have effort and mesh size changed?")
+
+#ggsave(paste0(getwd(),"/Output/Figures/11-Burbot/Number_burbot_per_net_per_year.pdf"), width=6, height=3.7)
+
+```
+<br>`r fig_cap("burbot year", caption = "Distribution of the number of burbot caught per year and per net. From 1990, more burbot are caught per net. Have effort and mesh size changed?")`
+
+Look more into details at the net used.
+
+There is a positive, linear relationship, between number of burbot caught and number of net set.
+
+```{r look at number of burbot caught per net set per year et al, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a summary of the number of nets set per date
+number_nets <- aggregate(data=burbot_mt, Net ~ Date, function(x) length(unique(x)))
+number_nets$Year <- as.numeric(substr(number_nets$Date,1,4))
+head(number_nets)
+# Then summarize per year the number of nets set
+number_nets <- aggregate(data=number_nets, Net ~ Year, function(x) sum(x))
+colnames(number_nets)[2] <- "Number_net_set_that_year"
+head(number_nets)
+
+# Add as variable the total number of fish caught per year
+other_var <- aggregate(data=burbot_mt, value ~ Year, function(x) sum(x))
+colnames(other_var)[2] <- "Number_burbot_caught"
+number_nets <- merge(number_nets, other_var, by="Year", all=TRUE)
+
+# Add as variable the total number of day fished
+other_var <- aggregate(data=burbot_mt, Date ~ Year, function(x) length(unique(x)))
+colnames(other_var)[2] <- "Number_day_nets_were_set"
+number_nets <- merge(number_nets, other_var, by="Year", all=TRUE)
+
+# Add as variable the total number of day fished
+other_var <- aggregate(data=burbot_mt, Net ~ Year, function(x) length(unique(x)))
+colnames(other_var)[2] <- "Number_different_nets_used_that_year"
+number_nets <- merge(number_nets, other_var, by="Year", all=TRUE)
+
+head(number_nets)
+
+number_nets2 <- melt(number_nets, id.vars  = c("Year", "Number_burbot_caught"))
+head(number_nets2)
+
+ggplot(number_nets2, aes(value,Number_burbot_caught, color=Year)) + 
+  geom_smooth() +
+  geom_point() +
+  facet_wrap(~variable, scales = "free_x", 
+             labeller = as_labeller(c(Number_net_set_that_year = "Number net set", Number_day_nets_were_set = "Number day at least one \nnet was set", Number_different_nets_used_that_year = "Number different nets \nused that year") ) ) +
+  xlab(NULL) +
+  ylab("Number of burbot caught") +
+  geom_text(mapping = aes(value,Number_burbot_caught, label=Year), nudge_y = 40, check_overlap = T)  +
+  theme_bw()
+#ggsave(paste0(getwd(),"/Output/Figures/11-Burbot/Number_burbot_per_various_params.pdf"), width=9, height=3.7)
+
+```
+<br>`r fig_cap("burbot net", caption = "Number of burbot caught over the year as a function of number of net that were use. It does not account.")`
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(number_nets, aes(Year,Number_burbot_caught/Number_net_set_that_year)) + 
+  geom_smooth() +
+  geom_point() +
+  labs(x = "Year", y = "Number of burbot caught / \nnumber of net set that year", subtitle = "Ratio of number of burbot caught per number of net set") +
+  #geom_text(mapping = aes(Net,value, label=Year), nudge_x = 5, check_overlap = T)  +
+  theme_bw()
+#ggsave(paste0(getwd(),"/Output/Figures/11-Burbot/Number_burbot_caught_per_net_per_year.pdf"), width=4.7, height=3)
+
+```
+<br>`r fig_cap("burbot net per year", caption = "Ratio of number of burbot caught per number of net set.")`
+
+
+## Size of burbot caught
+
+Look at the size distribution of burbot, and compare that with mesh-size.
+
+```{r looking at burbot size and meshsize, echo=FALSE, message=FALSE, warning=FALSE}
+
+p1 <- ggplot(burbot, aes(MESHSIZE, LENGTH)) + geom_point() + 
+  labs(x = "Mesh size (mm)", y = "Individual length (mm)",
+       subtitle = "a. Individual length per mesh size ") + 
+  theme_bw()
+
+p2 <- ggplot(burbot, aes(LENGTH, WEIGHT)) + stat_smooth() +
+  geom_point() + 
+  labs(x = "Length (mm)", y = "Weight (g) ",
+       subtitle=paste0("b. Weight length relationship for n = ", nrow(burbot[!is.na(burbot$WEIGHT) & !is.na(burbot$LENGTH),]), " individuals")) + 
+  theme_bw()
+
+p3 <- ggplot(burbot, aes(YEARPULL, LENGTH)) + stat_smooth() +
+  geom_point(size=(log(burbot$MESHSIZE)-2.7)*3,
+             alpha=.2) + 
+  labs(x="Year", y="Length (mm)",subtitle=paste0("c. Length of burbot per year. Size of points \nrefers to mesh size (min = ",min(burbot$MESHSIZE, na.rm=T), " mm, max = ",max(burbot$MESHSIZE, na.rm=T)," mm).")) + 
+  theme_bw()
+
+(p1 / p2 / p3)
+
+#ggsave(paste0(getwd(),"/Output/Figures/11-Burbot/Burbot_various_stats.pdf"), width=4.7, height=7)
+
+```
+<br>`r fig_cap("various stats burbot", caption = "Various stats for burbot data. (a) Individual length per mesh size. (b) Weight/length relationship for individuals with both data available. (c) Evolution of length over the year.")`
+
+Look at the number of fish caught per mesh size 
+
+```{r same process that for metadata but this time with length}
+# Getting metadata, the number of observations per net and per date set.
+burbot_mt_length <- as.data.frame(with(burbot, tapply(LENGTH,list("Date"=Date,"Net"=NET_MESHSIZE), mean, na.rm=T)))
+
+# Creating a Year column
+burbot_mt_length$Year <- as.numeric(substr(rownames(burbot_mt_length),1,4))
+
+# Melt the data
+burbot_mt_length <- cbind("Date"=rep(rownames(burbot_mt_length, ncol(burbot_mt_length))),melt(burbot_mt_length, id.vars  = "Year", variable.name = "Net"))
+# Remove NAs: net were never all used at once
+burbot_mt_length <- burbot_mt_length[!is.na(burbot_mt_length$value),]
+# Reorder by date
+burbot_mt_length <- burbot_mt_length[order(burbot_mt_length$Date),]
+
+# Structure of the data: Date, Year, Net, and the number of burbot caught per net.
+head(burbot_mt_length)
+
+burbot_mt_length$MESHSIZE <- as.numeric(paste(substr(burbot_mt_length$Net, nchar(as.character(burbot_mt_length$Net))-1,nchar(as.character(burbot_mt_length$Net)))))
+
+summary(as.factor(burbot_mt_length$Year))
+summary(burbot_mt_length$value)
+
+ggplot(burbot_mt_length, aes(MESHSIZE, value)) + geom_point()
+
+```
+
+
 # Lamprey
 
 Note: some data are available in FSAdata -- SLampreyGL: Stock and recruitment data for Sea Lamprey in the Great Lakes, 1997-2007.
 
 ```{r read sea lamprey data, include=FALSE}
 trap <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_trapping_data.txt"))
+trap$River[trap$River=="Rea"] <- "Rea  NY"
 trap_annual_summ <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/annual_trapping_summary.txt"))
 wound <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/wounding_LAT_LAS.txt"))
 annual_survey <- read.delim(paste0(getpath4data(), "data_from_Brad_Young/sea_lamprey_survey_data.txt"))
@@ -3241,6 +4194,44 @@ annual_survey[,2] <- as.numeric(paste(annual_survey[,2]))
 annual_survey[,3] <- as.numeric(paste(annual_survey[,3]))
 annual_survey[,4] <- as.numeric(paste(annual_survey[,4]))
 ```
+
+```{r comparing summary data given by Brad Young and summury data from trap dataset}
+sl_trap_summ <- data.frame("Name"=unique(trap$River))
+# Saving which rows have been matched
+sl_trap_summ$Row_matched <- rep(NA,nrow(sl_trap_summ))
+# Saving the name that have been matched
+sl_trap_summ$Name_matched <- rep(NA,nrow(sl_trap_summ))
+# Saving the number of matches
+sl_trap_summ$Number_matched <- rep(NA,nrow(sl_trap_summ))
+
+unique_name <- seq_along(trap_annual_summ$Name)
+for(i in seq_along(sl_trap_summ$Name)) {
+  fuzzy_match <- 
+    agrep(sl_trap_summ$Name[i],trap_annual_summ$Name,
+          max = 3, ignore.case = TRUE)
+  #fuzzy_match <- fuzzy_match[-which(fuzzy_match==i)]
+  unique_name <- unique_name[!unique_name %in% fuzzy_match]
+  if(length(fuzzy_match)>0) {
+    sl_trap_summ$Row_matched[i] <- paste(fuzzy_match,collapse="-")
+    sl_trap_summ$Name_matched[i] <- paste(trap_annual_summ$Name[fuzzy_match],collapse=", ")
+    sl_trap_summ$Number_matched[i] <- length(fuzzy_match)     
+  }
+}
+sl_trap_summ
+trap_annual_summ$Name[unique_name]
+
+trap_annual_summ_RB <- as.data.frame(with(trap[!is.na(trap$length),], tapply(rep(1, nrow(trap[!is.na(trap$length),])),list("Year"=Year,"River"=River), sum, na.rm=T)))
+rowSums(trap_annual_summ_RB, na.rm=T)
+ncol(trap_annual_summ_RB)
+colnames(trap_annual_summ_RB)
+trap_annual_summ$Name
+trap_annual_summ[trap_annual_summ$Name=="Total_Aaron",3:(ncol(trap_annual_summ)-1)] - rowSums(trap_annual_summ_RB, na.rm=T)[rownames(trap_annual_summ_RB)%in%2001:2017]
+trap_annual_summ[trap_annual_summ$Name=="TOTAL",3:(ncol(trap_annual_summ)-1)] - rowSums(trap_annual_summ_RB, na.rm=T)[rownames(trap_annual_summ_RB)%in%2001:2017]
+
+
+
+```
+
 
 ## Wounding 
 Lake Champlain salmonids presented a high rate of woundings which motivated the long-term sea lamprey control program, operated by VTFWS. The figure below shows the evolution of wounding per 100 fish.
@@ -3256,11 +4247,15 @@ p <- ggplot(melt(wound, id.vars='Year'), aes(Year, value, fill=variable)) +
 p + 
   geom_hline(aes(yintercept = 25, colour = "Lake Trout goal"), color='black', lty=2,show.legend = F) + 
   geom_hline(aes(yintercept = 15, colour = "Atlantic Salmon goal"), color='black', lty=3,show.legend = F) +
-  geom_text(aes(x=2003,y=25, label="Lake Trout goal"),hjust = 0, vjust=1.2) +
-  geom_text(aes(x=2003,y=15, label="Atlantic Salmon goal"),hjust = 0, vjust=1.2)
+  geom_text(aes(x=2003,y=25, label="Lake trout goal"),hjust = 0, vjust=1.2) +
+  geom_text(aes(x=2003,y=15, label="Atlantic salmon goal"),hjust = 0, vjust=1.2)
+
+#ggsave(paste0(getwd(),"/Output/Figures/8-SeaLamprey/Wounding_sea_lamprey.pdf"), width=10, height=4.7)
 
 ```
 <br>`r fig_cap("woundings per salmonid", "Lake Champlain Sea Lamprey Wounds per 100 fish")`
+
+
 
 ## Management of sea lamprey population
 Work on trapping data.
@@ -3288,7 +4283,7 @@ ggplot(trap_summ2, aes(rownames(trap_summ2),Total.catch, fill=trap_summ2$Number.
 
 Great Chazy river (NY) and Lewis stream (VT) are the two sites with the most lampreys `r fig_cap("total catch vs. number surveys", display="cite")`.
 
-```{r visualize total catch versus number of surveys}
+```{r visualize total catch versus number of surveys, echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(trap_summ2, aes(Number.surveys, Total.catch)) + 
   labs(x="Total number of years surveyed", y="Total number of lamprey caught") + 
   geom_label(aes(Number.surveys, Total.catch), label=rownames(trap_summ2), nudge_y = -150,alpha=.8) + 
@@ -3296,6 +4291,34 @@ ggplot(trap_summ2, aes(Number.surveys, Total.catch)) +
   theme_classic() 
 ```
 <br>`r fig_cap("total catch vs. number surveys", display="full")`
+
+
+
+```{r Visualize number caught per stations per year, echo=FALSE, message=FALSE, warning=FALSE}
+
+trap_annual_summ_plot <- trap_annual_summ[!trap_annual_summ$Name %in% c("POTS", "TOTAL", "Total_Aaron"),-1]
+trap_annual_summ_plot <- melt(trap_annual_summ_plot, variable.name = "Year")
+trap_annual_summ_plot$Year <- as.numeric(substr(trap_annual_summ_plot$Year,2,5))
+
+p1 <- ggplot(trap_annual_summ_plot, aes(Year, Name)) +
+ geom_raster(aes(fill = value)) + theme_light() + xlim(1980,2018) +
+  scale_fill_gradient(low = "yellow", high = "tomato", name="Number") + 
+  labs(subtitle=paste0("Number of sea lamprey collected per stations,\n", min(trap_annual_summ_plot$Year),"-",max(trap_annual_summ_plot$Year),"\nSummary trap + pot data provided by Brad Yound"), y = "Tributaries") 
+p1
+
+trap_annual_summ_RB <- trap_annual_summ_RB[,colSums(trap_annual_summ_RB, na.rm=T)>0]
+trap_annual_summ_plot_RB <- cbind("Year"=rep(as.numeric(rownames(trap_annual_summ_RB)),ncol(trap_annual_summ_RB)), melt(trap_annual_summ_RB, variable.name = "Name"))
+
+p2 <- ggplot(trap_annual_summ_plot_RB, aes(Year, Name)) +
+ geom_raster(aes(fill = value)) + theme_light() + xlim(1980,2018) +
+  scale_fill_gradient(low = "yellow", high = "tomato", name="Number") + 
+  labs(subtitle=paste0("Number of sea lamprey collected per stations,\n", min(trap_annual_summ_plot_RB$Year),"-",max(trap_annual_summ_plot_RB$Year),"\nSummary calculated using trap data only. Note \ndifferences in total number."), y = "Tributaries") 
+p2
+
+grid.newpage()
+grid.draw(rbind(ggplotGrob(p1), ggplotGrob(p2), size = "first"))
+```
+
 
 ## Lamprey weigth-length relationship from trap data
 
@@ -3318,12 +4341,11 @@ summary(lm1)
 ### Conclusion a and b parameters
 To convert them to the initial equation W = aL<sup>b</sup>:  
 ```{r conclusion a and b parameters for sea lamprey, message = FALSE, warning = FALSE}
-(a = 10^(lm1$coefficients[1]))
-(b = lm1$coefficients[2])
+(a = 10^(lm1$coefficients[1])) # 0.01726149
+(b = lm1$coefficients[2])      # 2.42935
 ```
 
-Therefore, the initial equation is W = 0.01726149 x L<sup>2.429350</sup>
-
+Therefore, the initial equation is W = `r as.numeric(a)` x L<sup>`r as.numeric(b)`</sup>
 
 ## Survey data
 
@@ -3343,11 +4365,60 @@ ggplot(annual_survey, aes(year_surveyed, num_ammocoetes)) +
 The mortality between the ammocoetes and transformers stage is really high, so using the number of ammocoetes per streams may not be the best approach. 
 However, trapping of adults is really efficient (~95% said Ellen), so backtracking and estimating the number of individuals at the parasitoid stage. Sea lamprey will spend 12-18 months in the parasitoid stage.
 
+
 "Estimates of the lake-wide out-migrating transformer population for the 2002 and 2003 parasitic-phase cohorts were 269,139 ± 55,610 (SD) and 111,807 ± 23,511 (SD)" (Howe et al, 2006^[Howe, E.A., Ellen Marsden, J., Bouffard, W., 2006. Movement of Sea Lamprey in the Lake Champlain Basin. Journal of Great Lakes Research 32, 776–787. https://doi.org/10.3394/0380-1330(2006)32[776:MOSLIT]2.0.CO;2]).
+
+
+Use average weight of trapped individuals (`r round(mean(trap$weight, na.rm=T),1)` g, converted in tons by multiplying by $10^{-6}$), multiply by the estimate of number of lamprey in the lake (average of 2002-2003 cohors), and divide by the area of the lake in $km^2$:
+
+```{r get lamprey biomass based on the several indicators we collected}
+w_lamprey = mean(trap$weight, na.rm=T)
+w_lamprey_2002_2003 = mean(trap$weight[trap$Year %in% c(2002,2003)], na.rm=T)
+n_lamprey = (269139+111807)/2
+area_lake = 1127 # km2
+
+w_lamprey_df <- as.data.frame(with(trap, tapply(weight,list("Year"=Year,"River"=River), mean, na.rm=T)))
+
+ggplot(cbind("Year"= rep(as.numeric(rownames(w_lamprey_df)), ncol(w_lamprey_df)),melt(w_lamprey_df)), aes(Year, variable)) +
+ geom_raster(aes(fill = value)) + theme_light() + 
+  scale_fill_gradient(low = "yellow", high = "tomato", name="Weight (g)") + 
+  labs(subtitle="Average weight of sea lamprey collected by tributaries",y="Tributaries") 
+
+# get moving average
+w_lamprey_yr <- rowMeans(w_lamprey_df,na.rm = T)
+w_lamprey_yr <- w_lamprey_yr[!is.na(w_lamprey_yr)]
+w_lamprey_yr <- approx(x=as.numeric(names(w_lamprey_yr)), y = w_lamprey_yr, xout=1980:2017)$y
+
+w_lamprey_3yr <- SMA(w_lamprey_yr, n=3)
+
+w_lamprey_summ <- data.frame("Year" = 1980:2017,
+                             "w_yr_interp" = w_lamprey_yr,
+                             "w_yr" = rowMeans(w_lamprey_df,na.rm = T),
+                             "w_3yr" = w_lamprey_3yr,
+                             "se" = rowSds(as.matrix(w_lamprey_df),na.rm = T))
+
+#plot moving average
+ggplot(w_lamprey_summ) +
+  geom_errorbar(aes(x=Year, ymin=w_yr-se, ymax=w_yr+se), colour="black", width=.3, lwd=.2) +
+  geom_line(aes(Year,w_yr_interp), lwd=.2, lty=2) +
+  geom_line(aes(Year, w_yr), lwd=.2) + 
+  geom_point(aes(Year, w_yr), lwd=.6) + 
+  geom_line(aes(Year,w_3yr), col=adjustcolor("tomato", alpha.f = 1), lwd=1) + 
+  theme_bw()  + 
+  geom_rect(data.frame(x1=2001.5, x2=2003.5, y1=50,y2=300), mapping=aes(xmin=x1, xmax=x2, ymin=y1, ymax=y2), fill="black", alpha=0.2) +
+  geom_text(data.frame(x=2004,y=280, t="cohorts with \npopulation \nestimates."), mapping=aes(x, y, label=t),  hjust = 0, cex=3, color="grey8") +
+  labs(subtitle="Average weight of sea lamprey collected (black) and running average (red). \nNo data were collected in 2006 and 2007. ",y = "Weight (g)")
+
+#ggsave(paste0(getwd(),"/Output/Figures/8-SeaLamprey/Average_weight__sea_lamprey_over_the_years.pdf"), width=6, height=4)
+
+B_lamprey = n_lamprey*w_lamprey_2002_2003*10^-6/area_lake
+B_lamprey
+```
+
 
 # Stocking
 
-## VTFWS long-term data 
+## VTFWD long-term data 
 Data communicated by Ellen on September 23rd, 2019. She presents them in Marsden et al (2018)^[].
 
 ```{r read long term stocking data VT, include=FALSE}
@@ -3369,7 +4440,23 @@ p1 + scale_y_continuous(labels = comma)
 ```
 
 
-## VTFWS online database
+### Get potential biomass in the system with Rpath
+```{r}
+library(Rpath)
+groups <- c(paste("Lake trout ", 0:30), 'Phytoplankton', 'Detritus', 'Fleet1')
+# type 1= primary producer
+# type 2= detritus
+# type 3= fleet
+# type 0= consumer (the rest)
+types  <- c(rep(0, length(groups)-3), 1, 2,3)
+
+stgroups <- c(rep(NA, 1), rep('LakeTrout', 3), rep(NA, 15),NA)
+
+REco.params.LC <- create.rpath.params(group = groups, type = types, stgroup = stgroups)
+```
+
+
+## VTFWD online database
 
 ### Data
 
@@ -3579,18 +4666,19 @@ summary_ls <- list(
   "Phytoplankton" = data.frame("Year"=c(min(dtlcm$Year):max(dtlcm$Year)),"Biovolume" = as.vector(with(dtlcm, tapply(Net.phytoplankton..total.biovolume,list("Year"=year(as.Date(dtlcm$VisitDate, format="%d/%m/%Y"))), mean, na.rm=T)))),
   "Zooplankton" = data.frame("Year"=zoo19_month_Predator$Year, "Biomass"=rowSums(zoo19_month_Predator[,-1], na.rm = T) + rowSums(zoo19_month_Grazer_sm[,-1], na.rm = T) +rowSums(zoo19_month_Grazer_lr[,-1], na.rm = T)),
   "Mysids" = mysis_summ[,c("Year","mean_w")],
-  "Zebra mussel" = data.frame("Year"=rownames(ZMvel_summ), "Densities"=ZMvel_summ$STA19),
+  "Zebra mussel veliger" = data.frame("Year"=rownames(ZMvel_summ), "Densities"=ZMvel_summ$STA19),
+  "Zebra mussel" = NA,
   "Sculpin" = NA,
   "Trout-perch" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(2016:2018))),
-  "Smelt" = data.frame("Year"=smelt_sub_summ$Year, "CPUE"=smelt_sub_summ$CPUE),
+  "Smelt" = data.frame("Year"=smelt_trawl_summ$Year[smelt_trawl_summ$Basin=="Main Lake"], "CPUE"=smelt_trawl_summ$CPUE[smelt_trawl_summ$Basin=="Main Lake"]),
   "Whitefish" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
   "Cisco" = data.frame("Year"=cisco$Year,"CPUE"=cisco$JuniperIsland),
-  "Alewife" = data.frame("Year"=c(2016:2018),"Density"=rep(0.5,length(c(2016:2018)))),
-  "Walleye" = NA,
+  "Alewife" = data.frame("Year"=c(2003:2018),"Density"=rep(0.5,length(c(2003:2018)))),
+  "Walleye" = data.frame("Year"=c(2002:2018),"Density"=rep(0.5,length(c(2002:2018)))),
   "Stocked juvenile lake trout" = data.frame("Year"=1972:2016, "Stocked"=as.vector(stklkt_summ[as.numeric(paste(rownames(stklkt_summ))) %in% 1972:2016, "TOTAL"])),
   "Lake trout" = data.frame("Year"=c(1982:1998,2016:2018),"Density"=rep(0.5,length(c(1982:1998,2016:2018)))),
-  "Atlantic salmon" = NA,
-  "Burbot" = data.frame("Year"=c(1982:1998),"Density"=rep(0.5,length(c(1982:1998)))),
+  "Atlantic salmon" = data.frame("Year"=c(1972:2016),"Density"=rep(0.5,length(c(1972:2016)))),
+  "Burbot" = data.frame("Year"=c(1982:1997),"Density"=rep(0.5,length(c(1982:1997)))),
   "Sea lamprey" = data.frame("Year"=c(1990:2018),"Density"=rep(0.5,length(1990:2018)))
 )
 
@@ -3615,9 +4703,9 @@ for (i in 1:length(summary_ls)) {
     #default
     whichyear= msubset[,1]
     if(names(summary_ls[i])=="Phytoplankton") whichyear= msubset$Year[msubset$Year %in% 2006:2015]
-    if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake trout", "Sea lamprey","Burbot")) whichyear= NULL
+    if(names(summary_ls[i])%in% c("Trout-perch", "Whitefish", "Lake trout", "Sea lamprey","Burbot", "Atlantic salmon", "Walleye", "Alewife")) whichyear= NULL
     if(names(summary_ls[i])=="Smelt") whichyear= msubset$Year[msubset$Year %in% 1998:2015]
-    if(names(summary_ls[i])=="Stocked juvenile lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
+#    if(names(summary_ls[i])=="Stocked juvenile lake trout") whichyear=as.numeric(paste(summ_stkvt$Year))
     
     msubset[,1] <- as.numeric(paste(msubset[,1]))
     msubset[,2] <- as.numeric(paste(msubset[,2]))
@@ -3633,7 +4721,7 @@ for (i in 1:length(summary_ls)) {
     w <- msubset_2[,2]/max(msubset_2[,2], na.rm=T)
     w[is.na(w)] <- 0
     polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("grey", alpha.f = .7))
-    if(names(summary_ls[i])=="Burbot") TeachingDemos::shadowtext(mean(1982:1998),i, labels = "uncertainties about \ndata availability", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9)
+    #if(names(summary_ls[i])=="Burbot") TeachingDemos::shadowtext(mean(1982:1998),i, labels = "uncertainties about \ndata availability", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9)
     x <- msubset_2[msubset_2[,1] %in% whichyear,1]
     w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
     w[is.na(w)] <- 0
@@ -3643,9 +4731,9 @@ for (i in 1:length(summary_ls)) {
        polygon(x = c(x,rev(x)), y=c((i+w/2),rev(i-w/2)), border = NA, col=adjustcolor("black", alpha.f = .8))
     # }
     if(names(summary_ls[i])=="Smelt") {
-     for (w in 1:2) {
-       if (w==1) whichyear = 1990:1996
-       if (w==2) whichyear = 1984:1985
+     for (w in 1) {
+       if (w==1) whichyear = 1988:1989
+       #if (w==2) whichyear = 1984:1985
     x <- msubset_2[msubset_2[,1] %in% whichyear,1]
     w <- msubset_2[msubset_2[,1] %in% whichyear,2]/max(msubset_2[msubset_2[,1] %in% whichyear,2], na.rm=T)
     w[is.na(w)] <- 0
@@ -3664,11 +4752,16 @@ for (i in 1:length(summary_ls)) {
   if(names(summary_ls[i])=="Zebra mussel") points(1993,i,pch=17, col="red")
   if(names(summary_ls[i])=="Zooplankton") points(c(2014,2018),rep(i,2),pch=17, col="red")
   
+  # Add snapshot data info
+  if(names(summary_ls[i])=="Sea lamprey") points(c(2003,2004),c(i,i),pch=16, col=adjustcolor("black", alpha.f = .6), cex=1.3)
+  if(names(summary_ls[i])=="Zebra mussel") points(c(2014),c(i),pch=16, col=adjustcolor("black", alpha.f = .6), cex=1.3)
+  
+  
   # Add comment
   #if(names(summary_ls[i])=="Alewife") TeachingDemos::shadowtext(2004,i, labels = "probably more data available?", col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.1, cex=.9, pos=4)
   
   # Add a different point if work still in progress
-  if(names(summary_ls[i])%in%c("Burbot","Atlantic salmon", "Sculpin","Walleye")) points(max(summary_data$MinYear, na.rm = T),i,pch=4, col="red")
+  if(names(summary_ls[i])%in%c( "Sculpin")) points(max(as.numeric(paste(summary_data[,2])), na.rm = T),i,pch=4, col="red")
 }
 rect(2000,0.7,2002,i+0.3, lty=2, lwd=.5)
 
@@ -3676,8 +4769,8 @@ par(mar=c(5,0,2,1))
 plot(c(1,10),c(1,10),axes=F,xlab="",ylab="", pch=NA)
 legend(x=1,y=9.5, legend = c("Relative biomass","Biomass still \nbeing estimated"),
        fill=c("black",adjustcolor("grey", alpha.f = .7)), bty="n", border = NULL)
-legend(x=1,y=7, legend = c("Species invasion", "No data yet", "Period chosen for \nmodel initialization"),
-       pch=c(17,4,NA), lty=c(NA,NA,2), col=c("red","red","black"), bty="n", border = NULL)
+legend(x=1,y=7, legend = c("Species invasion", "No data yet", "Snapshot biomass","Period chosen for \nmodel initialization"),
+       pch=c(17,4, 16,NA), lty=c(NA,NA, NA,2), col=c("red","red",adjustcolor("black", alpha.f = .6),"black"), bty="n", border = NULL)
 
 if(!R_U_KNITTING) dev.off()
 par(mfrow=c(1,1))
