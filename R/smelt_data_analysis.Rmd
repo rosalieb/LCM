@@ -4,7 +4,7 @@ author: "Rosalie Bruel and Alex Naccarato with data from Ellen Marsden"
 date: "6/10/2019"
 output: 
   html_document:
-    toc: yes
+    toc: no
     toc_depth: 3
     toc_float: true
     number_sections: true
@@ -91,7 +91,7 @@ coord_map
 
 Malletts Bay includes the most outliers of any station. The smelt in the Main Lake have a particularly odd linear relationship between their length and weight from the appearance of the graph. Barber Point and the Northeast Arm have some of the largest smelt of all stations. 
 
-```{r length weight by station, warning = FALSE}
+```{r length weight by station, echo=FALSE, message=FALSE, warning=FALSE}
 # Grid of plots which display the weight-length relationship of rainbow smelt over time at each station
 ggplot(aes(y=Weight, x=Length), data=smelt )+
   geom_point()+
@@ -104,7 +104,7 @@ ggplot(aes(y=Weight, x=Length), data=smelt )+
 
 It appears that the condition of rainbow smelt has stayed realtively constant over time in Lake Champlain. The trendlines show an average condition of roughly 0.5 to 0.7 over time.
 
-```{r condition by station, warning = FALSE}
+```{r condition by station, echo=FALSE, message=FALSE, warning=FALSE}
 # Grid of plots which display the condition of rainbow smelt over time at each station
 ggplot(aes(y=condition, x=Year), data=smelt )+
   ylim(0,6)+
@@ -117,7 +117,7 @@ ggplot(aes(y=condition, x=Year), data=smelt )+
 ## Abundance of species in Burlington Bay (1999-2000)
 
 Found in the Rube Lab newsletter from early 2000's
-```{r fbb, results = FALSE, warning = FALSE}
+```{r fbb, results = FALSE, warning = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 fbb <- read.delim(paste0(getpath4data(),"/data_from_Ellen/Fish_Burlington_Bay_1999_2000.txt"))
 class(fbb$rel_ab_Burl_Bay_1999_2000)
 fbb$abundance=gsub("<","",fbb$rel_ab_Burl_Bay_1999_2000)
@@ -175,12 +175,14 @@ colnames(summ_smelt_catches1) <- c("Year", "num_fish")
 ggplot(data = summ_smelt_catches1, mapping = aes(x = Year, y = num_fish)) + 
   geom_bar(stat = "summary") + 
   labs(x = "Year", y = "Number of Fish Sampled") + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme_bw()
 
 # Data frame which includes the years, list of the stations sampled during that year, and number of stations sampled that year
-summ_smelt_catches2 <- smelt %>% 
-  group_by(Year) %>% 
-  summarise(list_stations = list(unique(Station)), num_stations = length(list_stations))
+station_number_sampled <- as.data.frame(with(smelt, tapply(rep(1,nrow(smelt))
+  ,list("Year#"=Year,"station"=Station), sum, na.rm=T)))
+summ_smelt_catches2 <- data.frame("Year" = as.numeric(rownames(station_number_sampled)),
+                                  "num_stations"=apply(station_number_sampled, 1, function(x) sum(!is.na(x))))
 
 # Bar plot showing the number of stations sampled per year
 ggplot(data = summ_smelt_catches2, mapping = aes(x = as.factor(Year), y = num_stations)) +
@@ -472,4 +474,20 @@ b <- c(2.88230, 2.96750, 2.93121, 2.90205, 2.88082, 3.0303)
 a_and_b_summary <- data.frame(age_group, a, b)
 kable(a_and_b_summary)
 ```
+
+## Get smelt biomass evolution
+
+First, select fish sampled in the main lake. Juniper Island is a location with consistent sampling. The site is 70-90 m deep. In deeper sites, trawl was lowered to approximately 35 m depth. The net was towed at the maximum depth for 10 minutes, allowing it to stabilize. The net was then raised about 3 m and towed for an additional 5 minutes. This step is repeated until the net was 10 m below the surface, and then it is hauled back to the boat. Thus, in deep-water sites such as Juniper Island, each trawl consisted of nine steps and lasted for 55 minutes. Four trawls per night were conducted at each sites. <br>
+CPUE is expressed in terms of catch per 55-minutes of trawling (catch X 55 min/actual trawling time). A sample of 50 fish was randomly selected for each haul and frozen for later otolith extraction. In the laboratory, smelt were thawed, measured, weighed, and otoliths were extracted. 
+
+```{r smelt subset main lake}
+smelt_sub <- smelt[smelt$Station=="Juniper Island",]
+smelt_sub_summ<-as.data.frame(with(smelt_sub, tapply(rep(1,nrow(smelt_sub)),list("Year#"=Year), sum)))
+colnames(smelt_sub_summ) = "CPUE"
+smelt_sub_summ$Year <- as.numeric(paste(rownames(smelt_sub_summ)))
+
+ggplot(smelt_sub_summ, aes(Year, CPUE)) + geom_point() + geom_line()
+```
+
+
 

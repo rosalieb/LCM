@@ -195,7 +195,7 @@ col=rev(colr(length(brk)))
 #plot(1:10,1:10, pch=16, cex=4, col=col)
 
 #pdf(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.pdf"),width = 6, height = 9)
-if(!R_U_KNITTING) png(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites.png"), width = 5.5, height = 7.5, units = "in", res = 120)
+if(!R_U_KNITTING) png(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_sampling_sites2.png"), width = 5.5, height = 7.5, units = "in", res = 120)
 par(mar=c(5.1,5.1,2.1,2.1))
 plot(DEM, col=col, main="", axes="F") 
 axis(1, at =  seq(-74.5,-72, by=.5), labels = paste0(abs(seq(-74.5,-72, by=.5)), "°W"))
@@ -206,6 +206,11 @@ mtext("Latitude", side = 2, line = 3.6)
 # plot (add smelt sampling coordinates on top of it)
 smelt_coord <- read.csv(file = paste0(getpath4data(), "smelt_coord.csv"))
 smelt_coord$Basin <- c("Main", "NEArm", "Main", "Malletts", rep("Main", 6), "NEArm")
+
+smelt_coord$MainSites <- ifelse(smelt_coord$Station %in% c("Barber Point","Juniper Island", "Valcour Island", "Malletts Bay", "Northeast Arm"),T,F)
+plot_all=T
+if(!plot_all) smelt_coord <- smelt_coord[smelt_coord$MainSites,]
+
 smelt_coord <- smelt_coord[order(smelt_coord$Latitude, decreasing = T),]
 points(smelt_coord$Longitude[smelt_coord$Basin=="Main"],
        smelt_coord$Latitude[smelt_coord$Basin=="Main"], pch=16, cex=1.2, col="white")
@@ -220,7 +225,11 @@ points(smelt_coord$Longitude[smelt_coord$Basin=="NEArm"],
        smelt_coord$Latitude[smelt_coord$Basin=="NEArm"], pch=17)
 points(smelt_coord$Longitude[smelt_coord$Basin=="Malletts"],
        smelt_coord$Latitude[smelt_coord$Basin=="Malletts"], pch=15)
-TeachingDemos::shadowtext(smelt_coord$Longitude-0.045, smelt_coord$Latitude-0.015, 1:nrow(smelt_coord), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.15, cex=1.1)
+# Main sites
+TeachingDemos::shadowtext(smelt_coord$Longitude[smelt_coord$MainSites]-0.045, smelt_coord$Latitude[smelt_coord$MainSites]-0.015, 1:nrow(smelt_coord[smelt_coord$MainSites,]), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.15, cex=1.1)
+# Additional sites
+if(plot_all) TeachingDemos::shadowtext(c(smelt_coord$Longitude[!smelt_coord$MainSites]-c(rep(0.044, 4), rep(0.05,2))), c(smelt_coord$Latitude[!smelt_coord$MainSites]-c(rep(0.016, 4), rep(0.03,2))), paste0("(",(nrow(smelt_coord[smelt_coord$MainSites,])+1):nrow(smelt_coord),")"), col = "black",bg = "white", theta = seq(pi/4, 2 * pi, length.out = 8), r = 0.15, cex=.9)
+
 legend("bottomleft", legend = c("Main Lake", "Malletts Bay", "Northeast Arm"), pch= c(16,15,17), cex=.9)
 scalebar(25, xy=c(-73.18, 43.6), type='bar', divs=2, below = "kilometers")
 northarrow(loc=c(-73.0, 43.78), size = .09)

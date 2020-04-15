@@ -1,7 +1,7 @@
 ---
-title: "Stocking data VTFWS and NYDEC"
+title: "Stocking data VTFWD and NYDEC"
 author: "Rosalie Bruel"
-date: "15/05/2019"
+date: "2019-05-15 -- last updated `r Sys.Date()`"
 output: 
   html_document: 
     df_print: paged
@@ -16,7 +16,6 @@ editor_options:
 fontsize: 11pt
 ---
 
-_Last update: `r Sys.Date()`_
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -79,22 +78,28 @@ summ_stkvt <- stkvt %>% group_by(as.factor(Year)) %>%
             went_through=length(ACTUAL.NUMBER.STOCKED[!is.na(ACTUAL.NUMBER.STOCKED)]),
             percent_done=went_through/scheduled)
 summ_stkvt <- as.data.frame(summ_stkvt)
+summ_stkvt_clean <- summ_stkvt
+colnames(summ_stkvt_clean) <- c("Year", "Average number of stocked fish", "Total number of fish stocked", "Number of scheduled event", "Stocking event that went through", "Percentage stocking event done")
+summ_stkvt_clean$`Percentage stocking event done` <- round(summ_stkvt_clean$`Percentage stocking event done` * 100, digits = 1)
+summ_stkvt_clean
 
 p1 <- ggplot(data=summ_stkvt, aes(x=summ_stkvt[,1],y=as.numeric(summ_stkvt[,2]))) +
-  geom_bar(stat="identity") + xlab("Year") + ylab("mean # stocked") 
+  geom_bar(stat="identity") + xlab("Year") + ylab("A") 
 
 p2 <- ggplot(data=summ_stkvt, aes(x=summ_stkvt[,1],y=as.numeric(summ_stkvt[,3]))) +
-  geom_bar(stat="identity") + xlab("Year") + ylab("sum # stocked") 
+  theme_set(theme_bw()) +
+  geom_bar(stat="identity") + labs(title="Total number of fish stocked per year", subtitle = "All sizes and species considered - go to raw data to see details", x="Year", y ="Number") 
+p2
 
-## convert plots to gtable objects
-g1 <- ggplotGrob(p1)
-g2 <- ggplotGrob(p2)
-g <- rbind(g1, g2, size="first") # stack the two plots
-g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
-# center the legend vertically
-g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
-grid.newpage()
-grid.draw(g)
+# ## convert plots to gtable objects
+# g1 <- ggplotGrob(p1)
+# g2 <- ggplotGrob(p2)
+# g <- rbind(g1, g2, size="first") # stack the two plots
+# g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
+# # center the legend vertically
+# g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
+# grid.newpage()
+# grid.draw(g)
 
 colnames(summ_stkvt) <- c("Year","Mean #fish stocked", "Total #fish stocked", "Schedule events", "Stocking that went through", "% stocking done")
 summ_stkvt
@@ -132,6 +137,40 @@ ggplot(data=stkvt[grep("Champ",stkvt$WATER),], aes(x=SPECIES,y=ACTUAL.NUMBER.STO
 
 ```
 
+### Focus on lake trout in Lake Champlain
+
+According to the dataset, only yearling have been stocked in Lake Champlain for the period `r min(stkvt$Year)`-`r max(stkvt$Year)`.
+
+```{r}
+lt_stkvt <- stkvt[stkvt$SPECIES=="LAT" & stkvt$WATER == "Lake Champlain",]
+summary(lt_stkvt$AGE)
+```
+
+Stocking was done from `r length(summary(lt_stkvt$LOCATION)[summary(lt_stkvt$LOCATION)>0])` locations:
+
+```{r}
+#summary(lt_stkvt$TOWN)[summary(lt_stkvt$TOWN)>0]
+summary(lt_stkvt$LOCATION)[summary(lt_stkvt$LOCATION)>0]
+```
+
+
+The graph below shows the number of lake trout stocked per year. All are yearling so no conversion was needed. Number is in the range of data reported in Marsden et al (2018), but below the 85,000 number. Could the remaining fish come from NY?
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(lt_stkvt, aes(Year,ACTUAL.NUMBER.STOCKED)) +
+  geom_bar(stat="identity") +
+  labs(title="Total number of lake trout (yearling) stocked per year by VTFWD", subtitle = "Trout stocking online database (vtfishandwildlife.com/fishvt)", x="Year", y ="Number") 
+
+ggplot(lt_stkvt, aes(as.factor(Year),LENGTH)) +
+  geom_point(alpha=.3) +
+  #geom_violin(trim=FALSE) +
+  labs(title="Length reported of stocked fish", y="Length (cm I assume)", x ="Year") 
+```
+
+
+### Location of stocking events 
+
+Below I matched the location to GPS coordinates. Note that waterbodies are not represented.
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 bathy<-readOGR(paste0(getpath4data(),"GIS/LakeChamplain_Shapefile/LakeChamplain.shp"))
@@ -277,7 +316,7 @@ stkny$Town[stkny$Town=="plattsburgh"] <- "Plattsburgh"
 
 ```
 
-Over the `r min(stkny$Year)`-`r max(stkny$Year)` period, `r nrow(stkny)` stocking events took place.
+Over the `r min(stkny$Year)`-`r max(stkny$Year)` period, there were `r nrow(stkny)` stocking events.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -291,17 +330,17 @@ p1 <- ggplot(data=summ_stkny, aes(x=summ_stkny[,1],y=as.numeric(summ_stkny[,2]))
   geom_bar(stat="identity") + xlab("Year") + ylab("mean # stocked") 
 
 p2 <- ggplot(data=summ_stkny, aes(x=summ_stkny[,1],y=as.numeric(summ_stkny[,3]))) +
-  geom_bar(stat="identity") + xlab("Year") + ylab("sum # stocked") 
-
+  geom_bar(stat="identity") + labs(title="Total number of fish stocked per year", subtitle = "All sizes and species considered - go to raw data to see details", x="Year", y ="Number") 
+p2
 ## convert plots to gtable objects
-g1 <- ggplotGrob(p1)
-g2 <- ggplotGrob(p2)
-g <- rbind(g1, g2, size="first") # stack the two plots
-g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
-# center the legend vertically
-g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
-grid.newpage()
-grid.draw(g)
+# g1 <- ggplotGrob(p1)
+# g2 <- ggplotGrob(p2)
+# g <- rbind(g1, g2, size="first") # stack the two plots
+# g$widths <- unit.pmax(g1$widths, g2$widths) # use the largest widths
+# # center the legend vertically
+# g$layout[grepl("guide", g$layout$name),c("t","b")] <- c(1,nrow(g))
+# grid.newpage()
+# grid.draw(g)
 
 colnames(summ_stkny) <- c("Year","Mean #fish stocked", "Total #fish stocked", "Stocking events")
 summ_stkny
@@ -312,6 +351,9 @@ summ_stkny
 ### Species stocked
 
 What are the species stocked by VTFWD? We're only looking at the effective stocking now.
+
+Walleye is the main species stocked by NYDEC! But that account for all water bodies, and there is more walleye fisheries in other lakes in NY.
+Focussing on Lake Champlain, LT is the main species stocked.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 

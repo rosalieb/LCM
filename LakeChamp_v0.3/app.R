@@ -442,7 +442,7 @@ server <- function(input, output, session) {
                    function(b) ggplot(      dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),], 
                                             aes(x=as.Date(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),1]),
                                                 y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow), b])) +
-                     geom_point() +
+                     geom_point() + theme_bw() + theme(panel.grid.major = (element_line(color = "white")), panel.grid.minor = element_line(color = "white")) +theme(panel.grid.major = (element_line(color = "white")), panel.grid.minor = element_line(color = "white")) +
                      xlab("Year") + ylab(b) +
                      scale_x_date(limits=as.Date(c(paste0(as.numeric(paste(input$range[1])),"-01-01"),
                                                    paste0(as.numeric(paste(input$range[2])),"-01-01"))))
@@ -465,7 +465,7 @@ server <- function(input, output, session) {
                                                 y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow),b])) +
                      geom_point() + 
                      stat_smooth(method=loess, formula=y~x) +
-                     xlab("Year") + ylab(b) +
+                     xlab("Year") + ylab(b) + theme_bw() + theme(panel.grid.major = (element_line(color = "white")), panel.grid.minor = element_line(color = "white")) +
                      scale_x_date(limits=as.Date(c(paste0(as.numeric(paste(input$range[1])),"-01-01"),
                                                    paste0(as.numeric(paste(input$range[2])),"-01-01"))))
       )
@@ -484,7 +484,7 @@ server <- function(input, output, session) {
                    function(b) ggplot(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow) & dt_out$year>=input$range[1] & dt_out$year<=input$range[2],], 
                                       aes(x=as.factor(dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow) & dt_out$year>=input$range[1] & dt_out$year<=input$range[2],"StationID"]),
                                           y=dt_out[dt_out$StationID %in% as.numeric(input$stations_toshow) & dt_out$year>=input$range[1] & dt_out$year<=input$range[2], b])) +
-                     geom_boxplot() +
+                     geom_boxplot() + theme_bw() +
                      labs(x = "Station ID", y = b)
       )
       ifelse(length(gl) == 1, gl, grid.arrange(grobs = gl, nrow = round(length(gl)/2)))
