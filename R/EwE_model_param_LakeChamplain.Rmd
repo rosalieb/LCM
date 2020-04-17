@@ -46,7 +46,10 @@ library(FSA);library(FSAdata) # Fisheries stock assessment methods and data
 library(leaflet)
 library(janitor)
 library(rgdal)
-library(raster)
+#library(raster)
+# db <- available.packages()
+# deps <- tools::package_dependencies("raster", db)$raster
+# install.packages(deps)
 library(rnaturalearth)
 library(RColorBrewer)
 library(grid)
@@ -3654,7 +3657,7 @@ grid.draw(rbind(ggplotGrob(plaketrout+labs(subtitle = "a. Lake trout")+xlim(myxl
                 ggplotGrob(pmysis+labs(subtitle = "b. Mysis")+xlim(myxlim)+geom_vline(xintercept = 1995.5, col="cornflowerblue", alpha=.4)), size = "first"))
 
 
-drivers<- merge(stklkt_summ2 , mysis_summ, by="Year")
+drivers<- merge(stklkt_summ2 , mysis_summ, by="Year", all=T)
 ggplot(drivers, aes(TOTAL, mean)) + geom_point() + stat_smooth(method="gam", formula = y ~ s(x))
 gam1 <- gam(mean ~ s(TOTAL), data = drivers)
 acf(resid(gam1), lag.max = 20, main = "ACF")
@@ -3747,7 +3750,7 @@ for (i in seq(3,15,by=4)) {
 
 
 
-myxlim = c(1970,2016)
+myxlim = c(1990,2016)
 grid.draw(rbind(ggplotGrob(poutput[[1]] + 
                              labs(subtitle = "a. Water temperature") + 
                              xlim(myxlim)),
@@ -3765,7 +3768,7 @@ grid.draw(rbind(ggplotGrob(poutput[[1]] +
 
 
 ```{r Model some response variables in smelt population against drivers - step 2: get the drivers + response dataframe clean from previous step}
-drivers_smelt <- merge(drivers)
+drivers_smelt <- drivers
 for(i in Station) {
   if(i == Station[1]) drivers_smelt <- cbind("Station" = rep(i, nrow(drivers)), drivers) else
     drivers_smelt <- rbind(drivers_smelt,
@@ -3776,7 +3779,7 @@ drivers_smelt$Code <- paste0(drivers_smelt$Station, "_", drivers_smelt$Year)
 drivers_smelt <- drivers_smelt[,!colnames(drivers_smelt) %in% c("Station", "Year")]
 dtlcm_smelt$Code <- paste0(dtlcm_smelt$Station, "_", dtlcm_smelt$Year) 
 
-drivers_smelt <- merge(drivers_smelt,dtlcm_smelt, by="Code")
+drivers_smelt <- merge(drivers_smelt,dtlcm_smelt, by="Code", all = T)
 
 #Now get response (CPUE, condition, etc. for each Station, and model)
 smelt_station_CPUE <- smelt_age_CPUE %>% group_by(StationYear) %>%
@@ -3827,18 +3830,22 @@ for (i in resp_smelt)  {
       smelt_mod_subset <- smelt_mod
       if (k != 0) smelt_mod_subset <- smelt_mod_subset[smelt_mod_subset$Station == Station[k],]
       
+      # Subset to non NA data
+      smelt_mod_subset <- cbind(smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]),c("Year", "Station")],smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]),c(i,j)])
+      colnames(smelt_mod_subset)[3:4] <- c("resp", "driv")
+      
       # Linear model ####
-      lm1 <- lm(smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]),i] ~ smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]), j], data = smelt_mod_subset)
+      lm1 <- lm(resp ~ driv, data = smelt_mod_subset)
     
       # save output
       out_mod_lm <- c(out_mod_lm, 
                       "lm", 
                       ifelse(k!=0, Station[k], "All lake"),
-                      colnames(smelt_mod_subset)[j], colnames(smelt_mod_subset)[i], summary(lm1)[[8]], summary(lm1)[[4]][2,4], j, i)
+                      colnames(smelt_mod)[j], colnames(smelt_mod)[i], summary(lm1)[[8]], summary(lm1)[[4]][2,4], j, i)
     
       # GAM ####
-      if(length(smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]),i])>18) {
-        gam1 <- gam(smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]),i] ~ s(smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]), j]), data = smelt_mod_subset[!is.na(smelt_mod_subset[,i]) & !is.na(smelt_mod_subset[,j]),])
+      if(nrow(smelt_mod_subset)>18) {
+        gam1 <- gam(resp ~ s(driv), data = smelt_mod_subset)
         
         # Save output gam
         gam1_summ <- summary(gam1)
@@ -3848,7 +3855,7 @@ for (i in resp_smelt)  {
         out_mod_gam <- c(out_mod_gam,
                      "gam", 
                       ifelse(k!=0, Station[k], "All lake"),
-                     colnames(smelt_mod_subset)[j], colnames(smelt_mod_subset)[i],
+                     colnames(smelt_mod)[j], colnames(smelt_mod)[i],
                      gam1_summ$r.sq,         #r-squared
                      gam1_summ$s.table[1,4], #p-value
                      gam1_summ$s.table[1,1], #edf
@@ -3859,8 +3866,8 @@ for (i in resp_smelt)  {
         # If GAM has dev.explained high enough, plot the shape of the relationship
         # sometimes, the fit is weird
         if(gam1_summ$dev.expl>0.3) {
-          plot.gam(gam1, xlab = colnames(smelt_mod_subset)[j], 
-             ylab = paste0("s(", colnames(smelt_mod_subset)[i], ")"),
+          plot.gam(gam1, xlab = colnames(smelt_mod)[j], 
+             ylab = paste0("s(", colnames(smelt_mod)[i], ")"),
              shade = T, residuals = T, main = ifelse(k!=0, Station[k], "All lake")) 
           abline(h=0)
         }
@@ -3876,14 +3883,27 @@ out_mod_gam <- as.data.frame(matrix(out_mod_gam, ncol = 11, byrow = T))
  colnames(out_mod_lm) <- c("model", "Station", "driver", "response", "rsquared", "pvalue_driver", "j_index", "i_index")
 colnames(out_mod_gam) <- c("model", "Station", "driver", "response", "rsquared", "pvalue_driver", "edf", "F", "dev_expl", "j_index", "i_index")
 
+# Transform to numeric what needs be
+indx <- 5:ncol(out_mod_lm)
+out_mod_lm[indx] <- lapply(out_mod_lm[indx], function(x) as.numeric(as.character(x)))
+indx <- 5:ncol(out_mod_gam)
+out_mod_gam[indx] <- lapply(out_mod_gam[indx], function(x) as.numeric(as.character(x)))
+
+
 out_mod_lm <- out_mod_lm[order(out_mod_lm$pvalue_driver),]
 out_mod_lm[1:10,]
 
 out_mod_gam <- out_mod_gam[order(out_mod_gam$dev_expl, decreasing = T),]
-out_mod_gam[1:10,]
+out_mod_gam[out_mod_gam$driver=="TOTAL",][1:10,]
 
 j=17
 i=2
+
+```
+
+```{r Model some response variables in smelt population against drivers - step 4: look at the shape of some relationship}
+ggplot(smelt_mod, aes(log(TOTAL), log(CPUE_age2))) + geom_point() +
+  facet_wrap(~Station)
 
 ```
 
@@ -3897,47 +3917,156 @@ library(car) # for function Anova()
 
 i = 3 #CPUE 
 j = 6 # total number of fish stocked
-windowtest_residuals <- NULL
-for (l in 2008) {
-  sep= l
-  for (k in 0:length(Station)) {
-      # Run the model for lake, per stations, and per basin
-      smelt_mod_subset <- smelt_mod
-      if (k != 0) smelt_mod_subset <- smelt_mod_subset[smelt_mod_subset$Station == Station[k],]
-      
-      smelt_mod_subset <- cbind(smelt_mod_subset[, c("Year", "Station")], 
-                                smelt_mod_subset[, c(i,j)])
-      
-      colnames(smelt_mod_subset) <- c("Year", "Station", "resp", "driv")
-      
-      smelt_mod_subset <- smelt_mod_subset[complete.cases(smelt_mod_subset),]
-      
-      smelt_mod_subset$periods <- c(rep("pre", nrow(smelt_mod_subset[smelt_mod_subset$Year<sep,])), 
-                                    rep("post", nrow(smelt_mod_subset[smelt_mod_subset$Year>=sep,])))
-      
-      
-      model4=aov(resp ~ driv + periods, data=smelt_mod_subset)
-      info <- Anova(model4, type="III")
-  
-      model41=lm(resp ~ driv + I(driv^1) + I(driv^3), data = smelt_mod_subset[smelt_mod_subset$periods=="pre",]) #exp(-exp(-driv)))
-      info41 <- summary(model41) #Model Before
-  #model42a=lm(residu[-c(1:sep)]~TempMoyenne[-c(1:sep)], data=smelt_mod_subset)
-  #model42b=lm(residu[-c(1:sep)]~poly(TempMoyenne[-c(1:sep)],2), data=smelt_mod_subset)
-  #model42c=lm(residu[-c(1:sep)]~poly(TempMoyenne[-c(1:sep)],3), data=smelt_mod_subset)
-      model42=lm(resp ~ driv + I(driv^1) + I(driv^3), data = smelt_mod_subset[smelt_mod_subset$periods=="post",]) #exp(-exp(-smelt_mod_subset[,j][-c(1:sep)])), data=smelt_mod_subset)
-      info42 <- summary(model42)
-  #test_aic <- AIC(model42a,model42b,model42c,model42d)
-  #test_llrt <- lrtest(model42a,model42b,model42c,model42d)
-  test_anova <- anova(model42a,model42b,model42c,model42d)
-  #test_aic_pristine <- c(test_aic$AIC[1],test_aic$AIC[2],test_aic$AIC[3],test_aic$AIC[4])
-  #test_llrt_pristine <- c(test_llrt$LogLik[1],test_llrt$LogLik[2],test_llrt$LogLik[3],test_llrt$LogLik[4])
-  #test_anova_pristine <- c(test_llrt$LogLik[1],test_llrt$LogLik[2],test_llrt$LogLik[3],test_llrt$LogLik[4])
-  #Results <- c(test_aic_pristine, test_llrt_pristine)
-  Results <- c(smelt_mod_subset$Year[i],info$Pr[2],signif(info$Pr[2]),info$Pr[3], signif(info$Pr[3]),model41$coefficients[2],info41$adj.r.squared, model42$coefficients[2],info42$adj.r.squared,smelt_mod_subset$Year[i])
-  windowtest_residuals <- rbind (windowtest_residuals, Results)
+windowtest <- NULL
+
+# Instead, model before / after date, and see if relationship changes?
+for (i in resp_smelt) {
+  for (l in 1995:2010) {
+      sep= l
+      for (k in 0:length(Station)) {
+          # Run the model for lake, per stations, and per basin
+          smelt_mod_subset <- smelt_mod
+          if (k != 0) smelt_mod_subset <- smelt_mod_subset[smelt_mod_subset$Station == Station[k],]
+          
+          # Select only Year, Station, and response
+          smelt_mod_subset <- cbind(smelt_mod_subset[, c("Year", "Station")], 
+                                    smelt_mod_subset[, c(i)])
+          
+          colnames(smelt_mod_subset) <- c("Year", "Station", "resp")
+          
+          smelt_mod_subset <- smelt_mod_subset[complete.cases(smelt_mod_subset),]
+          
+          # Add category before /after
+          pre <- smelt_mod_subset[smelt_mod_subset$Year<sep,]
+          post <- smelt_mod_subset[smelt_mod_subset$Year>=sep,]
+          smelt_mod_subset$periods <- c(rep("pre", nrow(smelt_mod_subset[smelt_mod_subset$Year<sep,])), 
+                                        rep("post", nrow(smelt_mod_subset[smelt_mod_subset$Year>=sep,])))
+          
+          # Now model
+          all_m <- lm(resp ~ Year, data = smelt_mod_subset)
+          if(nrow(pre)>1)  pre_m <- lm(resp ~ Year, data = pre)
+          if(nrow(post)>1) post_m <- lm(resp ~ Year, data = post)
+          if(nrow(pre)>0&nrow(post)>0) aov_m <- aov(resp ~ Year + periods, data = smelt_mod_subset)
+          
+          summary(all_m)
+          summary(pre_m)
+          summary(post_m)
+          summary(aov_m)
+          
+          # Get output
+          windowtest <- c(windowtest, 
+                      ifelse(k!=0, Station[k], "All lake"),
+                      colnames(smelt_mod)[i], 
+                      l, #cut_year
+                      nrow(pre), nrow(post),
+                      summary(all_m)[[8]], summary(all_m)[[4]][2,4], # rquared and p-val
+                      ifelse(nrow(pre)>1,  summary(pre_m)[[8]], NA),
+                      ifelse(nrow(pre)>1,  summary(pre_m)[[4]][2,4], NA),
+                      ifelse(nrow(post)>1, summary(post_m)[[8]], NA), 
+                      ifelse(nrow(post)>1, summary(post_m)[[4]][2,4], NA), 
+                      ifelse(nrow(pre)>0&nrow(post)>0, summary(aov_m)[[1]][[5]][1], NA), #p-value for year
+                      ifelse(nrow(pre)>0&nrow(post)>0, summary(aov_m)[[1]][[5]][2], NA), #p-value for periods
+                      i)
+          
+          
+          ggplot(smelt_mod_subset, aes(Year, resp)) + geom_point(aes(shape=periods)) + stat_smooth(method = "lm") + labs(y = colnames(smelt_mod)[i]) + theme_bw() +
+            stat_smooth(data, aes)
+      }
+    }
 }
-colnames(windowtest_residuals) <- c("SplitingYear","AOV_pvalue_SATA","Significativity_SATA","AOV_pvalue_Periods","Significativity_Periods","SlopeAnthrophocene","rsquaredAnthropo","SlopePristine","rsquaredPristine","Year")
-View(windowtest_residuals)
+# Clean output
+windowtest <- as.data.frame(matrix(windowtest, ncol = 14, byrow = T))
+colnames(windowtest) <- c("Station", "response", "cut_yr",
+                          "numb_obs_pre", "numb_obs_post",
+                          "lm_all_r2", "lm_all_pv",
+                          "lm_pre_r2", "lm_pre_pv",
+                          "lm_post_r2", "lm_post_pv",
+                          "aov_year_pval", "aov_periods_pval",
+                          "index_resp")
+
+str(windowtest)
+
+# Transform to numeric what needs be
+indx <- 3:ncol(windowtest)
+windowtest[indx] <- lapply(windowtest[indx], function(x) as.numeric(as.character(x)))
+head(windowtest)
+
+# Plot the impact of periods 
+ggplot(windowtest, aes(cut_yr, aov_periods_pval)) +
+  geom_hline(yintercept = 0.05) +
+  geom_point(pch = ifelse(windowtest$aov_periods_pval<=0.06, 16,1),
+             size = ifelse(windowtest$aov_periods_pval<=0.06, 2,1)) +
+  facet_grid(Station~response) +
+  labs(x = "Cutting year", 
+       y = "p-value",
+       caption = "Anova test was conducted to compare periods before and after cutting year. Open circles indicate \n
+       samples where periods are non-significantly different, close circles indicate cutting dates where period \n
+       pre/post were significantly different at a level of 0.05.")  +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/pval_period.png"), height=8, width= 7)
+
+# Compare linear models characteristics
+
+
+for (i in resp_smelt)  {
+  for (j in 6) {# drivers_smelt) {
+    for (l in 2000:2010) {
+      sep= l
+      for (k in 0:length(Station)) {
+          # Run the model for lake, per stations, and per basin
+          smelt_mod_subset <- smelt_mod
+          if (k != 0) smelt_mod_subset <- smelt_mod_subset[smelt_mod_subset$Station == Station[k],]
+          
+          smelt_mod_subset <- cbind(smelt_mod_subset[, c("Year", "Station")], 
+                                    smelt_mod_subset[, c(i,j)])
+          
+          colnames(smelt_mod_subset) <- c("Year", "Station", "resp", "driv")
+          
+          smelt_mod_subset <- smelt_mod_subset[complete.cases(smelt_mod_subset),]
+          
+          smelt_mod_subset$periods <- c(rep("pre", nrow(smelt_mod_subset[smelt_mod_subset$Year<sep,])), 
+                                        rep("post", nrow(smelt_mod_subset[smelt_mod_subset$Year>=sep,])))
+          
+          
+          model4=aov(resp ~ driv + periods, data=smelt_mod_subset)
+          info <- Anova(model4, type="III")
+      
+          model41=lm(resp ~ driv + I(driv^1) + I(driv^3), data = smelt_mod_subset[smelt_mod_subset$periods=="pre",]) #exp(-exp(-driv)))
+          info41 <- summary(model41) #Model Before
+      #model42a=lm(residu[-c(1:sep)]~TempMoyenne[-c(1:sep)], data=smelt_mod_subset)
+      #model42b=lm(residu[-c(1:sep)]~poly(TempMoyenne[-c(1:sep)],2), data=smelt_mod_subset)
+      #model42c=lm(residu[-c(1:sep)]~poly(TempMoyenne[-c(1:sep)],3), data=smelt_mod_subset)
+          model42=lm(resp ~ driv + I(driv^1) + I(driv^3), data = smelt_mod_subset[smelt_mod_subset$periods=="post",]) #exp(-exp(-smelt_mod_subset[,j][-c(1:sep)])), data=smelt_mod_subset)
+          info42 <- summary(model42)
+      #test_aic <- AIC(model42a,model42b,model42c,model42d)
+      #test_llrt <- lrtest(model42a,model42b,model42c,model42d)
+          #test_anova <- anova(model42a,model42b,model42c,model42d)
+      #test_aic_pristine <- c(test_aic$AIC[1],test_aic$AIC[2],test_aic$AIC[3],test_aic$AIC[4])
+      #test_llrt_pristine <- c(test_llrt$LogLik[1],test_llrt$LogLik[2],test_llrt$LogLik[3],test_llrt$LogLik[4])
+      #test_anova_pristine <- c(test_llrt$LogLik[1],test_llrt$LogLik[2],test_llrt$LogLik[3],test_llrt$LogLik[4])
+      #Results <- c(test_aic_pristine, test_llrt_pristine)
+      Results <- c(l,colnames(smelt_mod)[c(j,i)],
+                   info$Pr[2],signif(info$Pr[2]),info$Pr[3],
+                   ifelse(k!=0, Station[k], "All lake"),
+                   signif(info$Pr[3]),model41$coefficients[2],info41$adj.r.squared, model42$coefficients[2],info42$adj.r.squared,l)
+      windowtest_residuals <- rbind (windowtest_residuals, Results)
+      }
+    }
+  }
+}
+colnames(windowtest_residuals) <- c("SplitingYear","driver", "response", "Station","AOV_pvalue_driv","Significativity_driv","AOV_pvalue_Periods","Significativity_Periods","SlopePre","rsquaredPre","SlopePost","rsquaredPost","Year")
+windowtest_residuals <- as.data.frame(windowtest_residuals)
+#View(windowtest_residuals)
+
+# Transform to numeric what needs be
+indx <- 5:ncol(windowtest_residuals)
+windowtest_residuals[indx] <- lapply(windowtest_residuals[indx], function(x) as.numeric(as.character(x)))
+
+windowtest_residuals <- windowtest_residuals[order(windowtest_residuals$Significativity_Periods, decreasing = T),]
+windowtest_residuals[1:10,]
+
 
 ```
 
