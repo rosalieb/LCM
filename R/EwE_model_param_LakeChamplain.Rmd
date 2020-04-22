@@ -33,6 +33,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # tmp$summary_functions_plot
 library(ggplot2)
 library(patchwork) # to easily arrange plot
+#devtools::install_github("rensa/stickylabeller")
 library(stickylabeller) # to get a, b, c, or fancy names in facet_wrap
 library(plotly)
 library(plyr) #for ddply
@@ -3383,14 +3384,25 @@ Up until now, I was using the MasterFileBio....xls, that only has the fish that 
 There is also a MasterFileTrawl...xls, that has catches.
 
 ```{r explore the dataset MasterFileTrawl, echo=FALSE, message=FALSE, warning=FALSE}
+
+use_Basin = T
+
 smelt_trawl <- read.delim(paste0(getpath4data(), "data_from_Bernie/MasterFileTrawlCPUE1987-2015.txt"))
 
 # Keep only the 5 main sites
 smelt_trawl <- smelt_trawl[smelt_trawl$Station %in% c("Northeast Arm", "Valcour Island", "Malletts Bay", "Juniper Island", "Barber Point"),]
 
+
 smelt_trawl2 <-  dcast(smelt_trawl, Year ~ Station, mean, value.var = "CPUE")
 smelt_trawl2 <- melt(smelt_trawl2, id.vars = "Year", variable.name = "Station")
 smelt_trawl2$Station2 <- as.numeric(factor(smelt_trawl2$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm"))))
+smelt_trawl2 <- smelt_trawl2 %>% mutate(Basin = case_when(
+  Station == "Malletts Bay"   ~ "Malletts Bay",
+  Station == "Northeast Arm"  ~ "Northeast Arm",
+  Station %in% c("Valcour Island","Juniper Island","Barber Point") ~ "Main Lake"
+))
+
+
 smelt_trawl2_sd <-  dcast(smelt_trawl, Year ~ Station, sd, value.var = "CPUE")
 smelt_trawl2_sd <- melt(smelt_trawl2_sd, id.vars = "Year", variable.name = "Station")
 smelt_trawl2_sd$Station2 <- as.numeric(factor(smelt_trawl2_sd$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm"))))
@@ -3447,12 +3459,13 @@ p1 <- ggplot(smelt_trawl, aes(Year, CPUE)) +
   geom_hline(yintercept = 0, lwd=.3, alpha=.3) +
   geom_smooth(color="tomato") +
   geom_vline(xintercept = 2003, lty=2) +
-  geom_point(aes(shape=smelt_trawl$Station)) +
-  scale_shape_manual(values=c(16,4,16,16,1), show.legend = F) +
+  geom_point(aes(shape=Station)) +
+  scale_shape_manual(values=c(16,4,16,16,1)) +
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + xlim(1986,2015) +
   facet_wrap(~Basin, scales="free", ncol = 1,
-             labeller = label_glue('({.l}) {Basin}'))
+             labeller = label_glue('({.l}) {Basin}')) +
+  guides(shape=FALSE)
 p1
 #ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_CPUE_per_basin.png"), width = 3, height=7)
 
@@ -3621,7 +3634,7 @@ ggplot(smelt %>%
 
 ## Model some response variables in smelt population against drivers
 
-```{r Model some response variables in smelt population against drivers - step 1: prepare drivers}
+```{r Model some response variables in smelt population against drivers - step 1: prepare drivers, message=FALSE, warning=FALSE}
 # Drivers
 # Mysis biomass
 pmysis <- ggplot(mysis_summ, aes(Year, mean)) +
@@ -3767,7 +3780,7 @@ grid.draw(rbind(ggplotGrob(poutput[[1]] +
 ```
 
 
-```{r Model some response variables in smelt population against drivers - step 2: get the drivers + response dataframe clean from previous step}
+```{r Model some response variables in smelt population against drivers - step 2: get the drivers + response dataframe clean from previous step, message=FALSE, warning=FALSE}
 drivers_smelt <- drivers
 for(i in Station) {
   if(i == Station[1]) drivers_smelt <- cbind("Station" = rep(i, nrow(drivers)), drivers) else
@@ -3809,16 +3822,27 @@ resp_smelt <- resp_smelt[,!colnames(resp_smelt) %in% c("Year", "Station")]
 # Merge Drivers and response ####
 smelt_mod <- merge(resp_smelt, drivers_smelt, by = "Code", all = T)
 
+smelt_mod$Code <- as.character(smelt_mod$Code)
 smelt_mod$Station <- substr(smelt_mod$Code, start = 1, stop = nchar(smelt_mod$Code)-5)
 smelt_mod$Year <- as.numeric(paste(substr(smelt_mod$Code, start = nchar(smelt_mod$Code)-3, stop = nchar(smelt_mod$Code))))
 
+smelt_mod <- cbind(smelt_mod[,c("Code", "Station", "StationID", "Year")],smelt_mod[,!colnames(smelt_mod) %in% c("Code", "Station", "StationID", "Year")])
+
+# write.table(smelt_mod, file = paste0(getwd(), "/Output/Data/smelt_data_model.txt"), sep="\t")
+
+# smelt_mod <- read.delim(paste0(getwd(), "/Output/Data/smelt_data_model.txt"))
+# # Transform to numeric what needs be
+# indx <- 3:ncol(smelt_mod)
+# smelt_mod[indx] <- lapply(smelt_mod[indx], function(x) as.numeric(as.character(x)))
+
 ```
 
-```{r Model some response variables in smelt population against drivers - step 3: actual model}
+```{r Model some response variables in smelt population against drivers - step 3: actual model, message=FALSE, warning=FALSE}
+
 colnames(smelt_mod)
 # Get two vectors with col numbers of drivers and responses, so I can model everything against everything
-   resp_smelt <- c(2:4)
-drivers_smelt <- c(5:7,13:28)
+   resp_smelt <- c(5:7)
+drivers_smelt <- c(8:10,14:29)
 
 # Start loop ####
 out_mod_lm = out_mod_gam = NULL
@@ -3901,22 +3925,30 @@ i=2
 
 ```
 
-```{r Model some response variables in smelt population against drivers - step 4: look at the shape of some relationship}
+```{r Model some response variables in smelt population against drivers - step 4: look at the shape of some relationship, message=FALSE, warning=FALSE}
 ggplot(smelt_mod, aes(log(TOTAL), log(CPUE_age2))) + geom_point() +
   facet_wrap(~Station)
 
 ```
 
 
-```{r code from lake geneva paper eval=FALSE, include=FALSE}
-# code from Lake Geneva paper
+```{r simple model before after periods smelt, message=FALSE, warning=FALSE}
+# code inspired from Lake Geneva paper
+
+# smelt_mod <- read.delim(paste0(getwd(), "/Output/Data/smelt_data_model.txt"))
+# # Transform to numeric what needs be
+# indx <- 3:ncol(smelt_mod)
+# smelt_mod[indx] <- lapply(smelt_mod[indx], function(x) as.numeric(as.character(x)))
+
 colnames(smelt_mod)
-   resp_smelt <- c(2:4)
-drivers_smelt <- c(5:7,13:28)
+   resp_smelt <- c(5:7)
+drivers_smelt <- c(8:10,14:29)
 library(car) # for function Anova()
 
-i = 3 #CPUE 
-j = 6 # total number of fish stocked
+i = 6 #CPUE 
+j = 9 # total number of fish stocked
+l = 2005
+k = 0 # whole lake
 windowtest <- NULL
 
 # Instead, model before / after date, and see if relationship changes?
@@ -3968,9 +4000,27 @@ for (i in resp_smelt) {
                       ifelse(nrow(pre)>0&nrow(post)>0, summary(aov_m)[[1]][[5]][2], NA), #p-value for periods
                       i)
           
+          if (k==0) plot_list <- list()
+          plot_list [[k+1]] <-
+          ggplot(smelt_mod_subset, aes(Year, resp)) +
+            stat_smooth(method = "lm", fill=NA, col="tomato") + 
+            stat_smooth(data = pre_m, mapping = aes(Year, resp), method ="lm", fill = NA, col = "#cedaff") + #fill = "#e7edff"
+            stat_smooth(data = post_m, mapping = aes(Year, resp), method ="lm", fill = NA, col = "#DDA0DD") + #fill = "#E6E6FA" 
+            geom_point(data = pre_m, mapping = aes(Year, resp), col = "#cedaff") + 
+            geom_point(data = post_m, mapping = aes(Year, resp), col = "#DDA0DD") +
+            labs(y = colnames(smelt_mod)[i], subtitle = ifelse(k!=0, Station[k], "All lake")) + 
+            theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
           
-          ggplot(smelt_mod_subset, aes(Year, resp)) + geom_point(aes(shape=periods)) + stat_smooth(method = "lm") + labs(y = colnames(smelt_mod)[i]) + theme_bw() +
-            stat_smooth(data, aes)
+          if (k == length(Station)) {
+             g <- grid.arrange(plot_list[[1]], 
+                              plot_list[[2]],
+                              plot_list[[3]],
+                              plot_list[[4]],
+                              plot_list[[5]],
+                              plot_list[[6]])
+             if(!R_U_KNITTING) ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Smelt_linear_model/smelt_linear_model_", ifelse(nrow(pre)>0&nrow(post)>0, ifelse(summary(aov_m)[[1]][[5]][2]<0.05, "signif_", "non_signif_"), "not_enough_data_"),colnames(smelt_mod)[i],"_", l,".png"), plot = g, height=8, width= 7)
+          }
       }
     }
 }
@@ -3990,6 +4040,7 @@ str(windowtest)
 indx <- 3:ncol(windowtest)
 windowtest[indx] <- lapply(windowtest[indx], function(x) as.numeric(as.character(x)))
 head(windowtest)
+windowtest$Station <- factor(windowtest$Station, levels = c('All lake', 'Barber Point', 'Juniper Island', 'Valcour Island', 'Malletts Bay', 'Northeast Arm'))
 
 # Plot the impact of periods 
 ggplot(windowtest, aes(cut_yr, aov_periods_pval)) +
@@ -4007,7 +4058,24 @@ ggplot(windowtest, aes(cut_yr, aov_periods_pval)) +
 
 #ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/pval_period.png"), height=8, width= 7)
 
+# example plot of 2 type of relationship
+ggplot(smelt_mod, aes(Year, CPUE)) + geom_point() +
+  facet_grid(Station~resp, drop = F) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
 # Compare linear models characteristics
+smelt_mod_resp <- cbind(smelt_mod[,c("Year", "Station")],
+                        smelt_mod[,resp_smelt])
+smelt_mod_resp <- melt(smelt_mod_resp, 
+                       id.vars = c("Year", "Station"),
+                       measure.vars = colnames(smelt_mod)[resp_smelt],
+                       variable.name = "resp")
+# plot
+ggplot(smelt_mod, aes(Year, value)) + geom_point() +
+  facet_grid(Station~resp, drop = F) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 
 for (i in resp_smelt)  {
@@ -4116,6 +4184,89 @@ if(!R_U_KNITTING) write.table(out, file=paste0(getwd(),"/Output/Data/Smelt_summa
 ```
 
 `r as.data.frame(out)`
+
+
+## Summary figure for paper
+
+```{r summary figure for smelt paper}
+# What I want is a summary figure with the different responses, per basin, across time.
+# Use facet grid, with columns being stations, and rows the different responses.
+
+smelt$StationYear <- paste0(smelt$Station, "_", smelt$Year)
+smelt_trawl$StationYear <- paste0(smelt_trawl$Station, "_", smelt_trawl$Year)
+Station <- c("Barber Point", "Juniper Island", "Malletts Bay", "Northeast Arm", "Valcour Island")
+
+# Do a summary dataset for bio data
+head(smelt_bio_stats <-
+       smelt %>% group_by(Station, Year, Sample.No.) %>% 
+  summarise(mean_l=mean(Length, na.rm=T),
+            mean_w=mean(Weight, na.rm=T),
+            mean_cond=mean(condition, na.rm=T),
+            mean_age=mean(Age, na.rm=T),
+            number = n()))
+
+smelt_bio_stats <-
+  smelt_bio_stats %>% mutate(Basin = case_when(
+  Station == "Malletts Bay"   ~ "Malletts Bay",
+  Station == "Northeast Arm"  ~ "Northeast Arm",
+  Station %in% c("Valcour Island","Juniper Island","Barber Point") ~ "Main Lake"
+))
+
+
+smelt_bio_stats$Station <- factor(smelt_bio_stats$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm")))
+smelt_bio_stats$Station2 <- as.numeric(factor(smelt_bio_stats$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm"))))
+
+summary(smelt_bio_stats$number)
+
+head(smelt_bio_stats <-
+  melt(smelt_bio_stats, id.vars = c("Station", "Year", "Sample.No.", "Basin", "Station2"))
+)
+
+# Create a dataframe that resemble smelt_bio_stats, so we could rbind them together
+smelt_trawl_stats <- smelt_trawl
+smelt_trawl_stats$logCPUE <- log(smelt_trawl_stats$CPUE)
+smelt_trawl_stats <- melt(smelt_trawl_stats, id.vars = c("Station", "Year", "Trawl.No.", "Basin"))
+colnames(smelt_trawl_stats)[colnames(smelt_trawl_stats)=="Trawl.No."] <- "Sample.No."
+smelt_trawl_stats <- smelt_trawl_stats[smelt_trawl_stats$variable=="logCPUE",]
+smelt_trawl_stats$Station <- factor(smelt_trawl_stats$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm")))
+smelt_trawl_stats$Station2 <- as.numeric(factor(smelt_trawl_stats$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm"))))
+
+# Bind both tables
+head(smelt_trawl_stats)
+head(smelt_bio_stats)
+smelt_trawl_stats <- smelt_trawl_stats[,colnames(smelt_bio_stats)]
+smelt_tot_stats <- rbind(smelt_trawl_stats,
+                         smelt_bio_stats[smelt_bio_stats$variable != "number",])
+# Transform to numeric what needs be
+indx <- which(colnames(smelt_tot_stats)=="value")
+smelt_tot_stats[indx] <- lapply(smelt_tot_stats[indx], function(x) as.numeric(as.character(x)))
+# Add clean variable name
+smelt_tot_stats <- smelt_tot_stats %>%
+  mutate(variable2 = case_when(
+    variable == "logCPUE" ~ "log(CPUE)",
+    variable == "mean_l" ~ "length (mm)",
+    variable == "mean_w" ~ "weight (g)",
+    variable == "mean_cond" ~ "condition",
+    variable == "mean_age" ~ "mean age"
+  ))
+
+smelt_tot_stats$variable2 <- factor(smelt_tot_stats$variable2,
+                                    levels = c('log(CPUE)' ,'length (mm)' ,'weight (g)' ,'condition', 'mean age'))
+
+ggplot(smelt_tot_stats, aes(Year, value)) +
+  geom_smooth(color="tomato") +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_point(aes(shape=Station), alpha=.5, show.legend = F) +
+  scale_shape_manual(values=c(16,16,16,4,1)) +
+  theme_bw() +
+  facet_grid(variable2~Basin, scales = "free_y") 
+  
+
+
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Final_figure_summary.png"), width = 6, height=7)
+```
+
+
 
 # Alewife
 
