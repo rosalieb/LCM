@@ -3314,6 +3314,7 @@ head(thcc_out)
 thcc_out$A_QAQC <- thcc_out$A
 thcc_out$A_QAQC[thcc_out$A_QAQC<0] <- NA
 
+# Weighted average for Station
 im_w <- NULL
 for (j in Station) {
   for (i in 3:(nrow(thcc_out[thcc_out$MinAge==2&thcc_out$Station==j,])-2)) {
@@ -3333,23 +3334,74 @@ im_w$im_3yr <- as.numeric(paste(im_w$im_3yr))
 im_w$im_3yr_QAQC <- as.numeric(paste(im_w$im_3yr_QAQC))
 im_w$im_5yr_QAQC <- as.numeric(paste(im_w$im_5yr_QAQC))
 
-# plot for age 2 only
-ggplot(thcc_out[thcc_out$MinAge==2,], aes(Cohort,A)) +
+# Add basin
+thcc_out <- thcc_out %>% mutate(Basin = case_when(
+  Station == "Malletts Bay"   ~ "Malletts Bay",
+  Station == "Northeast Arm"  ~ "Northeast Arm",
+  Station %in% c("Valcour Island","Juniper Island","Barber Point") ~ "Main Lake"
+))
+
+# Weighted average for Basin
+Basin <- factor(unique(thcc_out$Basin), levels = c("Main Lake", "Malletts Bay", "Northeast Arm"))
+
+im_w_ba <- NULL
+for (j in Basin) {
+  for (i in 3:(nrow(thcc_out[thcc_out$MinAge==2&thcc_out$Basin==j,])-2)) {
+    n_avail <- length(thcc_out$A_QAQC[thcc_out$MinAge==2&thcc_out$Basin==j][(i-2):(i+2)][!is.na(thcc_out$A_QAQC[thcc_out$MinAge==2&thcc_out$Basin==j][(i-2):(i+2)])])
+    n_avail_3 <- length(thcc_out$A_QAQC[thcc_out$MinAge==2&thcc_out$Basin==j][(i-1):(i+1)][!is.na(thcc_out$A_QAQC[thcc_out$MinAge==2&thcc_out$Basin==j][(i-1):(i+1)])])
+    im_w_ba_temp_5 <- sum(thcc_out$A_QAQC[thcc_out$MinAge==2&thcc_out$Basin==j][(i-2):(i+2)], na.rm=T) / n_avail
+    im_w_ba_temp_3 <- sum(thcc_out$A_QAQC[thcc_out$MinAge==2&thcc_out$Basin==j][(i-1):(i+1)], na.rm=T) / n_avail_3
+    im_w_ba <- c(im_w_ba, j, thcc_out$Cohort[thcc_out$MinAge==2&thcc_out$Basin==j][i],
+              ifelse(n_avail>4, im_w_ba_temp_5, NA), ifelse(n_avail_3>2, im_w_ba_temp_3, NA), im_w_ba_temp_3)
+    rm(im_w_ba_temp,n_avail, n_avail_3)
+  }
+}
+im_w_ba <- as.data.frame(matrix(im_w_ba, ncol=5, byrow=T))
+colnames(im_w_ba) <- c("Basin", "Year", "im_5yr_QAQC", "im_3yr_QAQC", "im_3yr")
+im_w_ba$Year <- as.numeric(paste(im_w_ba$Year))
+im_w_ba$im_3yr <- as.numeric(paste(im_w_ba$im_3yr))
+im_w_ba$im_3yr_QAQC <- as.numeric(paste(im_w_ba$im_3yr_QAQC))
+im_w_ba$im_5yr_QAQC <- as.numeric(paste(im_w_ba$im_5yr_QAQC))
+ 
+
+im_w_ba <- im_w_ba %>% 
+  group_by(Basin, Year) %>% 
+       summarise(
+         im_3yr = mean(im_3yr, na.rm=T),
+         im_3yr_QAQC = mean(im_3yr_QAQC, na.rm=T),
+         im_5yr_QAQC = mean(im_5yr_QAQC, na.rm=T)
+         )
+
+# plot instantaneous mortality for age 2, Station then Basin ####
+p_im <- 
+  ggplot(thcc_out[thcc_out$MinAge==2,], aes(Cohort,A)) +
     geom_vline(xintercept = 2003-0.3, lty=2) +
     geom_vline(xintercept = 2008-0.3, lty=1) +
     # geom_vline(xintercept = 1995.5, col="cornflowerblue", alpha=.4) + 
   geom_hline(yintercept = 0, col="grey") +
   geom_point(alpha=.2) +
-  geom_line(im_w, mapping = aes(Year, im_3yr), lty=3, alpha=.7) +
-  geom_line(im_w, mapping = aes(Year, im_3yr_QAQC), lty=2, alpha=.7) +
-  geom_line(im_w, mapping = aes(Year, im_5yr_QAQC)) +
-  facet_wrap(~Station, ncol = 1,
-             labeller = label_glue('({.l}) {Station}')) +
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   guides(color = guide_legend(title="Minimum age \nused for fit",
                               title.position="top", title.hjust = 0.5, ncol=1)) +
   ylim(0,1) 
+
+# for station
+p_im +
+  geom_line(im_w, mapping = aes(Year, im_3yr), lty=3, alpha=.7) +
+  geom_line(im_w, mapping = aes(Year, im_3yr_QAQC), lty=2, alpha=.7) +
+  geom_line(im_w, mapping = aes(Year, im_5yr_QAQC)) +
+  facet_wrap(~Station, ncol = 1,
+             labeller = label_glue('({.l}) {Station}')) 
+
+# for basin
+p_im +
+  geom_line(im_w_ba, mapping = aes(Year, im_3yr), lty=3, alpha=.7) +
+  geom_line(im_w_ba, mapping = aes(Year, im_3yr_QAQC), lty=2, alpha=.7) +
+  geom_line(im_w_ba, mapping = aes(Year, im_5yr_QAQC)) +
+  facet_wrap(~Basin, ncol = 1,
+             labeller = label_glue('({.l}) {Basin}')) 
+
 # ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Cohort_A_Age2.png"), width = 3, height=7)
 
 head(im_out)
@@ -4192,6 +4244,7 @@ if(!R_U_KNITTING) write.table(out, file=paste0(getwd(),"/Output/Data/Smelt_summa
 # What I want is a summary figure with the different responses, per basin, across time.
 # Use facet grid, with columns being stations, and rows the different responses.
 
+# Get summary data of all variable together ####
 smelt$StationYear <- paste0(smelt$Station, "_", smelt$Year)
 smelt_trawl$StationYear <- paste0(smelt_trawl$Station, "_", smelt_trawl$Year)
 Station <- c("Barber Point", "Juniper Island", "Malletts Bay", "Northeast Arm", "Valcour Island")
@@ -4237,25 +4290,126 @@ head(smelt_bio_stats)
 smelt_trawl_stats <- smelt_trawl_stats[,colnames(smelt_bio_stats)]
 smelt_tot_stats <- rbind(smelt_trawl_stats,
                          smelt_bio_stats[smelt_bio_stats$variable != "number",])
+
+# If we want to add instantaneous mortality to the summary figure
+instantaneous_mortality = T
+if (instantaneous_mortality) {
+  instantaneous_mortality2 = F
+  
+    thcc_out_f <-  melt(thcc_out, id.vars = c("Station", "Cohort", "Basin"), measure.vars = "A")
+  colnames(thcc_out_f)[colnames(thcc_out_f)=="Cohort"] <- "Year"
+  thcc_out_f <- thcc_out_f %>% 
+  group_by(Station, Basin, Year) %>% 
+       summarise(value = mean(value, na.rm=T))
+  thcc_out_f$variable <- "A"
+  thcc_out_f$Sample.No. <- rep(NA, nrow(thcc_out_f))
+  thcc_out_f$Station <- factor(thcc_out_f$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm")))
+thcc_out_f$Station2 <- as.numeric(factor(thcc_out_f$Station, levels = rev(c("Valcour Island","Juniper Island","Barber Point", "Malletts Bay", "Northeast Arm"))))
+
+
+
+  if(instantaneous_mortality2) {
+    im_w_ba_f  <-  melt(im_w_ba, id.vars = c("Year", "Basin"))
+  im_w_ba_f$Station <- im_w_ba_f$Station2 <- im_w_ba_f$Sample.No. <- rep(NA, nrow(im_w_ba_f))
+  im_w_ba_f <- im_w_ba_f[ , colnames(thcc_out_f)]
+  
+  im_tot_f <- rbind(im_w_ba_f,thcc_out_f)
+  im_tot_f <- im_tot_f[, colnames(smelt_tot_stats)]
+  } else {
+    im_tot_f <- thcc_out_f[, colnames(smelt_tot_stats)]
+  }
+
+  smelt_tot_stats <- rbind(smelt_tot_stats, data.frame(im_tot_f))
+  
+}
+
 # Transform to numeric what needs be
 indx <- which(colnames(smelt_tot_stats)=="value")
 smelt_tot_stats[indx] <- lapply(smelt_tot_stats[indx], function(x) as.numeric(as.character(x)))
+
+
+
 # Add clean variable name
 smelt_tot_stats <- smelt_tot_stats %>%
   mutate(variable2 = case_when(
     variable == "logCPUE" ~ "log(CPUE)",
-    variable == "mean_l" ~ "length (mm)",
-    variable == "mean_w" ~ "weight (g)",
-    variable == "mean_cond" ~ "condition",
-    variable == "mean_age" ~ "mean age"
+    variable == "mean_l" ~ "average length (mm)",
+    variable == "mean_w" ~ "average weight (g)",
+    variable == "mean_cond" ~ "average condition",
+    variable == "mean_age" ~ "average age",
+    variable == "A" ~ "annual mortality (A)"
   ))
 
-smelt_tot_stats$variable2 <- factor(smelt_tot_stats$variable2,
-                                    levels = c('log(CPUE)' ,'length (mm)' ,'weight (g)' ,'condition', 'mean age'))
+# Do changepoints for all variable in final smelt figure: ####
 
+# Create 2nd summary data
+head(smelt_tot_stats_mean <- smelt_tot_stats %>% 
+       group_by(variable, variable2, Station, Basin, Year) %>%
+       summarise(value = mean(value, na.rm = T))
+     ) 
+
+changepoint_found_out <- NULL
+for(i in unique(smelt_tot_stats_mean$variable)) {
+  for (j in unique(smelt_tot_stats_mean$Basin)) {
+    if(i == "logCPUE") {
+      changepoint_found <- 
+    e.divisive(as.matrix(exp(smelt_tot_stats_mean[smelt_tot_stats_mean$Basin==j & smelt_tot_stats_mean$variable==i,"value"])), min.size = 3, sig.lvl = .05)$order.found[-c(1:2)]
+    } else {
+      changepoint_found <- 
+    e.divisive(as.matrix(smelt_tot_stats_mean[smelt_tot_stats_mean$Basin==j & smelt_tot_stats_mean$variable==i,"value"]), min.size = 3, sig.lvl = .05)$order.found[-c(1:2)]
+    }
+     
+     
+     changepoint_found <- ifelse(length(changepoint_found)>0,
+                                 smelt_tot_stats_mean[smelt_tot_stats_mean$Basin==j & smelt_tot_stats_mean$variable==i,"Year"][changepoint_found,],NA)
+     
+     changepoint_found_out <- c(changepoint_found_out,
+                                i, j,
+                                changepoint_found[[1]][1],
+                                changepoint_found[[1]][2],
+                                changepoint_found[[1]][3])
+
+  }
+}
+changepoint_found_out <- as.data.frame(matrix(changepoint_found_out, ncol = 5, byrow = T))
+colnames(changepoint_found_out) <- c("variable", "Basin", "Changepoint1", "Changepoint2", "Changepoint3")
+# Add clean variable name
+changepoint_found_out <- changepoint_found_out %>%
+  mutate(variable2 = case_when(
+    variable == "logCPUE" ~ "log(CPUE)",
+    variable == "mean_l" ~ "average length (mm)",
+    variable == "mean_w" ~ "average weight (g)",
+    variable == "mean_cond" ~ "average condition",
+    variable == "mean_age" ~ "average age",
+    variable == "A" ~ "annual mortality (A)"
+  ))
+
+# Transform to numeric what needs be
+indx <- 3:5
+changepoint_found_out[indx] <- lapply(changepoint_found_out[indx], function(x) as.numeric(as.character(x)))
+
+# Add for each changepoint the corresponding value
+smelt_tot_stats_mean$BasinYear <- paste(smelt_tot_stats_mean$Basin, smelt_tot_stats_mean$Year, collapse = "_")
+changepoint_found_out$BasinYear <- paste(changepoint_found_out$Basin, changepoint_found_out$Year, collapse = "_")
+data.frame(changepoint_found_out, 
+           Cpt1_value = 
+             smelt_tot_stats_mean[match(changepoint_found_out$BasinYear, smelt_tot_stats_mean$BasinYear), "value"])
+changepoint_found_out
+
+
+# Plot ####
+smelt_tot_stats$variable2 <- factor(smelt_tot_stats$variable2,
+                                    levels = c("log(CPUE)" ,"average length (mm)" ,"average weight (g)" ,"average condition", "average age", "annual mortality (A)"))
+changepoint_found_out$variable2 <- factor(changepoint_found_out$variable2,
+                                    levels = c("log(CPUE)" ,"average length (mm)" ,"average weight (g)" ,"average condition", "average age", "annual mortality (A)"))
+#library(tidyquant) # for moving average 
 ggplot(smelt_tot_stats, aes(Year, value)) +
-  geom_smooth(color="tomato") +
-  geom_vline(xintercept = 2003, lty=2) +
+  geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint1)) +
+  geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint2)) +
+  geom_smooth(color="black") +
+  #geom_ma(n=10,col="red", na.rm = TRUE) +
+  # geom_vline(xintercept = 2003, lty=2) +
+  geom_vline(xintercept = 2008, lty=2) +
   geom_point(aes(shape=Station), alpha=.5, show.legend = F) +
   scale_shape_manual(values=c(16,16,16,4,1)) +
   theme_bw() +
@@ -4263,7 +4417,19 @@ ggplot(smelt_tot_stats, aes(Year, value)) +
   
 
 
-#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Final_figure_summary.png"), width = 6, height=7)
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Final_figure_summary.png"), width = 6, height=8)
+
+
+
+
+
+
+dummy1 <- expand.grid(X = factor(c("A", "B")), Y = rnorm(10))
+dummy1$D <- rnorm(nrow(dummy1))
+dummy2 <- data.frame(X = c("A", "B"), Z = c(1, 0))
+ggplot(dummy1, aes(x = D, y = Y)) + geom_point() + facet_grid(~X) + 
+    geom_hline(data = dummy2, aes(yintercept = Z))
+
 ```
 
 
