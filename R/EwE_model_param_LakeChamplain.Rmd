@@ -31,13 +31,15 @@ knitr::opts_chunk$set(echo = TRUE)
 # tmp$packages_used
 # tmp$packages_non_used
 # tmp$summary_functions_plot
+library(plyr) #for ddply
+library(dplyr)
+library(tidyr)
+library(forcats)
 library(ggplot2)
 library(patchwork) # to easily arrange plot
 #devtools::install_github("rensa/stickylabeller")
 library(stickylabeller) # to get a, b, c, or fancy names in facet_wrap
 library(plotly)
-library(plyr) #for ddply
-library(dplyr)
 library(lubridate) # for date time
 library(changepoint) #changepoint analysis
 library(ecp) #changepoints
@@ -69,6 +71,14 @@ library(matrixStats) # for sd per row - states of matrix in general
 
 # model library
 library(mgcv)
+
+# For cute fish icons
+library(fishualize)
+#Overview of all fish shapes available
+# fishapes()
+# ggplot() + add_fishape(family = "Salmonidae", 
+#                        option = "Oncorhynchus_nerka") +
+#   theme_void()
 
 # Captions with library captioner
 # https://community.rstudio.com/t/avoiding-repetitive-latex-codes-in-r-markdown/7834/12
@@ -4389,13 +4399,20 @@ indx <- 3:5
 changepoint_found_out[indx] <- lapply(changepoint_found_out[indx], function(x) as.numeric(as.character(x)))
 
 # Add for each changepoint the corresponding value
-smelt_tot_stats_mean$BasinYear <- paste(smelt_tot_stats_mean$Basin, smelt_tot_stats_mean$Year, collapse = "_")
-changepoint_found_out$BasinYear <- paste(changepoint_found_out$Basin, changepoint_found_out$Year, collapse = "_")
-data.frame(changepoint_found_out, 
-           Cpt1_value = 
-             smelt_tot_stats_mean[match(changepoint_found_out$BasinYear, smelt_tot_stats_mean$BasinYear), "value"])
-changepoint_found_out
+smelt_tot_stats_mean <- smelt_tot_stats_mean %>% unite("BasinVar", Basin, variable, Year, remove = FALSE, sep = "_")
+changepoint_found_out$BasinVar1 <- paste(changepoint_found_out$Basin, changepoint_found_out$variable, changepoint_found_out$Changepoint1, sep = "_")
+changepoint_found_out$BasinVar2 <- paste(changepoint_found_out$Basin, changepoint_found_out$variable, changepoint_found_out$Changepoint2, sep = "_")
+changepoint_found_out$BasinVar3 <- paste(changepoint_found_out$Basin, changepoint_found_out$variable, changepoint_found_out$Changepoint3, sep = "_")
+changepoint_found_out <- data.frame(changepoint_found_out, 
+                     
+           smelt_tot_stats_mean[match(changepoint_found_out$BasinVar1, smelt_tot_stats_mean$BasinVar), "value"],
+           
+             smelt_tot_stats_mean[match(changepoint_found_out$BasinVar2, smelt_tot_stats_mean$BasinVar), "value"],
+           
+             smelt_tot_stats_mean[match(changepoint_found_out$BasinVar3, smelt_tot_stats_mean$BasinVar), "value"])
+changepoint_found_out 
 
+colnames(changepoint_found_out)[(ncol(changepoint_found_out)-2):ncol(changepoint_found_out)] <- c("Cpt1", "Cpt2", "Cpt3")
 
 # Plot ####
 smelt_tot_stats$variable2 <- factor(smelt_tot_stats$variable2,
@@ -4404,12 +4421,18 @@ changepoint_found_out$variable2 <- factor(changepoint_found_out$variable2,
                                     levels = c("log(CPUE)" ,"average length (mm)" ,"average weight (g)" ,"average condition", "average age", "annual mortality (A)"))
 #library(tidyquant) # for moving average 
 ggplot(smelt_tot_stats, aes(Year, value)) +
-  geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint1)) +
-  geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint2)) +
+  geom_point(data = changepoint_found_out, 
+             mapping = aes(Changepoint1, Cpt1), 
+             col = "red", size = 10, pch = "|") +
+  geom_point(data = changepoint_found_out, 
+             mapping = aes(Changepoint2, Cpt2), 
+             col = "pink", size = 10, pch = "|") +
+  # geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint1)) +
+  # geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint2)) +
   geom_smooth(color="black") +
   #geom_ma(n=10,col="red", na.rm = TRUE) +
-  # geom_vline(xintercept = 2003, lty=2) +
-  geom_vline(xintercept = 2008, lty=2) +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_vline(xintercept = 2008, lty=1) +
   geom_point(aes(shape=Station), alpha=.5, show.legend = F) +
   scale_shape_manual(values=c(16,16,16,4,1)) +
   theme_bw() +
@@ -4420,15 +4443,89 @@ ggplot(smelt_tot_stats, aes(Year, value)) +
 #ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Final_figure_summary.png"), width = 6, height=8)
 
 
+# PCA on this smelt_tot_stats ####
+smelt_tot_stats_df <- 
+dcast(smelt_tot_stats, Station + Basin + Year ~ variable, value.var = "value", fun.aggregate = mean, na.rm = T)
+
+head(smelt_tot_stats_df)
+str(smelt_tot_stats_df) # make sure it's numeric
+
+# prepare datset for 
+smelt_tot_stats_df$logCPUE[smelt_tot_stats_df$logCPUE=="-Inf"] <- 0
+row.names(smelt_tot_stats_df) <- paste(smelt_tot_stats_df$Station, smelt_tot_stats_df$Basin, smelt_tot_stats_df$Year, sep="_") 
+smelt_tot_stats_df$Station <- smelt_tot_stats_df$Basin <- smelt_tot_stats_df$Year <- NULL
+head(smelt_tot_stats_df)
+
+df_pca <- prcomp(smelt_tot_stats_df[complete.cases(smelt_tot_stats_df), ], scale. = T,center = T )
+summary(df_pca)
+
+df_out <- as.data.frame(df_pca$x)
+df_out$Station <- sapply( strsplit(as.character(row.names(smelt_tot_stats_df[complete.cases(smelt_tot_stats_df), ])), "_"), "[[", 1 )
+df_out$Basin <- sapply( strsplit(as.character(row.names(smelt_tot_stats_df[complete.cases(smelt_tot_stats_df), ])), "_"), "[[", 2 )
+df_out$Year <- as.numeric(paste(sapply( strsplit(as.character(row.names(smelt_tot_stats_df[complete.cases(smelt_tot_stats_df), ])), "_"), "[[", 3 )))
+head(df_out)
+
+percentage <- round(df_pca$sdev / sum(df_pca$sdev) * 100, 2)
+percentage <- paste( colnames(df_out), "(", paste( as.character(percentage), "%", ")", sep="") )
 
 
+p1 <- 
+  ggplot(df_out,aes(x=PC1,y=PC2,color=Basin )) + 
+  geom_hline(yintercept = 0, lwd=.1) +
+  geom_vline(xintercept = 0, lwd=.1) +
+  geom_point() +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  xlab(percentage[1]) + ylab(percentage[2]) #+
+  #scale_color_manual(values=c("tomato", "orange", "black"))
 
+df_out_r <- as.data.frame(df_pca$rotation)
+df_out_r$feature <- row.names(df_out_r)
 
-dummy1 <- expand.grid(X = factor(c("A", "B")), Y = rnorm(10))
-dummy1$D <- rnorm(nrow(dummy1))
-dummy2 <- data.frame(X = c("A", "B"), Z = c(1, 0))
-ggplot(dummy1, aes(x = D, y = Y)) + geom_point() + facet_grid(~X) + 
-    geom_hline(data = dummy2, aes(yintercept = Z))
+df_out_r
+
+p2 <- 
+  ggplot(df_out_r,aes(x=PC1,y=PC2,label=feature)) + #,color=feature )) + 
+  geom_hline(yintercept = 0, lwd=.1) +
+  geom_vline(xintercept = 0, lwd=.1) +
+  geom_point() + 
+  theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  geom_text(size=3, nudge_y = .05) +
+  labs(x = percentage[1], y = percentage[2]) +
+  xlim(-0.5,0.7)
+
+df_out_mean <- df_out %>% group_by(Basin, Year) %>%
+  summarise(PC1 = mean(PC1),
+            PC2 = mean(PC2),
+            PC3 = mean(PC3),
+            PC4 = mean(PC4),
+            PC5 = mean(PC5))
+p3_PC1 <-
+  ggplot(df_out) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_vline(xintercept = 2008, lty=1) +
+  geom_point(df_out, mapping = aes(Year, PC1, color = Basin)) +
+  geom_line(df_out_mean, mapping = aes(Year, PC1, color = Basin)) +
+  labs(y = percentage[1]) + 
+  theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+
+p3_PC2 <-
+  ggplot(df_out) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 2003, lty=2) +
+  geom_vline(xintercept = 2008, lty=1) + 
+  geom_point(df_out, mapping = aes(Year, PC2, color = Basin), show.legend = F) +
+  geom_line(df_out_mean, mapping = aes(Year, PC2, color = Basin), show.legend = F) +
+  labs(y = percentage[2]) +
+    theme_bw() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+
+(p1 / p2 / p3_PC1 / p3_PC2)
+
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/PCA.png"), width = 5.5, height=8)
 
 ```
 
@@ -4486,6 +4583,67 @@ colnames(cisco2) <- c("Station","CPUE","Year")
 ggplot(cisco2, aes(Year,CPUE,col=Station)) + geom_point() + geom_line()
 ```
 <br> `r fig_cap("cisco CPUE", "CPUE (catch per 55 minutes trawl) of cisco collected, 1999-2014")`
+
+
+# Walleye
+
+*Data:* <br>
+- Data given by Bernie Pientka.
+
+Bernie recommended a few sources:  
+-	Overman, Nathanel C. 2000. Bioenergetics and Stable Isotope Analyses of Walleye in Lake Champlain. MS Thesis, Wildlife and Fisheries Biology, The University of Vermont, Burlington, Vermont. Under supervision of Donna Parrish. <br>
+-	Simonin, P.W., Rudstam, L.G., Parrish, D.L., Pientka, B., Sullivan, P.J., 2018. Piscivore Diet Shifts and Trophic Level Change after Alewife Establishment in Lake Champlain. Trans Am Fish Soc 147, 939–947. https://doi.org/10.1002/tafs.10080 <br>
+-	Labar G.W., Parrish, D.L., 1996. Bioenergetics Modeling for Lake Trout and other Top Predators in Lake Champlain, LCBP Technical Report #21 <br>
+-	Parker Stetter, S.L., Rudstam, L.G., Stritzel Thomson, J.L., Parrish, D.L., 2006. Hydroacoustic separation of rainbow smelt (Osmerus mordax) age groups in Lake Champlain. Fisheries Research 82, 176–185. https://doi.org/10.1016/j.fishres.2006.06.014 <br>
+-	Mitro, Matthew G. 1995. Estimation of Larval Walleye Production and the Potential for Starvation Mortality in Two Tributaries of Lake Champlain. MS Thesis, Wildlife and Fisheries Biology, The University of Vermont, Burlington, Vermont.<br>
+-	Frater, Benjamin J. 2002. Habitat Selection and Annual Survival of Juvenile Walleye in Malletts Bay, Lake Champlain, Vermont. MS Thesis, Wildlife and Fisheries Biology, The University of Vermont, Burlington, Vermont.<br>
+<br>
+Bernie explained the rotating sampling and management of walleye population. Shortly, there is a 3-years rotation among rivers with historical walleye fishing:<br>
+-	Winooski river (VT),<br>
+-	Poultney river (NY/VT),<br>
+-	Missisquoi river (VT),<br>
+-	(and Lamoille river, but not in the 3-years rotation because the natural reproduction is going well there.<br>
+In April, adults are sampled (electrofishing) and brought to the hatchery in Grand Isle. Eggs are sampled, fertilized, hatched, and raised for ~2.5 months, then released by July 4th in the river adults were sampled. Before that, individuals are marked. Fish are raised in ponds outside (Grand Isle hatchery), except for some experiments were fish were grown inside (but most of it takes place in the pond and that is where they got the highest survival).
+The objective is to give a little boost to the population once every 3 years. Naturally, walleye have some 4-years cycle, and intervention of VTDFW hopefully avoids having one cohort dominating the whole population.<br>
+During electrofishing, length, weight, and sex of individuals are collected, so the population structure can be characterized. Note that if I want to use these data, I should use male data, because females come and go, so sampling may not be representative of the population. As a matter of fact, there are often 4+ times more male walleye collected in the river than female. Also, it is not possible to calculate condition of female from these data because they may still have eggs.
+Note that walleye wounding by sea lamprey and skin disease are also reported. Sea lamprey wounding has been null in Missisquoi river for the past two sampling event.<br>
+__I could be able to estimate the biomass of walleye in the lake from the number of fish stocked and the proportion of fish recaptured that were stocked. Then calculate mortality using the different cohort strength (data every 3 years).__ <br>
+
+
+```{r read walleye data}
+# I pooled together the walleye data that were available per year
+walleye_bio <- read.delim(paste0(getpath4data(),"data_from_Bernie/Walleye_surveys_2004-2019.txt"))
+walleye_demo <- read.delim(paste0(getpath4data(),"data_from_Bernie/Walleye_age_structure.txt")) 
+
+# Transform to numeric / factor what needs be
+indx <- c(2,4:6,8)
+walleye_bio[indx] <- lapply(walleye_bio[indx], function(x) as.numeric(as.character(x)))
+walleye_bio$Year_f <- factor(walleye_bio$Year)
+walleye_bio$Age_f <- factor(walleye_bio$Age)
+
+indx <- c(2,4:6)
+walleye_demo[indx] <- lapply(walleye_demo[indx], function(x) as.numeric(as.character(x)))
+walleye_demo$Year_f <- factor(walleye_demo$Year)
+
+
+# Demographic not within original excel files for at least 2004 and 2007. Extract these from walleye bio
+# not working, go back to it 
+head(walleye_demo_2)
+str(walleye_bio)
+#walleye_demo_2 <- 
+walleye_bio %>% group_by(Year_f, Sex, Age_f) %>% 
+  drop_na(Age) %>% 
+  summarise(count = n(na.rm=T))
+
+walleye_bio$count <- 1
+walleye_demo2 <- walleye_bio %>% group_by(Year_f, Sex, Age) %>%
+  summarise(count = sum(count))
+
+ggplot(walleye_demo2, aes(Age, count)) +
+  facet_grid(Year_f~Sex) + 
+  geom_bar(stat="identity", position=position_dodge())
+
+```
 
 
 # Lake Trout
