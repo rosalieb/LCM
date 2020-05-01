@@ -68,6 +68,12 @@ library(concurve) # plot p-value and s-value, see recommandations in Chow and Sa
 library(psych) # for pairs-panels (scaterplot matrix)
 library(TTR) # for moving average 
 library(matrixStats) # for sd per row - states of matrix in general
+#devtools::install_github("vqv/ggbiplot")
+library(ggbiplot) # for biplot in PCA 
+# correlation matrix on ggplot2 
+#devtools::install_github("kassambara/ggcorrplot")
+library(ggcorrplot)
+library("PerformanceAnalytics") # for corplots with scatter plots
 
 # model library
 library(mgcv)
@@ -4350,6 +4356,9 @@ smelt_tot_stats <- smelt_tot_stats %>%
     variable == "A" ~ "annual mortality (A)"
   ))
 
+# Add as NA any instantanous mortality <.20
+smelt_tot_stats$value[smelt_tot_stats$variable == "A"][smelt_tot_stats$value[smelt_tot_stats$variable == "A"]<=0.2] <- NA
+
 # Do changepoints for all variable in final smelt figure: ####
 
 # Create 2nd summary data
@@ -4414,33 +4423,99 @@ changepoint_found_out
 
 colnames(changepoint_found_out)[(ncol(changepoint_found_out)-2):ncol(changepoint_found_out)] <- c("Cpt1", "Cpt2", "Cpt3")
 
+# do biplot variable to trim down the number of variables ####
+smelt_tot_stats_mean_corr <-
+dcast(smelt_tot_stats_mean, Basin + Year ~ variable2, value.var = "value", fun.aggregate = mean, na.rm = T)
+smelt_tot_stats_mean_corr[is.na(smelt_tot_stats_mean_corr)] <- NA
+smelt_tot_stats_mean_corr$`log(CPUE)`[smelt_tot_stats_mean_corr$`log(CPUE)`=="-Inf"] <- 0
+
+corr <- round(cor(smelt_tot_stats_mean_corr[,-c(1,2)], use="pairwise.complete.obs"), 2)
+cor.test(smelt_tot_stats_mean_corr[,6],smelt_tot_stats_mean_corr[,7], use="pairwise.complete.obs")
+head(corr[, 1:6])
+ggcorrplot(corr, hc.order = TRUE, outline.col = "white",
+           type = "lower",
+           ggtheme = ggplot2::theme_bw,
+   colors = c("#6D9EC1", "white", "#E46726"),
+   lab = TRUE)
+
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/correlation_plot.png"), width = 7, height=7)
+
+library("PerformanceAnalytics")
+#if(!R_U_KNITTING) pdf(paste0(getwd(),"/Output/Figures/9-Smelt/corplot.pdf"),width = 6, height = 6)
+if(!R_U_KNITTING) jpeg(paste0(getwd(),"/Output/Figures/9-Smelt/corplot.jpeg"), width = 700, height = 700, quality = 4000, bg = "white")
+chart.Correlation(smelt_tot_stats_mean_corr[,-c(1,2)], histogram=TRUE, pch=19)
+if(!R_U_KNITTING) dev.off()
+
+
+
 # Plot ####
+
+# Understand what are the trawls with matching bio data 
+summary(smelt_trawl$Trawl.No. %in% smelt$Sample.No. )
+357/(258+357) # data can be crossed in 58% of the cases
+smelt_trawl$match_bio_data <- smelt_trawl$Trawl.No. %in% smelt$Sample.No.
+
+smelt_tot_stats$StationYear <- paste(smelt_tot_stats$Station, smelt_tot_stats$Year, sep = "_")
+
+smelt_tot_stats <- merge(smelt_tot_stats, smelt_trawl[,c("StationYear", "match_bio_data")], by="StationYear")
+
+# head(smelt_trawl)
+# ggplot(smelt_trawl, aes(Year, log(CPUE))) +
+#   geom_point(smelt_trawl, mapping = aes(color = match_bio_data)) +
+#   facet_wrap(~ Basin) 
+
+
+# Plot with frequencies each age
+temp1 <- smelt %>% group_by(Basin2,Age) %>% tally %>% mutate(f = n/sum(n))
+p2 <- ggplot(temp1, aes(Age,f)) + 
+  geom_bar(stat = "identity",col="grey", fill="lightgray") +
+  geom_text(mapping = aes(Age,f, label=n),
+            nudge_y =c(rep(0.03, 10*2+1), -0.01, rep(0.03, 8)), size = 2.8) +
+  facet_wrap(~Basin2, ncol=3,
+              labeller = label_glue('({.l}) {Basin2}')) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_x_continuous(
+  labels = scales::number_format(accuracy = 1)
+  ) +
+  scale_y_continuous(
+    labels = scales::percent
+    ) +
+  labs(y = "Percentage", subtitle = "A")
+
 smelt_tot_stats$variable2 <- factor(smelt_tot_stats$variable2,
                                     levels = c("log(CPUE)" ,"average length (mm)" ,"average weight (g)" ,"average condition", "average age", "annual mortality (A)"))
 changepoint_found_out$variable2 <- factor(changepoint_found_out$variable2,
                                     levels = c("log(CPUE)" ,"average length (mm)" ,"average weight (g)" ,"average condition", "average age", "annual mortality (A)"))
 #library(tidyquant) # for moving average 
-ggplot(smelt_tot_stats, aes(Year, value)) +
-  geom_point(data = changepoint_found_out, 
-             mapping = aes(Changepoint1, Cpt1), 
-             col = "red", size = 10, pch = "|") +
-  geom_point(data = changepoint_found_out, 
-             mapping = aes(Changepoint2, Cpt2), 
-             col = "pink", size = 10, pch = "|") +
-  # geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint1)) +
-  # geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint2)) +
-  geom_smooth(color="black") +
-  #geom_ma(n=10,col="red", na.rm = TRUE) +
-  geom_vline(xintercept = 2003, lty=2) +
-  geom_vline(xintercept = 2008, lty=1) +
-  geom_point(aes(shape=Station), alpha=.5, show.legend = F) +
-  scale_shape_manual(values=c(16,16,16,4,1)) +
-  theme_bw() +
-  facet_grid(variable2~Basin, scales = "free_y") 
-  
+p1 <- 
+  ggplot(smelt_tot_stats[smelt_tot_stats$variable!="mean_w",], aes(Year, value, color = match_bio_data)) +
+  scale_color_manual(values=c("TRUE" = "black", "FALSE" = "#1A85FF")) +
+    geom_point(data = changepoint_found_out[changepoint_found_out$variable!="mean_w",], 
+               mapping = aes(Changepoint1, Cpt1), 
+               col = "red", size = 10, pch = "|") +
+    geom_point(data = changepoint_found_out[changepoint_found_out$variable!="mean_w",], 
+               mapping = aes(Changepoint2, Cpt2), 
+               col = "pink", size = 10, pch = "|") +
+    # geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint1)) +
+    # geom_vline(data = changepoint_found_out, mapping = aes(xintercept = Changepoint2)) +
+    geom_smooth(color="black") +
+    #geom_ma(n=10,col="red", na.rm = TRUE) +
+    geom_vline(xintercept = 2003, lty=2) +
+    geom_vline(xintercept = 2008, lty=1) +
+    geom_point(aes(shape=Station), alpha=.5, show.legend = F) +
+    scale_shape_manual(values=c(16,16,16,4,1)) +
+    theme_bw() +
+    facet_grid(variable2~Basin, scales = "free_y")+
+    labs(subtitle = "B") 
+  p1
 
+(p2/p1 + 
+  plot_layout(heights = c(1, 4.5)))
 
-#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Final_figure_summary.png"), width = 6, height=8)
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/Final_figure_summary.png"), width = 7, height=9.5)
+
 
 
 # PCA on this smelt_tot_stats ####
@@ -4476,8 +4551,8 @@ p1 <-
   geom_point() +
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
-  xlab(percentage[1]) + ylab(percentage[2]) #+
-  #scale_color_manual(values=c("tomato", "orange", "black"))
+  xlab(percentage[1]) + ylab(percentage[2]) +
+  scale_color_manual(values=c("#D41159", "#1A85FF", "#FFC20A"))
 
 df_out_r <- as.data.frame(df_pca$rotation)
 df_out_r$feature <- row.names(df_out_r)
@@ -4493,7 +4568,8 @@ p2 <-
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
   geom_text(size=3, nudge_y = .05) +
   labs(x = percentage[1], y = percentage[2]) +
-  xlim(-0.5,0.7)
+  xlim(-0.5,0.7) +
+  scale_color_manual(values=c("#D41159", "#1A85FF", "#FFC20A"))
 
 df_out_mean <- df_out %>% group_by(Basin, Year) %>%
   summarise(PC1 = mean(PC1),
@@ -4506,11 +4582,12 @@ p3_PC1 <-
   geom_hline(yintercept = 0) +
   geom_vline(xintercept = 2003, lty=2) +
   geom_vline(xintercept = 2008, lty=1) +
-  geom_point(df_out, mapping = aes(Year, PC1, color = Basin)) +
-  geom_line(df_out_mean, mapping = aes(Year, PC1, color = Basin)) +
-  labs(y = percentage[1]) + 
+  geom_point(df_out, mapping = aes(Year, PC1, color = Basin), show.legend = F) +
+  geom_line(df_out_mean, mapping = aes(Year, PC1, color = Basin), show.legend = F) +
+  labs(y = "PC1") + 
   theme_bw() + 
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())  +
+  scale_color_manual(values=c("#D41159", "#1A85FF", "#FFC20A"))
 
 p3_PC2 <-
   ggplot(df_out) +
@@ -4519,13 +4596,23 @@ p3_PC2 <-
   geom_vline(xintercept = 2008, lty=1) + 
   geom_point(df_out, mapping = aes(Year, PC2, color = Basin), show.legend = F) +
   geom_line(df_out_mean, mapping = aes(Year, PC2, color = Basin), show.legend = F) +
-  labs(y = percentage[2]) +
+  labs(y = "PC2") +
     theme_bw() + 
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())  +
+  scale_color_manual(values=c("#D41159", "#1A85FF", "#FFC20A"))
 
-(p1 / p2 / p3_PC1 / p3_PC2)
+# biplot
+g <- ggbiplot(df_pca, obs.scale=1, var.scale=1, groups=df_out$Basin, ellipse=TRUE, circle=TRUE) +
+  scale_color_manual(values=c("#D41159", "#1A85FF", "#FFC20A"), name = "Basin")  +
+    theme_bw()
+
+
+(p1 + labs(subtitle = 'A')) / (p2  + labs(subtitle = 'B')) / (p3_PC1 + labs(subtitle = 'C')) / (p3_PC2 + labs(subtitle = 'D'))
 
 #ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/PCA.png"), width = 5.5, height=8)
+
+(g + labs(subtitle = 'A')) / ((p3_PC1 + labs(subtitle = 'B')) / (p3_PC2 + labs(subtitle = 'C')))
+#ggsave(paste0(getwd(),"/Output/Figures/9-Smelt/PCA2.png"), width = 5.5, height=8)
 
 ```
 
